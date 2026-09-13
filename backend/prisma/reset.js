@@ -24,7 +24,6 @@ async function main() {
     ['emergencyControl',       () => prisma.emergencyControl.deleteMany()],
     ['fraudAlert',             () => prisma.fraudAlert.deleteMany()],
     ['screenshotLog',          () => prisma.screenshotLog.deleteMany()],
-    ['selfieVerification',     () => prisma.selfieVerification.deleteMany()],
     ['scanAttempt',            () => prisma.scanAttempt.deleteMany()],
     ['breakRecord',            () => prisma.breakRecord.deleteMany()],
     ['attendanceRecord',       () => prisma.attendanceRecord.deleteMany()],

@@ -5,8 +5,8 @@
   "main": "src/server.js",
   "scripts": {
     "dev": "nodemon src/server.js",
-    "build": "prisma generate",
-    "start": "npx prisma migrate deploy && node src/server.js",
+    "build": "node scripts/clear-failed-migrations.js && prisma generate && npx prisma migrate deploy",
+    "start": "node scripts/clear-failed-migrations.js && npx prisma migrate deploy && node src/server.js",
     "deploy": "npm start",
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate dev",

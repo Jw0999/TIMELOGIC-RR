@@ -17,7 +17,6 @@ async function main() {
     'emergencyControl',
     'fraudAlert',
     'screenshotLog',
-    'selfieVerification',
     'scanAttempt',
     'breakRecord',
     'attendanceRecord',
