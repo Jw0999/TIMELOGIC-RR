@@ -39,11 +39,20 @@ function createApp() {
     // the Electron desktop app (file:// sends Origin "null"). Auth is a Bearer
     // JWT (not cookies), so permitting null-origin native apps is safe here.
     origin: (origin, cb) => {
-      if (!origin || origin === 'null' || env.isAllowedFrontendOrigin(origin)) return cb(null, true);
+      if (!origin || origin === 'null' || origin.startsWith('file:') || env.isAllowedFrontendOrigin(origin)) return cb(null, true);
       return cb(null, false);
     },
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Cache-Control', 'Pragma', 'X-Requested-With'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'Accept',
+      'Cache-Control',
+      'Pragma',
+      'X-Requested-With',
+      'X-Organization-Id',
+      'x-organization-id',
+    ],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   }));
   app.use(compression());

@@ -71,21 +71,33 @@ export async function authenticatedFetch(url: string, init: RequestInit = {}): P
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 async function request<T>(method: Method, path: string, body?: unknown, allowRefresh = true): Promise<T> {
-  let res: Response;
-  try {
-    res = await fetch(`${API_URL}${path}`, {
+  const reqHeaders = {
+    'Content-Type': 'application/json',
+    'Cache-Control': 'no-cache',
+    Pragma: 'no-cache',
+    ...(_token ? { Authorization: `Bearer ${_token}` } : {}),
+    ...(_activeOrgId ? { 'X-Organization-Id': _activeOrgId } : {}),
+  };
+
+  const doFetch = () =>
+    fetch(`${API_URL}${path}`, {
       method,
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache',
-        Pragma: 'no-cache',
-        ...(_token ? { Authorization: `Bearer ${_token}` } : {}),
-        ...(_activeOrgId ? { 'X-Organization-Id': _activeOrgId } : {}),
-      },
+      headers: reqHeaders,
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     });
-  } catch {
-    throw new Error(`Cannot reach the TimeLogic backend at ${API_URL}. Check your connection and try again.`);
+
+  let res: Response;
+  try {
+    res = await doFetch();
+  } catch (initialErr) {
+    // Render free-tier cold starts can drop or delay initial connections; retry once after 2s
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      res = await doFetch();
+    } catch (retryErr) {
+      console.error('[API Connection Error]', initialErr, retryErr);
+      throw new Error(`Cannot reach the TimeLogic backend at ${API_URL}. The server may be waking up from sleep, or check your connection.`);
+    }
   }
 
   const data = await res.json().catch(() => null);

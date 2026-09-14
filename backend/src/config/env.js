@@ -54,6 +54,9 @@ const isAllowedFrontendOrigin = (origin) => {
   try { parsed = new URL(origin); } catch { return false; }
   if (parsed.hostname.endsWith('.pages.dev') || parsed.hostname === 'pages.dev') return true;
   if (parsed.hostname.endsWith('.onrender.com')) return true;
+  if (isPrivateHost(parsed.hostname) && LOCAL_FRONTEND_PORTS.has(parsed.port || (parsed.protocol === 'https:' ? '443' : '80'))) {
+    return true;
+  }
   if (isProduction) return false;
   return ['http:', 'https:'].includes(parsed.protocol)
     && isPrivateHost(parsed.hostname)
