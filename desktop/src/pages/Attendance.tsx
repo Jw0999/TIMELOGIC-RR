@@ -73,6 +73,18 @@ export default function Attendance() {
     }
   };
 
+  const fmtDate = (d: string | null, timezone?: string | null) => {
+    if (!d) return '—';
+    try {
+      return new Date(d).toLocaleDateString('en-GB', {
+        day: '2-digit', month: 'short', year: 'numeric',
+        timeZone: timezone || organizationTimezone || 'Africa/Lagos',
+      });
+    } catch {
+      return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+  };
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <Header title="Attendance Records" subtitle="Live server attendance" action={(
@@ -84,7 +96,7 @@ export default function Attendance() {
         {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
         {!loading && !error && records.length > 0 && <p className="mb-3 text-xs font-semibold text-emerald-700">{view === 'today' ? `${records.length} live attendance record${records.length === 1 ? '' : 's'} from the server` : view === 'all' ? `${records.length} retained attendance record${records.length === 1 ? '' : 's'} from all past dates` : `${records.length} attendance record${records.length === 1 ? '' : 's'} for ${pastDate}`}</p>}
         <div className="flex items-center gap-2 mb-4">
-          {(['today', 'past', 'all'] as const).map((option) => <button key={option} onClick={() => setView(option)} className={`text-xs font-semibold px-3 py-2 rounded-xl ${view === option ? 'bg-primary-700 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}>{option === 'today' ? 'Today' : option === 'past' ? 'Past Date' : 'All History'}</button>)}
+          {(['today', 'past', 'all'] as const).map((option) => <button key={option} onClick={() => setView(option)} className={`text-xs font-semibold px-3 py-2 rounded-xl transition ${view === option ? 'bg-primary-700 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}>{option === 'today' ? 'Today' : option === 'past' ? 'Past Date' : 'All History'}</button>)}
           {view === 'past' && <input type="date" value={pastDate} onChange={(e) => setPastDate(e.target.value)} className="border border-slate-200 rounded-xl px-3 py-2 text-sm" />}
         </div>
         <div className="flex items-center gap-3 mb-5">
@@ -98,37 +110,40 @@ export default function Attendance() {
         </div>
         {loading ? <Spinner /> : (
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-            <table className="w-full text-sm">
-              <thead><tr className="bg-slate-50 border-b border-slate-100">
-                <th className="text-left text-xs font-semibold text-slate-500 px-5 py-3">Employee</th>
-                <th className="text-left text-xs font-semibold text-slate-500 px-4 py-3">Clock In</th>
-                <th className="text-left text-xs font-semibold text-slate-500 px-4 py-3">Clock Out</th>
-                <th className="text-left text-xs font-semibold text-slate-500 px-4 py-3">Status</th>
-                <th className="text-left text-xs font-semibold text-slate-500 px-4 py-3">Penalty</th>
-                <th className="text-left text-xs font-semibold text-slate-500 px-4 py-3">Source / Verification</th>
-                <th className="text-left text-xs font-semibold text-slate-500 px-4 py-3">Actions</th>
-              </tr></thead>
-              <tbody className="divide-y divide-slate-50">
-                {filtered.map((r: any) => {
-                  const checkInSource = r.checkInSource ?? r.source ?? r.attendanceSource ?? r.entryMethod ?? 'PHONE';
-                  const checkOutSource = r.checkOutSource ?? null;
-                  const checkInRecorder = recorderName(r.checkInRecorder ?? r.recordedBy ?? r.checkedInBy);
-                  const checkOutRecorder = recorderName(r.checkOutRecorder ?? r.checkedOutBy);
-                  const timezone = r.session?.office?.timezone ?? null;
-                  return <tr key={r.id} className={`hover:bg-slate-50 transition ${r.flagged ? 'bg-orange-50' : ''}`}>
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
-                          <span className="text-xs font-bold text-primary-700">{r.employee?.firstName?.[0]}{r.employee?.lastName?.[0]}</span>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead><tr className="bg-slate-50 border-b border-slate-100">
+                  <th className="text-left text-xs font-semibold text-slate-500 px-5 py-3">Employee</th>
+                  <th className="text-left text-xs font-semibold text-slate-500 px-4 py-3">Date</th>
+                  <th className="text-left text-xs font-semibold text-slate-500 px-4 py-3">Clock In</th>
+                  <th className="text-left text-xs font-semibold text-slate-500 px-4 py-3">Clock Out</th>
+                  <th className="text-left text-xs font-semibold text-slate-500 px-4 py-3">Status</th>
+                  <th className="text-left text-xs font-semibold text-slate-500 px-4 py-3">Penalty</th>
+                  <th className="text-left text-xs font-semibold text-slate-500 px-4 py-3">Source / Verification</th>
+                  <th className="text-left text-xs font-semibold text-slate-500 px-4 py-3">Actions</th>
+                </tr></thead>
+                <tbody className="divide-y divide-slate-50">
+                  {filtered.map((r: any) => {
+                    const checkInSource = r.checkInSource ?? r.source ?? r.attendanceSource ?? r.entryMethod ?? 'PHONE';
+                    const checkOutSource = r.checkOutSource ?? null;
+                    const checkInRecorder = recorderName(r.checkInRecorder ?? r.recordedBy ?? r.checkedInBy);
+                    const checkOutRecorder = recorderName(r.checkOutRecorder ?? r.checkedOutBy);
+                    const timezone = r.session?.office?.timezone ?? null;
+                    return <tr key={r.id} className={`hover:bg-slate-50 transition ${r.flagged ? 'bg-orange-50' : ''}`}>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
+                            <span className="text-xs font-bold text-primary-700">{r.employee?.firstName?.[0]}{r.employee?.lastName?.[0]}</span>
+                          </div>
+                          <div>
+                            <p className="font-semibold text-slate-800">{r.employee?.firstName} {r.employee?.lastName}</p>
+                            <p className="text-xs text-slate-400">{r.employee?.employeeCode}</p>
+                          </div>
+                          {r.flagged && <AlertTriangle size={13} className="text-orange-500" />}
                         </div>
-                        <div>
-                          <p className="font-semibold text-slate-800">{r.employee?.firstName} {r.employee?.lastName}</p>
-                          <p className="text-xs text-slate-400">{r.employee?.employeeCode}</p>
-                        </div>
-                        {r.flagged && <AlertTriangle size={13} className="text-orange-500" />}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 font-medium text-slate-800">{fmt(r.clockInTime, timezone)}</td>
+                      </td>
+                      <td className="px-4 py-3 text-xs font-medium text-slate-700 whitespace-nowrap">{fmtDate(r.date, timezone)}</td>
+                      <td className="px-4 py-3 font-medium text-slate-800">{fmt(r.clockInTime, timezone)}</td>
                     <td className="px-4 py-3 font-medium text-slate-800">{fmt(r.clockOutTime, timezone)}</td>
                     <td className="px-4 py-3">
                       <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLE[r.status] ?? 'bg-slate-100 text-slate-500'}`}>{r.status?.replace('_', ' ')}</span>
@@ -175,7 +190,8 @@ export default function Attendance() {
                   </tr>;
                 })}
               </tbody>
-            </table>
+              </table>
+            </div>
             {filtered.length === 0 && <div className="text-center py-12 text-slate-400 text-sm">No records found</div>}
           </div>
         )}

@@ -71,3 +71,10 @@ This document persists the architectural state, infrastructure endpoints, and cr
 4. **Offline Backups (`backups/`)**:
    - `timelogic_production_backup_latest.json` (230 KB) contains the complete snapshot of all organizations, users, hashed credentials, attendance logs, and student rosters.
    - Restoration script: `backend/scripts/restore-to-new-database.js`.
+5. **Super Admin Organization Scoping & `X-Organization-Id`**:
+   - Super Admin accounts (`platform-org`) can manage any client organization via `X-Organization-Id` request header or `orgId` query param.
+   - Backend controllers (`attendance`, `breaks`, `students`, `admin`, `sessions`, `reports`) gracefully resolve target client organizations (or all records) when accessed by Super Admin.
+6. **Desktop Client View Modes**:
+   - **Breaks**: Supports `All History` (`/breaks/daily?all=true`), `Today`, and `Past Date` with clear Date formatting.
+   - **Attendance**: Displays clear `Date` column for all past records across history without date cutoff.
+   - **Students**: Displays roster (12 students) and historical attendance (48 records) for both Super Admin and Org Admins.

@@ -1,10 +1,12 @@
 import { API_URL } from '../config';
 
-// ─── Token store — kept in memory AND persisted to localStorage ──────────────
+// ── Token store — kept in memory AND persisted to localStorage ──────────────
 let _token: string | null = null;
+let _activeOrgId: string | null = null;
 
 // Restore from localStorage on module load (page refresh / Electron restart)
 try { _token = localStorage.getItem('accessToken'); } catch { _token = null; }
+try { _activeOrgId = localStorage.getItem('activeOrgId'); } catch { _activeOrgId = null; }
 
 export function setToken(t: string | null) {
   _token = t;
@@ -15,6 +17,16 @@ export function setToken(t: string | null) {
 }
 
 export function getToken() { return _token; }
+
+export function setActiveOrgId(id: string | null) {
+  _activeOrgId = id;
+  try {
+    if (id) localStorage.setItem('activeOrgId', id);
+    else   localStorage.removeItem('activeOrgId');
+  } catch { /* localStorage unavailable */ }
+}
+
+export function getActiveOrgId() { return _activeOrgId; }
 
 let refreshPromise: Promise<boolean> | null = null;
 
@@ -47,6 +59,7 @@ export async function authenticatedFetch(url: string, init: RequestInit = {}): P
     headers: {
       ...(init.headers || {}),
       ...(_token ? { Authorization: `Bearer ${_token}` } : {}),
+      ...(_activeOrgId ? { 'X-Organization-Id': _activeOrgId } : {}),
     },
   });
   let res = await send();
@@ -67,6 +80,7 @@ async function request<T>(method: Method, path: string, body?: unknown, allowRef
         'Cache-Control': 'no-cache',
         Pragma: 'no-cache',
         ...(_token ? { Authorization: `Bearer ${_token}` } : {}),
+        ...(_activeOrgId ? { 'X-Organization-Id': _activeOrgId } : {}),
       },
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     });

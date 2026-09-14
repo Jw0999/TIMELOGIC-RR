@@ -151,7 +151,7 @@ const getHistory = async (req, res, next) => {
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 30));
 
-    if (req.params.employeeId) {
+    if (req.params?.employeeId) {
       // Admin requesting a specific employee's history
       const target = await prisma.user.findFirst({
         where: { id: req.params.employeeId, orgId: req.user.orgId, role: 'EMPLOYEE' }, select: { id: true },
@@ -164,11 +164,16 @@ const getHistory = async (req, res, next) => {
     // Admin requesting ALL employees' attendance for their org
     if (req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN') {
       const skip = (page - 1) * limit;
+      const targetOrgId = req.headers['x-organization-id'] || req.query.orgId || (req.user.orgId !== 'platform-org' ? req.user.orgId : null);
+      const employeeFilter = targetOrgId ? { employee: { orgId: targetOrgId } } : {};
+
+      const dateFilter = req.query.endDate
+        ? { date: { gte: new Date(`${startDate}T00:00:00.000Z`), lte: new Date(`${req.query.endDate}T23:59:59.999Z`) } }
+        : { date: { gte: new Date(`${startDate}T00:00:00.000Z`) } };
+
       const where = {
-        employee: { orgId: req.user.orgId },
-        // AttendanceRecord.date is a calendar date, not a timestamp. Compare
-        // the requested local date keys directly to avoid timezone shifts.
-        date: { gte: new Date(`${startDate}T00:00:00.000Z`), lte: new Date(`${endDate}T00:00:00.000Z`) },
+        ...employeeFilter,
+        ...dateFilter,
       };
       const [records, total] = await Promise.all([
         prisma.attendanceRecord.findMany({
@@ -179,7 +184,7 @@ const getHistory = async (req, res, next) => {
             checkInRecorder: { select: { id: true, firstName: true, lastName: true, email: true } },
             checkOutRecorder: { select: { id: true, firstName: true, lastName: true, email: true } },
           },
-          orderBy: { date: 'desc' },
+          orderBy: [{ date: 'desc' }, { clockInTime: 'desc' }],
         }),
         prisma.attendanceRecord.count({ where }),
       ]);
@@ -200,14 +205,16 @@ const getMonthlyPenalties = async (req, res, next) => {
     const start = new Date(Date.UTC(year, monthNumber - 1, 1));
     const end = new Date(Date.UTC(year, monthNumber, 1));
     const daysInMonth = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+    const targetOrgId = req.headers['x-organization-id'] || req.query.orgId || (req.user.orgId !== 'platform-org' ? req.user.orgId : null);
+    const orgWhere = targetOrgId ? { orgId: targetOrgId } : (req.user.orgId !== 'platform-org' ? { orgId: req.user.orgId } : {});
     const employees = await prisma.user.findMany({
-      where: { orgId: req.user.orgId, role: 'EMPLOYEE', status: { not: 'TERMINATED' } },
+      where: { ...orgWhere, role: 'EMPLOYEE', status: { not: 'TERMINATED' } },
       select: { id: true, firstName: true, lastName: true, employeeCode: true, department: { select: { name: true } } },
       orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
     });
     const penalties = await prisma.attendanceRecord.groupBy({
       by: ['employeeId'],
-      where: { employee: { orgId: req.user.orgId, role: 'EMPLOYEE' }, date: { gte: start, lt: end } },
+      where: { ...(targetOrgId ? { employee: { orgId: targetOrgId } } : {}), date: { gte: start, lt: end } },
       _sum: { penalty: true }, _count: { _all: true },
     });
     const totals = new Map(penalties.map((row) => [row.employeeId, row]));
@@ -228,14 +235,15 @@ const flagRecord = async (req, res, next) => {
 const getLiveAttendance = async (req, res, next) => {
   try {
     const now = await getCurrentServerTime();
-    const organization = await prisma.organization.findUnique({ where: { id: req.user.orgId }, select: { timezone: true } });
+    const targetOrgId = req.headers['x-organization-id'] || req.query.orgId || (req.user.orgId !== 'platform-org' ? req.user.orgId : null);
+    const organization = await prisma.organization.findUnique({ where: { id: targetOrgId || req.user.orgId }, select: { timezone: true } });
     const today = new Date(`${dateKey(now, organization?.timezone || 'Africa/Lagos')}T00:00:00.000Z`);
     const records = await prisma.attendanceRecord.findMany({
       where: {
-        employee: { orgId: req.user.orgId },
+        ...(targetOrgId ? { employee: { orgId: targetOrgId } } : {}),
         OR: [
           { date: today },
-          { session: { status: 'ACTIVE', office: { orgId: req.user.orgId } } },
+          { session: { status: 'ACTIVE', ...(targetOrgId ? { office: { orgId: targetOrgId } } : {}) } },
         ],
       },
       include: {

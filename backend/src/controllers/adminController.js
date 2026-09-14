@@ -6,10 +6,26 @@ const EmployeePolicy = require('../services/EmployeePolicyService');
 
 // ── Organization / Office / Department ────────────────────────────────────────
 
+const resolveAdminOrgId = async (req) => {
+  const headerOrgId = req.headers['x-organization-id'];
+  if (headerOrgId) return headerOrgId;
+  if (req.query.orgId) return req.query.orgId;
+  if (req.user.role === 'SUPER_ADMIN' && req.user.orgId === 'platform-org') {
+    const orgWithUsers = await prisma.organization.findFirst({
+      where: { id: { not: 'platform-org' } },
+      orderBy: { users: { _count: 'desc' } },
+      select: { id: true },
+    });
+    if (orgWithUsers) return orgWithUsers.id;
+  }
+  return req.user.orgId;
+};
+
 const getOrg = async (req, res, next) => {
   try {
+    const targetOrgId = await resolveAdminOrgId(req);
     const org = await prisma.organization.findUnique({
-      where: { id: req.user.orgId },
+      where: { id: targetOrgId },
       include: {
         offices: { orderBy: { createdAt: 'asc' }, include: { securitySettings: true, _count: { select: { sessions: true } } } },
         departments: { include: { _count: { select: { employees: true } } } },
@@ -23,8 +39,9 @@ const getOrg = async (req, res, next) => {
 const updateOrg = async (req, res, next) => {
   try {
     const { name, industry, subscriptionTier } = req.body;
+    const targetOrgId = await resolveAdminOrgId(req);
     const org = await prisma.organization.update({
-      where: { id: req.user.orgId },
+      where: { id: targetOrgId },
       data: { name, industry, subscriptionTier },
     });
     res.json({ success: true, data: org });
@@ -34,8 +51,9 @@ const updateOrg = async (req, res, next) => {
 const createOffice = async (req, res, next) => {
   try {
     const { name, address, timezone } = req.body;
+    const targetOrgId = await resolveAdminOrgId(req);
     const office = await prisma.office.create({
-      data: { id: uuidv4(), orgId: req.user.orgId, name, address, timezone },
+      data: { id: uuidv4(), orgId: targetOrgId, name, address, timezone },
     });
     await prisma.securitySettings.create({
       data: { id: uuidv4(), officeId: office.id, updatedBy: req.user.id },
@@ -47,14 +65,15 @@ const createOffice = async (req, res, next) => {
 const createDepartment = async (req, res, next) => {
   try {
     const { name, managerId } = req.body;
+    const targetOrgId = await resolveAdminOrgId(req);
     if (managerId) {
       const manager = await prisma.user.findFirst({
-        where: { id: managerId, orgId: req.user.orgId }, select: { id: true },
+        where: { id: managerId, orgId: targetOrgId }, select: { id: true },
       });
       if (!manager) return res.status(400).json({ success: false, message: 'Manager does not belong to your organization.' });
     }
     const dept = await prisma.department.create({
-      data: { id: uuidv4(), orgId: req.user.orgId, name, managerId },
+      data: { id: uuidv4(), orgId: targetOrgId, name, managerId },
     });
     res.status(201).json({ success: true, data: dept });
   } catch (err) { next(err); }
@@ -66,8 +85,9 @@ const listUsers = async (req, res, next) => {
   try {
     const { role, status, departmentId, page = 1, limit = 20, search } = req.query;
     const skip = (+page - 1) * +limit;
+    const targetOrgId = await resolveAdminOrgId(req);
     const where = {
-      orgId: req.user.orgId,
+      ...(targetOrgId ? { orgId: targetOrgId } : {}),
       // Admins never see TERMINATED employees — only Super Admin can via /api/super routes
       status: { not: 'TERMINATED' },
       ...(role && { role }),
@@ -460,21 +480,24 @@ const resetDevice = async (req, res, next) => {
 
 const getManualAttendance = async (req, res, next) => {
   try {
-    const data = await AttendanceService.getManualDashboard(req.user.orgId, req.query);
+    const targetOrgId = await resolveAdminOrgId(req);
+    const data = await AttendanceService.getManualDashboard(targetOrgId, req.query);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 };
 
 const manualCheckIn = async (req, res, next) => {
   try {
-    const data = await AttendanceService.manualCheckIn(req.user.id, req.user.orgId, req.body);
+    const targetOrgId = await resolveAdminOrgId(req);
+    const data = await AttendanceService.manualCheckIn(req.user.id, targetOrgId, req.body);
     res.status(201).json({ success: true, data });
   } catch (err) { next(err); }
 };
 
 const manualCheckOut = async (req, res, next) => {
   try {
-    const data = await AttendanceService.manualCheckOut(req.user.id, req.user.orgId, req.body);
+    const targetOrgId = await resolveAdminOrgId(req);
+    const data = await AttendanceService.manualCheckOut(req.user.id, targetOrgId, req.body);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 };

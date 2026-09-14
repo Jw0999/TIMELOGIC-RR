@@ -155,7 +155,9 @@ const exportCSV = async (req, res, next) => {
 const liveStats = async (req, res, next) => {
   try {
     const now = await getCurrentServerTime();
-    const stats = await ReportService.getDashboardLiveStats(req.user.orgId, now);
+    const targetOrgId = req.headers['x-organization-id'] || req.query.orgId || (req.user.orgId !== 'platform-org' ? req.user.orgId : null);
+    const orgId = targetOrgId || req.user.orgId;
+    const stats = await ReportService.getDashboardLiveStats(orgId, now);
     stats.serverTime = now.toISOString();
     res.json({ success: true, data: stats });
   } catch (err) { next(err); }

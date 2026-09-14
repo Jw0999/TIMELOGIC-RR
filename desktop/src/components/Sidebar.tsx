@@ -28,7 +28,8 @@ const NAV: { to: string; label: string; icon: LucideIcon; capability?: Capabilit
 export default function Sidebar() {
   const { user, organization, logout } = useAuth();
   const navigate = useNavigate();
-  const visibleNav = NAV.filter((item) => !item.capability || Boolean(organization?.[item.capability]));
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+  const visibleNav = NAV.filter((item) => isSuperAdmin || !item.capability || Boolean(organization?.[item.capability]));
   return (
     <aside className="w-60 min-h-screen bg-primary-900 dark:bg-slate-950 flex flex-col flex-shrink-0 transition-colors">
       <div className="px-5 py-6 border-b border-primary-800 dark:border-slate-800">

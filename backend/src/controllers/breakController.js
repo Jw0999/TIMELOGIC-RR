@@ -55,7 +55,7 @@ const getDailyBreaks = async (req, res, next) => {
   try {
     const { date } = req.query;
 
-    if (req.params.employeeId) {
+    if (req.params?.employeeId) {
       const employee = await prisma.user.findFirst({
         where: { id: req.params.employeeId, orgId: req.user.orgId, role: 'EMPLOYEE' }, select: { id: true },
       });
@@ -65,24 +65,32 @@ const getDailyBreaks = async (req, res, next) => {
       return res.json({ success: true, data: BreakService.withLifecycleStatus(records) });
     }
 
-    // Admin requesting all employees' breaks for today → scope to their org
+    // Admin requesting breaks → scope to their org (or selected org / all orgs for SUPER_ADMIN)
     if (req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN') {
-      const organization = await prisma.organization.findUnique({
-        where: { id: req.user.orgId }, select: { timezone: true },
-      });
-      const requested = date && /^\d{4}-\d{2}-\d{2}$/.test(String(date))
-        ? new Date(`${date}T12:00:00.000Z`)
-        : date ? new Date(date) : new Date();
-      const bounds = dayBounds(requested, organization?.timezone || 'Africa/Lagos');
+      const targetOrgId = req.headers['x-organization-id'] || req.query.orgId || (req.user.orgId !== 'platform-org' ? req.user.orgId : null);
+      const orgFilter = targetOrgId ? { employee: { orgId: targetOrgId } } : {};
+
+      const isAll = date === 'all' || req.query.all === 'true' || date === '*';
+      let dateFilter = {};
+      if (!isAll) {
+        const organization = await prisma.organization.findUnique({
+          where: { id: targetOrgId || req.user.orgId }, select: { timezone: true },
+        });
+        const requested = date && /^\d{4}-\d{2}-\d{2}$/.test(String(date))
+          ? new Date(`${date}T12:00:00.000Z`)
+          : date ? new Date(date) : new Date();
+        const bounds = dayBounds(requested, organization?.timezone || 'Africa/Lagos');
+        dateFilter = { startTime: { gte: bounds.start, lt: bounds.end } };
+      }
 
       const records = await prisma.breakRecord.findMany({
-        where: { employee: { orgId: req.user.orgId }, startTime: { gte: bounds.start, lt: bounds.end } },
+        where: { ...orgFilter, ...dateFilter },
         include: {
           employee: {
             select: {
               id: true, firstName: true, lastName: true,
               employeeCode: true,
-              organization: { select: { timezone: true } },
+              organization: { select: { timezone: true, name: true } },
               department: { select: { name: true, breakPolicy: true } },
             },
           },

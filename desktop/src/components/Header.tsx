@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, Sun, Moon, Monitor, X } from 'lucide-react';
+import { Bell, Sun, Moon, Monitor, X, Building2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme, Theme } from '../context/ThemeContext';
 import { api } from '../services/api';
@@ -7,7 +7,7 @@ import { api } from '../services/api';
 interface Props { title: string; subtitle?: string; action?: React.ReactNode }
 
 export default function Header({ title, subtitle, action }: Props) {
-  const { user } = useAuth();
+  const { user, organization, organizations, switchOrganization } = useAuth();
   const { theme, setTheme } = useTheme();
   const [showTheme, setShowTheme] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
@@ -43,6 +43,23 @@ export default function Header({ title, subtitle, action }: Props) {
         {subtitle && <p className="text-sm text-[var(--text-muted)] mt-0.5">{subtitle}</p>}
       </div>
       <div className="flex items-center gap-3">
+        {user?.role === 'SUPER_ADMIN' && organizations?.length > 0 && (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[var(--border)] bg-[var(--card-bg)] shadow-sm">
+            <Building2 size={15} className="text-primary-600 shrink-0" />
+            <select
+              value={organization?.id || ''}
+              onChange={(e) => switchOrganization(e.target.value)}
+              className="bg-transparent text-xs font-semibold text-[var(--text-main)] focus:outline-none cursor-pointer"
+            >
+              {organizations.filter((o: any) => o.id !== 'platform-org').map((o: any) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {action}
 
         {/* Theme */}

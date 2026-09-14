@@ -68,8 +68,8 @@ const forceRefreshQR = async (req, res, next) => {
 const getActiveSessions = async (req, res, next) => {
   try {
     const { officeId } = req.query;
-    // Always scope sessions to the admin's org — critical for multi-tenant isolation
-    const sessions = await SessionService.getActiveSessions(officeId, req.user.orgId);
+    const targetOrgId = req.headers['x-organization-id'] || req.query.orgId || (req.user.orgId !== 'platform-org' ? req.user.orgId : null);
+    const sessions = await SessionService.getActiveSessions(officeId, targetOrgId);
     res.json({ success: true, data: sessions });
   } catch (err) { next(err); }
 };
