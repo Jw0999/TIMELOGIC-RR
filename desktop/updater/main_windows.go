@@ -1,3 +1,5 @@
+//go:build windows
+
 package main
 
 import (
@@ -163,7 +165,10 @@ func main() {
 	showMessage(
 		"TimeLogic Admin — Update Complete",
 		"✓ TimeLogic Admin has been successfully updated to v1.0.17!\n\n"+
-			"The application is now connected to the new production server:\n"+
+			"• Strict department break windows enforced\n"+
+			"• Overdue breaks auto-closed\n"+
+			"• Student check-ins and fraud alerts fixed\n\n"+
+			"The application is now connected to the production server:\n"+
 			"https://timelogic-backend.onrender.com\n\n"+
 			"You can now log in normally.",
 		MB_ICONINFO,

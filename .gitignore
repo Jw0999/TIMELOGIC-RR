@@ -14,6 +14,7 @@
 **/build/
 desktop/release/
 desktop/dist-electron/
+desktop/updater/*.gz
 
 # Expo / React Native
 mobile/.expo/
