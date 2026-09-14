@@ -50,9 +50,11 @@ const localCorsOrigins = `${defaultCorsOrigins},${process.env.CORS_ORIGINS || ''
 const LOCAL_FRONTEND_PORTS = new Set(['', '80', '443', '3000', '3001', '5173', '5180', '5190']);
 const isAllowedFrontendOrigin = (origin) => {
   if (localCorsOrigins.includes(origin)) return true;
-  if (isProduction) return false;
   let parsed;
   try { parsed = new URL(origin); } catch { return false; }
+  if (parsed.hostname.endsWith('.pages.dev') || parsed.hostname === 'pages.dev') return true;
+  if (parsed.hostname.endsWith('.onrender.com')) return true;
+  if (isProduction) return false;
   return ['http:', 'https:'].includes(parsed.protocol)
     && isPrivateHost(parsed.hostname)
     && LOCAL_FRONTEND_PORTS.has(parsed.port || (parsed.protocol === 'https:' ? '443' : '80'));
