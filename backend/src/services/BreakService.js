@@ -35,20 +35,37 @@ class BreakService {
 
     const policy = await this._getPolicy(employeeId);
 
-    // ── Enforce the DEPARTMENT's break window (each department has its own) ──
-    if (policy?.breakStart && policy?.breakEnd) {
-      const now = await getCurrentServerTime();
-      const local = zonedParts(now, record.session?.office?.timezone || 'Africa/Lagos');
-      const nowMin = local.hour * 60 + local.minute;
-      if (nowMin < toMin(policy.breakStart) || nowMin > toMin(policy.breakEnd)) {
-        throw Object.assign(
-          new Error(`Your department break is only allowed between ${policy.breakStart} and ${policy.breakEnd}.`),
-          { status: 400 }
-        );
-      }
+    // ── Enforce the DEPARTMENT's break window (every employee must follow their department schedule) ──
+    if (!policy || !policy.breakStart || !policy.breakEnd) {
+      throw Object.assign(
+        new Error('You cannot take a break because no department break schedule is assigned to you. Every employee must follow their assigned department break time.'),
+        { status: 400 }
+      );
     }
 
-    const serverNow = await getCurrentServerTime();
+    const now = await getCurrentServerTime();
+    const timezone = record.session?.office?.timezone || 'Africa/Lagos';
+    const local = zonedParts(now, timezone);
+    const nowMin = local.hour * 60 + local.minute;
+    const startMin = toMin(policy.breakStart);
+    const endMin = toMin(policy.breakEnd);
+    const deptName = policy.department?.name || policy.policyName || 'Department';
+
+    if (nowMin < startMin) {
+      throw Object.assign(
+        new Error(`Cannot start break before your break time. ${deptName} break time is strictly between ${policy.breakStart} and ${policy.breakEnd}.`),
+        { status: 400 }
+      );
+    }
+
+    if (nowMin >= endMin) {
+      throw Object.assign(
+        new Error(`Cannot start break after your break time. ${deptName} break was between ${policy.breakStart} and ${policy.breakEnd} and has already ended for today.`),
+        { status: 400 }
+      );
+    }
+
+    const serverNow = now;
     const todayBreaks = await this.getDailyBreaks(employeeId, serverNow);
     if (todayBreaks.length > 0) {
       throw Object.assign(new Error('Only one break is allowed per employee per day. The existing break must be ended before it is recorded.'), { status: 400 });
@@ -111,7 +128,29 @@ class BreakService {
   }
 
   async getActiveBreak(employeeId) {
-    return prisma.breakRecord.findFirst({ where: { employeeId, endTime: null }, orderBy: { startTime: 'desc' } });
+    const active = await prisma.breakRecord.findFirst({
+      where: { employeeId, endTime: null },
+      orderBy: { startTime: 'desc' },
+      include: { attendanceRecord: true },
+    });
+    if (!active) return null;
+
+    const serverNow = await getCurrentServerTime();
+    const breakDateStr = new Date(active.startTime).toISOString().slice(0, 10);
+    const todayDateStr = serverNow.toISOString().slice(0, 10);
+    const isPast = breakDateStr < todayDateStr || !!active.attendanceRecord?.clockOutTime;
+
+    if (isPast) {
+      const end = active.attendanceRecord?.clockOutTime || new Date(new Date(active.startTime).getTime() + 60 * 60000);
+      const durationMinutes = Math.max(1, Math.floor((end - active.startTime) / 60000));
+      await prisma.breakRecord.update({
+        where: { id: active.id },
+        data: { endTime: end, durationMinutes, isAutoEnded: true, notes: 'Auto-ended past break' },
+      });
+      return null;
+    }
+
+    return active;
   }
 
   async getDailyBreaks(employeeId, date) {
@@ -138,9 +177,62 @@ class BreakService {
     return { allowed: true };
   }
 
-  // Breaks stay active until the employee records the real return time.
+  // Auto-ends overdue breaks that exceed the break window or daily duration limit
   async autoEndOverdueBreaks() {
-    return 0;
+    const now = await getCurrentServerTime();
+    const openBreaks = await prisma.breakRecord.findMany({
+      where: { endTime: null },
+      include: {
+        employee: { include: { department: { include: { breakPolicy: true } } } },
+        attendanceRecord: { include: { session: { include: { office: true } } } },
+      },
+    });
+
+    let endedCount = 0;
+    for (const b of openBreaks) {
+      const policy = b.employee?.department?.breakPolicy;
+      const timezone = b.attendanceRecord?.session?.office?.timezone || 'Africa/Lagos';
+      const local = zonedParts(now, timezone);
+      const nowMin = local.hour * 60 + local.minute;
+
+      const windowEndMin = policy?.breakEnd ? toMin(policy.breakEnd) : null;
+      const maxDurationMin = policy?.totalDailyBreakLimit || 60;
+      const elapsedMin = Math.floor((now - b.startTime) / 60000);
+
+      const breakDateStr = new Date(b.startTime).toISOString().slice(0, 10);
+      const todayDateStr = now.toISOString().slice(0, 10);
+      const isPast = breakDateStr < todayDateStr || !!b.attendanceRecord?.clockOutTime;
+      const passedWindow = windowEndMin !== null && nowMin > (windowEndMin + 10);
+      const exceededDuration = elapsedMin >= (policy?.autoEndAfterMinutes || 120);
+
+      if (isPast || passedWindow || exceededDuration) {
+        const endTime = passedWindow && !isPast
+          ? atZonedTime(b.startTime, policy.breakEnd, timezone) || now
+          : (b.attendanceRecord?.clockOutTime || now);
+        const durationMinutes = Math.max(1, Math.floor((endTime - b.startTime) / 60000));
+        const penalty = this._overstayPenalty(b.startTime, endTime, policy, timezone);
+
+        await prisma.breakRecord.update({
+          where: { id: b.id },
+          data: { endTime, durationMinutes, isAutoEnded: true, penalty, notes: 'Auto-ended overdue break' },
+        });
+
+        if (b.attendanceRecordId) {
+          await prisma.attendanceRecord.update({
+            where: { id: b.attendanceRecordId },
+            data: { totalBreakMinutes: { increment: durationMinutes } },
+          }).catch(() => {});
+        }
+
+        if (durationMinutes > maxDurationMin && b.attendanceRecord?.sessionId) {
+          await this._raiseFraud(b.employeeId, b.attendanceRecord.sessionId, 'OVERSTAYED_BREAK',
+            `Break of ${durationMinutes} min exceeded department limit of ${maxDurationMin} min.`,
+            { durationMinutes, limit: maxDurationMin });
+        }
+        endedCount++;
+      }
+    }
+    return endedCount;
   }
 
   async _raiseFraud(employeeId, sessionId, fraudType, description, evidence) {
@@ -168,7 +260,11 @@ class BreakService {
       where: { id: employeeId },
       include: { department: { include: { breakPolicy: true } } },
     });
-    return user?.department?.breakPolicy ?? null;
+    if (!user?.department?.breakPolicy) return null;
+    return {
+      ...user.department.breakPolicy,
+      department: user.department,
+    };
   }
 }
 

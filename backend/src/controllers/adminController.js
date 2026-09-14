@@ -109,9 +109,15 @@ const listUsers = async (req, res, next) => {
           role: true, status: true, shiftType: true,
           profileImageUrl: true, employeeCode: true,
           phone: true, checkInMethod: true,
-          departmentId: true, createdAt: true, lastLoginAt: true,
-          department: { select: { name: true } },
-          _count: { select: { devices: true } },
+          department: {
+            select: {
+              id: true,
+              name: true,
+              breakPolicy: {
+                select: { breakStart: true, breakEnd: true, totalDailyBreakLimit: true },
+              },
+            },
+          },
         },
         orderBy: { firstName: 'asc' },
         skip,

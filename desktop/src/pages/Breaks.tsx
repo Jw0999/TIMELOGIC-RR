@@ -48,6 +48,37 @@ export default function Breaks() {
     serverNow && (view === 'today' || date === serverNow.toLocaleDateString('en-CA', { timeZone: organizationTimezone }))
   );
 
+  const selectedEmpObj = employees.find((e) => e.id === selectedEmployee);
+  const selectedPolicy = selectedEmpObj?.department?.breakPolicy;
+  const breakStart = selectedPolicy?.breakStart;
+  const breakEnd = selectedPolicy?.breakEnd;
+
+  const breakWindowStatus = useMemo(() => {
+    if (!selectedEmpObj) return null;
+    if (!breakStart || !breakEnd) {
+      return { allowed: false, text: 'No department break schedule assigned', color: 'text-amber-600 bg-amber-50 dark:bg-amber-950/30' };
+    }
+    if (!serverNow) return { allowed: true, text: `Break window: ${breakStart} - ${breakEnd}`, color: 'text-slate-600' };
+
+    const tz = selectedEmpObj.organization?.timezone || organizationTimezone || 'Africa/Lagos';
+    const timeStr = serverNow.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: tz });
+    const [currH, currM] = timeStr.split(':').map(Number);
+    const currMin = currH * 60 + currM;
+
+    const [startH, startM] = breakStart.split(':').map(Number);
+    const startMin = startH * 60 + startM;
+    const [endH, endM] = breakEnd.split(':').map(Number);
+    const endMin = endH * 60 + endM;
+
+    if (currMin < startMin) {
+      return { allowed: false, text: `Too early (Break time is ${breakStart} - ${breakEnd})`, color: 'text-amber-600 bg-amber-50 dark:bg-amber-950/30' };
+    }
+    if (currMin >= endMin) {
+      return { allowed: false, text: `Too late (Break time was ${breakStart} - ${breakEnd})`, color: 'text-red-600 bg-red-50 dark:bg-red-950/30' };
+    }
+    return { allowed: true, text: `Break time open (${breakStart} - ${breakEnd})`, color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30' };
+  }, [selectedEmpObj, breakStart, breakEnd, serverNow, organizationTimezone]);
+
   const load = async () => {
     setLoading(true);
     try {
@@ -193,15 +224,20 @@ export default function Breaks() {
                   </option>
                 ))}
             </select>
+            {breakWindowStatus && (
+              <span className={`text-xs font-semibold px-2.5 py-1.5 rounded-xl border border-current/20 ${breakWindowStatus.color}`}>
+                {breakWindowStatus.text}
+              </span>
+            )}
             <button
-              disabled={!isToday || !selectedEmployee || takenEmployeeIds.has(selectedEmployee) || !!starting}
+              disabled={!isToday || !selectedEmployee || takenEmployeeIds.has(selectedEmployee) || !breakWindowStatus?.allowed || !!starting}
               onClick={() => startFor(selectedEmployee, 'LUNCH')}
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary-700 text-white text-xs font-semibold disabled:opacity-50 transition hover:bg-primary-800"
             >
               <Play size={13} /> Take lunch
             </button>
             <button
-              disabled={!isToday || !selectedEmployee || takenEmployeeIds.has(selectedEmployee) || !!starting}
+              disabled={!isToday || !selectedEmployee || takenEmployeeIds.has(selectedEmployee) || !breakWindowStatus?.allowed || !!starting}
               onClick={() => startFor(selectedEmployee, 'SHORT_BREAK')}
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-700 text-white text-xs font-semibold disabled:opacity-50 transition hover:bg-slate-800"
             >

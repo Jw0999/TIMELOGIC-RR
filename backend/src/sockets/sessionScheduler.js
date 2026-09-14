@@ -216,6 +216,12 @@ async function autoCheckoutExpired(now) {
     const scheduledCheckout = new Date(r.session.endTime.getTime() + env.AUTO_CHECKOUT_LAG_MIN * 60000);
     const clockOutTime = scheduledCheckout > r.clockInTime ? scheduledCheckout : new Date(r.clockInTime);
     const workMs = clockOutTime - r.clockInTime;
+
+    await prisma.breakRecord.updateMany({
+      where: { attendanceRecordId: r.id, endTime: null },
+      data: { endTime: clockOutTime, isAutoEnded: true, notes: 'Auto-ended on session expiry' },
+    });
+
     await prisma.attendanceRecord.updateMany({
       where: { id: r.id, clockOutTime: null },
       data: { clockOutTime, totalWorkHours: parseFloat((workMs / 3600000).toFixed(2)), checkOutSource: 'SYSTEM' },

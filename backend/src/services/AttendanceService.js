@@ -462,6 +462,18 @@ class AttendanceService {
     const workMs = clockOutTime - record.clockInTime;
     const totalWorkHours = parseFloat((workMs / 3600000).toFixed(2));
 
+    // Auto-end any active break upon clock out
+    const activeBreaks = await prisma.breakRecord.findMany({
+      where: { employeeId, endTime: null },
+    });
+    for (const b of activeBreaks) {
+      const dur = Math.max(1, Math.floor((clockOutTime - b.startTime) / 60000));
+      await prisma.breakRecord.update({
+        where: { id: b.id },
+        data: { endTime: clockOutTime, durationMinutes: dur, isAutoEnded: true, notes: 'Auto-ended on clock out' },
+      });
+    }
+
     const changed = await prisma.attendanceRecord.updateMany({
       where: { id: record.id, clockOutTime: null },
       data: { clockOutTime, totalWorkHours, checkOutSource: 'PHONE' },
@@ -647,6 +659,18 @@ class AttendanceService {
     const clockOutTime = await getCurrentServerTime();
     this._assertCheckoutAllowed(record, clockOutTime);
     const totalWorkHours = parseFloat(((clockOutTime - record.clockInTime) / 3600000).toFixed(2));
+    // Auto-end any active break upon manual clock out
+    const activeBreaks = await prisma.breakRecord.findMany({
+      where: { employeeId, endTime: null },
+    });
+    for (const b of activeBreaks) {
+      const dur = Math.max(1, Math.floor((clockOutTime - b.startTime) / 60000));
+      await prisma.breakRecord.update({
+        where: { id: b.id },
+        data: { endTime: clockOutTime, durationMinutes: dur, isAutoEnded: true, notes: 'Auto-ended on manual clock out' },
+      });
+    }
+
     const changed = await prisma.attendanceRecord.updateMany({
       where: { id: record.id, clockOutTime: null },
       data: {
