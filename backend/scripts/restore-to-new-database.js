@@ -496,6 +496,43 @@ async function main() {
   }
   console.log(`  -> Restored ${totalStudentAtt} student attendance records`);
 
+  // 11. Restoring Fraud Alerts
+  console.log('\n9. Restoring Fraud Alerts...');
+  let totalFraudAlerts = 0;
+  if (backup.detailedEmployeeRecords) {
+    for (const empId in backup.detailedEmployeeRecords) {
+      const emp = backup.detailedEmployeeRecords[empId];
+      if (emp.fraudAlerts && Array.isArray(emp.fraudAlerts)) {
+        for (const fa of emp.fraudAlerts) {
+          const existing = await prisma.fraudAlert.findUnique({
+            where: { id: fa.id },
+          });
+          if (!existing) {
+            await prisma.fraudAlert.create({
+              data: {
+                id: fa.id,
+                employeeId: fa.employeeId,
+                sessionId: fa.sessionId,
+                scanAttemptId: fa.scanAttemptId || null,
+                fraudType: fa.fraudType || fa.type,
+                severity: fa.severity || 'HIGH',
+                description: fa.description,
+                evidence: fa.evidence || null,
+                status: fa.status || 'NEW',
+                resolvedBy: fa.resolvedBy || null,
+                resolution: fa.resolution || null,
+                createdAt: toDate(fa.createdAt),
+                updatedAt: toDate(fa.updatedAt || fa.createdAt),
+              },
+            });
+            totalFraudAlerts++;
+          }
+        }
+      }
+    }
+  }
+  console.log(`  -> Restored ${totalFraudAlerts} fraud alerts`);
+
   console.log('\n=== ALL PRODUCTION DATA RESTORED 100% SUCCESSFULLY! ===');
 }
 

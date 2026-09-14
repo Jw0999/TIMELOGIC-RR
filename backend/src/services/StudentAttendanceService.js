@@ -66,7 +66,6 @@ class StudentAttendanceService {
     const openAttendance = students.length ? await prisma.studentAttendance.findMany({
       where: {
         studentId: { in: students.map((student) => student.id) },
-        date: today,
         checkOutTime: null,
       },
       orderBy: { checkInTime: 'desc' },
@@ -169,8 +168,20 @@ class StudentAttendanceService {
     const checkInTime = await getCurrentServerTime();
     const office = organization.offices[0] ?? { timezone: organization.timezone };
       const date = dateOnly(checkInTime, office.timezone || organization.timezone);
+    // Auto-close any unclosed student records from previous dates so historical records do not block new check-ins
+    const pastOpenRecords = await prisma.studentAttendance.findMany({
+      where: { studentId: student.id, date: { lt: date }, checkOutTime: null },
+    });
+    for (const past of pastOpenRecords) {
+      const autoOut = new Date(new Date(past.checkInTime).getTime() + 4 * 60 * 60 * 1000);
+      await prisma.studentAttendance.update({
+        where: { id: past.id },
+        data: { checkOutTime: autoOut, checkedOutById: adminId },
+      });
+    }
+
     const existingOpen = await prisma.studentAttendance.findFirst({
-      where: { studentId: student.id, checkOutTime: null }, select: { id: true },
+      where: { studentId: student.id, date, checkOutTime: null }, select: { id: true },
     });
     if (existingOpen) {
       throw Object.assign(new Error('Student is already checked in and must be checked out first.'), { status: 409 });

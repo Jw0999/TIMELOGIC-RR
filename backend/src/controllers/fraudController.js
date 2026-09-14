@@ -6,10 +6,17 @@ const getAlerts = async (req, res, next) => {
     const { status, severity, page = 1, limit = 100 } = req.query;
     const skip = (+page - 1) * +limit;
 
-    // Super Admin sees ALL organizations; a regular admin sees only their own org.
+    const headerOrgId = req.headers['x-organization-id'] || req.query.orgId;
+    let orgFilter = {};
+    if (headerOrgId && headerOrgId !== 'platform-org') {
+      orgFilter = { employee: { orgId: headerOrgId } };
+    } else if (req.user.role !== 'SUPER_ADMIN') {
+      orgFilter = { employee: { orgId: req.user.orgId } };
+    }
+
     const where = {
-      ...(req.user.role === 'SUPER_ADMIN' ? {} : { employee: { orgId: req.user.orgId } }),
-      ...(status && { status }),
+      ...orgFilter,
+      ...(status && status !== 'All' ? { status } : {}),
       ...(severity && { severity }),
     };
 
