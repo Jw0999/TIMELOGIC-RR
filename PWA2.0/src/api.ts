@@ -123,13 +123,25 @@ export async function getLiveAttendance() {
 export async function getStudents(search = '') {
   const query = new URLSearchParams({ limit: '200', status: 'ACTIVE' });
   if (search.trim()) query.set('search', search.trim());
-  return (await api.get<{ data: { students: Student[] } }>(`/students?${query}`)).data;
+  try {
+    return (await api.get<{ data: { students: Student[] } }>(`/admin/students?${query}`)).data;
+  } catch {
+    return (await api.get<{ data: { students: Student[] } }>(`/students?${query}`)).data;
+  }
 }
 export async function checkInStudent(studentId: string) {
-  return (await api.post<{ data: Student }>(`/students/${studentId}/check-in`, {})).data;
+  try {
+    return (await api.post<{ data: Student }>(`/admin/students/${studentId}/check-in`, {})).data;
+  } catch {
+    return (await api.post<{ data: Student }>(`/students/${studentId}/check-in`, {})).data;
+  }
 }
 export async function checkOutStudent(studentId: string) {
-  return (await api.post<{ data: Student }>(`/students/${studentId}/check-out`, {})).data;
+  try {
+    return (await api.post<{ data: Student }>(`/admin/students/${studentId}/check-out`, {})).data;
+  } catch {
+    return (await api.post<{ data: Student }>(`/students/${studentId}/check-out`, {})).data;
+  }
 }
 export async function enrollFace(employeeId: string, photoBlob: Blob): Promise<{ success: boolean; data: { id: string; firstName: string; lastName: string; profileImageUrl: string } }> {
   const formData = new FormData();
