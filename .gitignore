@@ -49,3 +49,8 @@ Thumbs.db
 __pycache__/
 *.pyc
 *.pyo
+
+# ONNX models (downloaded dynamically inside Docker on Render)
+deepface-service/models/*.onnx
+deepface-service/models/
+

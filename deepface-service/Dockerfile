@@ -1,20 +1,21 @@
 FROM python:3.11-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1 libglib2.0-0 && \
+    libglib2.0-0 curl && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install --no-cache-dir --timeout 600 -r requirements.txt
-# DeepFace's current OpenCV wheel omits the Haar cascade data it expects.
-RUN python -c "import cv2, urllib.request; urllib.request.urlretrieve('https://raw.githubusercontent.com/opencv/opencv/4.x/data/haarcascades/haarcascade_frontalface_default.xml', cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')" && \
-    python -c "import cv2, os; assert os.path.exists(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')"
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Pre-download Facenet512 and SFace model weights so container starts fast
-RUN python -c "from deepface import DeepFace; DeepFace.build_model('Facenet512'); DeepFace.build_model('SFace')"
+# Download ultra-fast ONNX models directly during Docker build
+RUN mkdir -p models && \
+    curl -fsSL -o models/face_detection_yunet.onnx https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx && \
+    curl -fsSL -o models/face_recognition_sface.onnx https://github.com/opencv/opencv_zoo/raw/main/models/face_recognition_sface/face_recognition_sface_2021dec.onnx
 
 COPY app.py .
-ENV PYTHONUNBUFFERED=1 CUDA_VISIBLE_DEVICES="-1" TF_CPP_MIN_LOG_LEVEL="3" TF_ENABLE_ONEDNN_OPTS="0" OMP_NUM_THREADS="1"
+
+ENV PYTHONUNBUFFERED=1 OMP_NUM_THREADS=1
 EXPOSE 5001
-CMD ["sh", "-c", "gunicorn -b 0.0.0.0:${PORT:-5001} -w 1 --threads 1 --timeout 180 --worker-class gthread app:app"]
+
+CMD ["sh", "-c", "gunicorn -b 0.0.0.0:${PORT:-5001} -w 1 --threads 2 --timeout 60 app:app"]
