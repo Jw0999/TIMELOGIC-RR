@@ -23,12 +23,12 @@ const weeklySchedule = (openTime = '08:00', closeTime = '17:00'): WeeklySchedule
 interface OrgFormData {
   name: string; industry: string; subscriptionTier: string;
   allowDeviceCheckIn: boolean; allowManualCheckIn: boolean; hasStudents: boolean;
-  openingTime: string; timezone: string;
+  timezone: string;
   offices: {
     name: string; address: string; timezone: string; wifiSSID: string; publicIp: string;
-    openTime: string; closeTime: string; breakMinutes: number;
+    breakMinutes: number;
     weeklySchedule: WeeklySchedule;
-    graceMinutes: number; lateAfterMinutes: number; gracePenalty: number; latePenalty: number; completelyLatePenalty: number;
+    graceMinutes: number; lateAfterMinutes: number; gracePenalty: number; latePenalty: number; completelyLatePenalty: number; absentPenalty: number;
     breakStart: string; breakEnd: string;
   }[];
   departments: { name: string; breakStart: string; breakEnd: string }[];
@@ -36,15 +36,15 @@ interface OrgFormData {
 }
 const newOffice = () => ({
   name: '', address: '', timezone: 'Africa/Lagos', wifiSSID: '', publicIp: '',
-  openTime: '08:00', closeTime: '17:00', breakMinutes: 60,
+  breakMinutes: 60,
   weeklySchedule: weeklySchedule(),
-  graceMinutes: 30, lateAfterMinutes: 90, gracePenalty: 0, latePenalty: 0, completelyLatePenalty: 0,
+  graceMinutes: 30, lateAfterMinutes: 90, gracePenalty: 0, latePenalty: 0, completelyLatePenalty: 0, absentPenalty: 0,
   breakStart: '13:00', breakEnd: '14:00',
 });
 const defaultForm = (): OrgFormData => ({
   name: '', industry: 'Technology', subscriptionTier: 'starter',
   allowDeviceCheckIn: true, allowManualCheckIn: false, hasStudents: false,
-  openingTime: '08:00', timezone: 'Africa/Lagos',
+  timezone: 'Africa/Lagos',
   offices: [{ ...newOffice(), name: 'Main Office' }],
   departments: [{ name: 'Engineering', breakStart: '13:00', breakEnd: '14:00' }],
   admin: { firstName: '', lastName: '', email: '', password: '', confirmPassword: '' },
@@ -87,7 +87,7 @@ function OrgModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
     const lastName = form.admin.lastName.trim();
     const email = form.admin.email.trim();
     if (!form.name.trim()) { setError('Organization name is required.'); return; }
-    if (!form.openingTime || !form.timezone) { setError('Company opening time and timezone are required.'); return; }
+    if (!form.timezone) { setError('Company timezone is required.'); return; }
     if (!form.allowDeviceCheckIn && !form.allowManualCheckIn) { setError('Enable device check-in, manual check-in, or both.'); return; }
     if (!firstName || !lastName) { setError('Admin first name and last name are required.'); return; }
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setError('Enter a valid admin email address.'); return; }
@@ -102,7 +102,6 @@ function OrgModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
         allowDeviceCheckIn: form.allowDeviceCheckIn,
         allowManualCheckIn: form.allowManualCheckIn,
         hasStudents: form.hasStudents,
-        openingTime: form.openingTime,
         timezone: form.timezone,
         offices: form.offices,
         departments: form.departments,
@@ -143,10 +142,7 @@ function OrgModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
                 <p className="text-sm font-bold text-[var(--text-main)]">Company attendance schedule</p>
                 <p className="text-[11px] text-[var(--text-muted)] mt-0.5">Used to evaluate the company admin's first login of the day. Office hours continue to control employee attendance sessions.</p>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div><label className={lbl}>Company Opening Time *</label><input className={inp} type="time" value={form.openingTime} onChange={(e) => setForm((p) => ({...p, openingTime: e.target.value}))}/></div>
-                <div><label className={lbl}>Company Timezone *</label><select className={inp} value={form.timezone} onChange={(e) => setForm((p) => ({...p, timezone: e.target.value}))}>{TIMEZONES.map((t) => <option key={t}>{t}</option>)}</select></div>
-              </div>
+              <div><label className={lbl}>Company Timezone *</label><select className={inp} value={form.timezone} onChange={(e) => setForm((p) => ({...p, timezone: e.target.value}))}>{TIMEZONES.map((t) => <option key={t}>{t}</option>)}</select></div>
             </div>
             <div className="p-4 bg-[var(--hover-bg)] rounded-xl border border-[var(--border)] space-y-3">
               <div>
@@ -180,12 +176,8 @@ function OrgModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><div><label className={lbl}>Name</label><input className={inp} value={o.name} onChange={(e) => updateOffice(i,'name',e.target.value)} placeholder="HQ Lagos"/></div><div><label className={lbl}>Timezone</label><select className={inp} value={o.timezone} onChange={(e) => updateOffice(i,'timezone',e.target.value)}>{TIMEZONES.map((t) => <option key={t}>{t}</option>)}</select></div></div>
               <div><label className={lbl}>Address</label><input className={inp} value={o.address} onChange={(e) => updateOffice(i,'address',e.target.value)} placeholder="Full address"/></div>
               {/* Work hours + break — drives check-in / check-out everywhere */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div><label className={lbl}>Open Time</label><input className={inp} type="time" value={o.openTime} onChange={(e) => updateOffice(i,'openTime',e.target.value)}/></div>
-                <div><label className={lbl}>Close Time</label><input className={inp} type="time" value={o.closeTime} onChange={(e) => updateOffice(i,'closeTime',e.target.value)}/></div>
-                <div><label className={lbl}>Break (min)</label><input className={inp} type="number" min={0} value={o.breakMinutes} onChange={(e) => updateOffice(i,'breakMinutes',e.target.value)}/></div>
-              </div>
-              <p className="text-[11px] text-[var(--text-muted)]">Check-in opens at <b>Open Time</b> and the session auto-closes at <b>Close Time</b>. Employees use these exact times to clock in/out.</p>
+              <div><label className={lbl}>Break allowance (min)</label><input className={inp} type="number" min={0} value={o.breakMinutes} onChange={(e) => updateOffice(i,'breakMinutes',e.target.value)}/></div>
+              <p className="text-[11px] text-[var(--text-muted)]">Weekly schedule controls opening, closing, check-in, and checkout for each day.</p>
               <div className="pt-2 border-t border-[var(--border)]"><p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide mb-2">Weekly schedule</p>{DAYS.map((day) => <div key={day} className="grid grid-cols-[1fr_1fr_1fr] gap-2 items-end mb-2"><span className="text-xs font-semibold capitalize text-[var(--text-main)]">{day}</span><input className={inp} type="time" value={o.weeklySchedule?.[day]?.openTime ?? ''} onChange={(e) => updateOffice(i, 'weeklySchedule', { ...o.weeklySchedule, [day]: { ...o.weeklySchedule?.[day], openTime: e.target.value } })} /><input className={inp} type="time" value={o.weeklySchedule?.[day]?.closeTime ?? ''} onChange={(e) => updateOffice(i, 'weeklySchedule', { ...o.weeklySchedule, [day]: { ...o.weeklySchedule?.[day], closeTime: e.target.value } })} /></div>)}</div>
 
               {/* Lateness grace + penalties (salary deductions) */}
@@ -197,6 +189,7 @@ function OrgModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
                   <div><label className={lbl}>Penalty after grace (₦)</label><input className={inp} type="number" min={0} value={o.gracePenalty} onChange={(e) => updateOffice(i,'gracePenalty',e.target.value)}/></div>
                   <div><label className={lbl}>Late penalty (₦)</label><input className={inp} type="number" min={0} value={o.latePenalty} onChange={(e) => updateOffice(i,'latePenalty',e.target.value)}/></div>
                   <div><label className={lbl}>Completely late penalty (₦)</label><input className={inp} type="number" min={0} value={o.completelyLatePenalty} onChange={(e) => updateOffice(i,'completelyLatePenalty',e.target.value)}/></div>
+                  <div><label className={lbl}>Unauthorized absence penalty (₦)</label><input className={inp} type="number" min={0} value={o.absentPenalty} onChange={(e) => updateOffice(i,'absentPenalty',e.target.value)}/></div>
                 </div>
                 <p className="text-[11px] text-[var(--text-muted)] mt-1">Deducted from salary. On-time within grace = ₦0. After grace = grace penalty. After "late after" = marked LATE + late penalty.</p>
               </div>
@@ -282,16 +275,15 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
   const [allowDeviceCheckIn, setAllowDeviceCheckIn] = useState(org.allowDeviceCheckIn ?? true);
   const [allowManualCheckIn, setAllowManualCheckIn] = useState(org.allowManualCheckIn ?? false);
   const [hasStudents, setHasStudents] = useState(org.hasStudents ?? false);
-  const [openingTime, setOpeningTime] = useState(org.openingTime ?? '08:00');
   const [timezone, setTimezone] = useState(org.timezone ?? 'Africa/Lagos');
   const [offices, setOffices] = useState<any[]>(() => (org.offices ?? []).map((o: any) => ({
     id: o.id, name: o.name ?? '', address: o.address ?? '', timezone: o.timezone ?? 'Africa/Lagos',
-    wifiSSID: o.wifiSSID ?? '', publicIp: o.publicIp ?? '', openTime: o.openTime ?? '08:00', closeTime: o.closeTime ?? '17:00',
+    wifiSSID: o.wifiSSID ?? '', publicIp: o.publicIp ?? '',
     breakMinutes: o.breakMinutes ?? 60,
     graceMinutes: o.graceMinutes ?? 30, lateAfterMinutes: o.lateAfterMinutes ?? 90,
-    gracePenalty: o.gracePenalty ?? 0, latePenalty: o.latePenalty ?? 0, completelyLatePenalty: o.completelyLatePenalty ?? 0,
+    gracePenalty: o.gracePenalty ?? 0, latePenalty: o.latePenalty ?? 0, completelyLatePenalty: o.completelyLatePenalty ?? 0, absentPenalty: o.absentPenalty ?? 0,
     breakStart: o.breakStart ?? '13:00', breakEnd: o.breakEnd ?? '14:00',
-    weeklySchedule: o.weeklySchedule ?? weeklySchedule(o.openTime ?? '08:00', o.closeTime ?? '17:00'),
+    weeklySchedule: o.weeklySchedule ?? weeklySchedule('08:00', '17:00'),
   })));
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
@@ -301,7 +293,7 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
 
   const save = async () => {
     if (!name.trim()) { setError('Organization name is required.'); return; }
-    if (!openingTime || !timezone) { setError('Company opening time and timezone are required.'); return; }
+    if (!timezone) { setError('Company timezone is required.'); return; }
     if (!allowDeviceCheckIn && !allowManualCheckIn) { setError('Enable device check-in, manual check-in, or both.'); return; }
     setLoading(true); setError('');
     try {
@@ -312,7 +304,6 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
         allowDeviceCheckIn,
         allowManualCheckIn,
         hasStudents,
-        openingTime,
         timezone,
         offices,
       });
@@ -341,10 +332,7 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
               <p className="text-sm font-bold text-[var(--text-main)]">Company attendance schedule</p>
               <p className="text-[11px] text-[var(--text-muted)] mt-0.5">Used to evaluate the company admin's first login of the day. Office hours below continue to control employee attendance sessions.</p>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div><label className={lbl}>Company Opening Time *</label><input className={inp} type="time" value={openingTime} onChange={(e) => setOpeningTime(e.target.value)}/></div>
-              <div><label className={lbl}>Company Timezone *</label><select className={inp} value={timezone} onChange={(e) => setTimezone(e.target.value)}>{TIMEZONES.map((t) => <option key={t}>{t}</option>)}</select></div>
-            </div>
+            <div><label className={lbl}>Company Timezone *</label><select className={inp} value={timezone} onChange={(e) => setTimezone(e.target.value)}>{TIMEZONES.map((t) => <option key={t}>{t}</option>)}</select></div>
           </div>
 
           <div className="p-4 bg-[var(--hover-bg)] rounded-xl border border-[var(--border)] space-y-3">
@@ -380,11 +368,7 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
                 <div><label className={lbl}>Timezone</label><select className={inp} value={o.timezone} onChange={(e) => updOffice(i,'timezone',e.target.value)}>{TIMEZONES.map((t) => <option key={t}>{t}</option>)}</select></div>
               </div>
               <div><label className={lbl}>Address</label><input className={inp} value={o.address} onChange={(e) => updOffice(i,'address',e.target.value)}/></div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div><label className={lbl}>Open Time</label><input className={inp} type="time" value={o.openTime} onChange={(e) => updOffice(i,'openTime',e.target.value)}/></div>
-                <div><label className={lbl}>Close Time</label><input className={inp} type="time" value={o.closeTime} onChange={(e) => updOffice(i,'closeTime',e.target.value)}/></div>
-                <div><label className={lbl}>Break (min)</label><input className={inp} type="number" min={0} value={o.breakMinutes} onChange={(e) => updOffice(i,'breakMinutes',e.target.value)}/></div>
-              </div>
+              <div><label className={lbl}>Break allowance (min)</label><input className={inp} type="number" min={0} value={o.breakMinutes} onChange={(e) => updOffice(i,'breakMinutes',e.target.value)}/></div>
               <div className="pt-2 border-t border-[var(--border)]"><p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide mb-2">Weekly schedule</p>{DAYS.map((day) => <div key={day} className="grid grid-cols-[1fr_1fr_1fr] gap-2 items-end mb-2"><span className="text-xs font-semibold capitalize text-[var(--text-main)]">{day}</span><input className={inp} type="time" value={o.weeklySchedule?.[day]?.openTime ?? ''} onChange={(e) => updOffice(i, 'weeklySchedule', { ...o.weeklySchedule, [day]: { ...o.weeklySchedule?.[day], openTime: e.target.value } })} /><input className={inp} type="time" value={o.weeklySchedule?.[day]?.closeTime ?? ''} onChange={(e) => updOffice(i, 'weeklySchedule', { ...o.weeklySchedule, [day]: { ...o.weeklySchedule?.[day], closeTime: e.target.value } })} /></div>)}</div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className={lbl}>Grace (min, no penalty)</label><input className={inp} type="number" min={0} value={o.graceMinutes} onChange={(e) => updOffice(i,'graceMinutes',e.target.value)}/></div>
@@ -392,6 +376,7 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
                 <div><label className={lbl}>Penalty after grace (₦)</label><input className={inp} type="number" min={0} value={o.gracePenalty} onChange={(e) => updOffice(i,'gracePenalty',e.target.value)}/></div>
                 <div><label className={lbl}>Late penalty (₦)</label><input className={inp} type="number" min={0} value={o.latePenalty} onChange={(e) => updOffice(i,'latePenalty',e.target.value)}/></div>
                 <div><label className={lbl}>Completely late penalty (₦)</label><input className={inp} type="number" min={0} value={o.completelyLatePenalty} onChange={(e) => updOffice(i,'completelyLatePenalty',e.target.value)}/></div>
+                <div><label className={lbl}>Unauthorized absence penalty (₦)</label><input className={inp} type="number" min={0} value={o.absentPenalty} onChange={(e) => updOffice(i,'absentPenalty',e.target.value)}/></div>
                 <div><label className={lbl}>Break Start</label><input className={inp} type="time" value={o.breakStart} onChange={(e) => updOffice(i,'breakStart',e.target.value)}/></div>
                 <div><label className={lbl}>Break End</label><input className={inp} type="time" value={o.breakEnd} onChange={(e) => updOffice(i,'breakEnd',e.target.value)}/></div>
               </div>

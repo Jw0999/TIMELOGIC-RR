@@ -146,6 +146,7 @@ async function endExpiredSessions(now) {
     select: { id: true, sessionName: true },
   });
   for (const sn of sessions) {
+    await AttendanceService.syncEmployeeAbsencesForSession(sn.id).catch((e) => logger.warn('absence sweep:', e.message));
     await prisma.attendanceSession.updateMany({
       where: { id: sn.id, status: { in: ['ACTIVE', 'PAUSED'] } },
       data: { status: 'ENDED' },

@@ -38,11 +38,16 @@ const getOrg = async (req, res, next) => {
 
 const updateOrg = async (req, res, next) => {
   try {
-    const { name, industry, subscriptionTier } = req.body;
+    const { name, industry, subscriptionTier, requireFaceVerification } = req.body;
     const targetOrgId = await resolveAdminOrgId(req);
     const org = await prisma.organization.update({
       where: { id: targetOrgId },
-      data: { name, industry, subscriptionTier },
+      data: {
+        ...(name !== undefined ? { name } : {}),
+        ...(industry !== undefined ? { industry } : {}),
+        ...(subscriptionTier !== undefined ? { subscriptionTier } : {}),
+        ...(requireFaceVerification !== undefined ? { requireFaceVerification: Boolean(requireFaceVerification) } : {}),
+      },
     });
     res.json({ success: true, data: org });
   } catch (err) { next(err); }
@@ -492,6 +497,14 @@ const getManualAttendance = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+const findManualEmployee = async (req, res, next) => {
+  try {
+    const targetOrgId = await resolveAdminOrgId(req);
+    const data = await AttendanceService.findManualEmployee(targetOrgId, req.query.email);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
 const manualCheckIn = async (req, res, next) => {
   try {
     const targetOrgId = await resolveAdminOrgId(req);
@@ -508,6 +521,49 @@ const manualCheckOut = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+const listPenalties = async (req, res, next) => {
+  try {
+    const targetOrgId = await resolveAdminOrgId(req);
+    const month = String(req.query.month || '');
+    const monthMatch = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(month);
+    const dateFilter = monthMatch ? {
+      createdAt: {
+        gte: new Date(Date.UTC(Number(monthMatch[1]), Number(monthMatch[2]) - 1, 1)),
+        lt: new Date(Date.UTC(Number(monthMatch[1]), Number(monthMatch[2]), 1)),
+      },
+    } : {};
+    const penalties = await prisma.manualPenalty.findMany({
+      where: { orgId: targetOrgId, ...dateFilter },
+      include: {
+        employee: { select: { id: true, firstName: true, lastName: true, employeeCode: true } },
+        createdBy: { select: { firstName: true, lastName: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json({ success: true, data: penalties });
+  } catch (err) { next(err); }
+};
+
+const createPenalty = async (req, res, next) => {
+  try {
+    const targetOrgId = await resolveAdminOrgId(req);
+    const { employeeId, amount, reason } = req.body;
+    const employee = await prisma.user.findFirst({
+      where: { id: employeeId, orgId: targetOrgId, role: 'EMPLOYEE', status: { not: 'TERMINATED' } },
+      select: { id: true },
+    });
+    if (!employee) return res.status(404).json({ success: false, message: 'Employee not found.' });
+    const penalty = await prisma.manualPenalty.create({
+      data: { orgId: targetOrgId, employeeId, amount: Number(amount), reason: reason.trim(), createdById: req.user.id },
+      include: {
+        employee: { select: { id: true, firstName: true, lastName: true, employeeCode: true } },
+        createdBy: { select: { firstName: true, lastName: true } },
+      },
+    });
+    res.status(201).json({ success: true, data: penalty });
+  } catch (err) { next(err); }
+};
+
 module.exports = {
   getOrg, updateOrg,
   createOffice,
@@ -517,5 +573,7 @@ module.exports = {
   setBreakPolicy,
   emergencyStopAll, emergencyLockSystem, emergencyInvalidateQR, emergencyRevert,
   getNotifications, createEmployee,
-  getManualAttendance, manualCheckIn, manualCheckOut,
+  getManualAttendance, findManualEmployee, manualCheckIn, manualCheckOut,
+  listPenalties, createPenalty,
+  resolveAdminOrgId,
 };

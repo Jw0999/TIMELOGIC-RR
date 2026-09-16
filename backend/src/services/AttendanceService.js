@@ -7,6 +7,7 @@ const logger = require('../config/logger');
 const EmployeePolicy = require('./EmployeePolicyService');
 const { dateOnly, evaluateAttendance, attendanceDate, isSunday, openingOccurrence, atZonedTime, officeHoursFor } = require('../utils/attendanceClock');
 const { getCurrentServerTime } = require('../utils/networkTime');
+const { performFaceVerification, hasValidEnrolledFace } = require('../utils/faceVerify');
 
 const CHALLENGE_TTL_SECONDS = 120; // code valid for 2 minutes
 
@@ -343,7 +344,7 @@ class AttendanceService {
           select: {
             id: true, orgId: true, name: true, isActive: true, timezone: true,
             wifiSSID: true, publicIp: true, openTime: true, closeTime: true, weeklySchedule: true,
-            graceMinutes: true, lateAfterMinutes: true, gracePenalty: true, latePenalty: true, completelyLatePenalty: true,
+            graceMinutes: true, lateAfterMinutes: true, gracePenalty: true, latePenalty: true, completelyLatePenalty: true, absentPenalty: true,
             securitySettings: true,
           },
         },
@@ -360,6 +361,7 @@ class AttendanceService {
     if (session.office.orgId !== employee.orgId) {
       return { success: false, reason: 'SESSION_CLOSED', message: 'This attendance session does not belong to your organization.' };
     }
+    await this._assertEmployeeMayCheckIn(employeeId, clockInTime, session.office.timezone);
 
     // The session starts AUTO_SESSION_LEAD_MIN before official opening. Keep
     // accepting check-ins until office close; lateness is applied below.
@@ -549,8 +551,7 @@ class AttendanceService {
         where,
         select: {
           id: true, firstName: true, lastName: true, employeeCode: true,
-          email: true, checkInMethod: true, phone: true,
-          profileImageUrl: true,
+          email: true, checkInMethod: true, phone: true, profileImageUrl: true,
           department: { select: { name: true } },
           attendanceRecords: selectedSession ? {
             where: { sessionId: selectedSession.id, date: recordDate },
@@ -594,16 +595,78 @@ class AttendanceService {
     return {
       enabled: true, serverTime: now, organization,
       activeSessions, selectedSession: selectedSession ?? null,
-      employees: employees.map((employee) => ({
-        ...employee,
-        attendance: openByEmployee.get(employee.id) ?? employee.attendanceRecords?.[0] ?? null,
-        attendanceRecords: undefined,
-      })),
+      employees: employees.map((employee) => {
+        const hasFace = Boolean(employee.profileImageUrl && hasValidEnrolledFace(employee.profileImageUrl));
+        return {
+          ...employee,
+          profileImageUrl: hasFace ? 'enrolled' : null,
+          hasFaceEnrolled: hasFace,
+          attendance: openByEmployee.get(employee.id) ?? employee.attendanceRecords?.[0] ?? null,
+          attendanceRecords: undefined,
+        };
+      }),
       total, page: safePage, totalPages: Math.ceil(total / safeLimit),
     };
   }
 
-  async manualCheckIn(adminId, adminOrgId, { employeeId, sessionId, password }) {
+  async findManualEmployee(adminOrgId, email) {
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    const employee = await prisma.user.findFirst({
+      where: {
+        orgId: adminOrgId,
+        role: 'EMPLOYEE',
+        status: 'ACTIVE',
+        email: cleanEmail,
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        employeeCode: true,
+        profileImageUrl: true,
+        department: { select: { name: true } },
+      },
+    });
+    if (!employee) throw Object.assign(new Error('No active employee was found with that registered Gmail address.'), { status: 404 });
+
+    // Look for an open attendance record first (clocked in, not yet clocked out)
+    let record = await prisma.attendanceRecord.findFirst({
+      where: {
+        employeeId: employee.id,
+        clockInTime: { not: null },
+        clockOutTime: null,
+      },
+      orderBy: { clockInTime: 'desc' },
+      select: { sessionId: true, clockInTime: true, clockOutTime: true },
+    });
+
+    // If no open record, check if they checked out today
+    if (!record) {
+      const now = await getCurrentServerTime();
+      const todayStart = new Date(now);
+      todayStart.setHours(0, 0, 0, 0);
+
+      record = await prisma.attendanceRecord.findFirst({
+        where: {
+          employeeId: employee.id,
+          clockInTime: { gte: todayStart },
+        },
+        orderBy: { clockInTime: 'desc' },
+        select: { sessionId: true, clockInTime: true, clockOutTime: true },
+      });
+    }
+
+    const hasFace = Boolean(employee.profileImageUrl && hasValidEnrolledFace(employee.profileImageUrl));
+    return {
+      ...employee,
+      hasFaceEnrolled: hasFace,
+      profileImageUrl: hasFace ? 'enrolled' : null,
+      attendance: record ?? null,
+    };
+  }
+
+  async manualCheckIn(adminId, adminOrgId, { employeeId, sessionId, password, faceImage }) {
     const clockInTime = await getCurrentServerTime();
     const employee = await this._loadEmployeeForChannel(employeeId, 'MANUAL', true);
     if (employee.orgId !== adminOrgId) {
@@ -612,8 +675,24 @@ class AttendanceService {
     if (!password || !(await bcrypt.compare(password, employee.passwordHash))) {
       throw Object.assign(new Error('Employee password is incorrect.'), { status: 403 });
     }
+
+    // ── Face verification (after password passes) ──────────────────────────
+    const hasFace = Boolean(employee.profileImageUrl && hasValidEnrolledFace(employee.profileImageUrl));
+    if (hasFace) {
+      // Employee has a verified face enrolled on disk → must verify
+      if (!faceImage) {
+        throw Object.assign(new Error('Face image is required. Please capture your face.'), { status: 400, code: 'FACE_REQUIRED' });
+      }
+      await performFaceVerification(employee, faceImage);
+    } else if (employee.organization?.requireFaceVerification) {
+      // Org requires face but employee hasn't enrolled yet
+      throw Object.assign(new Error('Face not registered. Please enroll your face first.'), { status: 400, code: 'FACE_NOT_ENROLLED' });
+    }
+    // else: no valid face enrolled + org doesn't require it → password-only (backwards compatible)
+
     const session = await this._loadManualSession(sessionId, adminOrgId, clockInTime);
     if (!officeHoursFor(clockInTime, session.office)) throw Object.assign(new Error('This office is closed today.'), { status: 400 });
+    await this._assertEmployeeMayCheckIn(employeeId, clockInTime, session.office.timezone);
 
     const { status, penalty } = this._computeStatusAndPenalty(clockInTime, session);
     const record = await this._persistCheckIn({
@@ -629,7 +708,7 @@ class AttendanceService {
     return { record, status, penalty, clockInTime };
   }
 
-  async manualCheckOut(adminId, adminOrgId, { employeeId, sessionId, password }) {
+  async manualCheckOut(adminId, adminOrgId, { employeeId, sessionId, password, faceImage }) {
     const employee = await this._loadEmployeeForChannel(employeeId, 'MANUAL', true);
     if (employee.orgId !== adminOrgId) {
       throw Object.assign(new Error('Employee not found.'), { status: 404 });
@@ -637,6 +716,9 @@ class AttendanceService {
     if (!password || !(await bcrypt.compare(password, employee.passwordHash))) {
       throw Object.assign(new Error('Employee password is incorrect.'), { status: 403 });
     }
+
+    // Checkout is password-only. Face verification is required only at check-in.
+
     const record = await prisma.attendanceRecord.findFirst({
       where: {
         employeeId,
@@ -717,6 +799,8 @@ class AttendanceService {
         profileImageUrl: true,
         faceEncodingData: true,
         faceBlockedUntil: true,
+        faceMismatchCount: true,
+        faceLastMismatchAt: true,
         ...(
           includePassword ? { passwordHash: true } : {}
         ),
@@ -724,6 +808,7 @@ class AttendanceService {
           select: {
             id: true, allowDeviceCheckIn: true, allowManualCheckIn: true,
             hasStudents: true, openingTime: true, timezone: true,
+            requireFaceVerification: true,
           },
         },
       },
@@ -733,6 +818,36 @@ class AttendanceService {
     }
     EmployeePolicy.assertChannelAllowed(employee.organization, employee.checkInMethod, channel);
     return employee;
+  }
+
+  async _assertEmployeeMayCheckIn(employeeId, value, timezone) {
+    const date = dateOnly(value, timezone || 'Africa/Lagos');
+    const leave = await prisma.leaveRequest.findFirst({
+      where: { employeeId, status: 'APPROVED', startDate: { lte: date }, endDate: { gte: date } },
+      select: { startDate: true, endDate: true, leaveType: true },
+    });
+    if (leave) throw Object.assign(new Error(`You are on approved ${leave.leaveType} leave and cannot check in until ${leave.endDate.toISOString().slice(0, 10)}.`), { status: 403, code: 'ON_LEAVE' });
+  }
+
+  async syncEmployeeAbsencesForSession(sessionId) {
+    const session = await prisma.attendanceSession.findUnique({
+      where: { id: sessionId },
+      select: { id: true, startTime: true, office: { select: { orgId: true, timezone: true, openTime: true, closeTime: true, weeklySchedule: true, absentPenalty: true } } },
+    });
+    if (!session?.office) return;
+    const date = attendanceDate(session.startTime, { ...session.office, openingReference: session.startTime });
+    if (!officeHoursFor(session.startTime, session.office)) return;
+    const employees = await prisma.user.findMany({ where: { orgId: session.office.orgId, role: 'EMPLOYEE', status: 'ACTIVE' }, select: { id: true } });
+    for (const employee of employees) {
+      const leave = await prisma.leaveRequest.findFirst({ where: { employeeId: employee.id, status: 'APPROVED', startDate: { lte: date }, endDate: { gte: date } }, select: { id: true } });
+      const existing = await prisma.attendanceRecord.findUnique({ where: { employeeId_sessionId_date: { employeeId: employee.id, sessionId, date } }, select: { clockInTime: true } });
+      if (existing?.clockInTime) continue;
+      await prisma.attendanceRecord.upsert({
+        where: { employeeId_sessionId_date: { employeeId: employee.id, sessionId, date } },
+        create: { id: uuidv4(), employeeId: employee.id, sessionId, date, status: leave ? 'ON_LEAVE' : 'ABSENT', penalty: leave ? 0 : (session.office.absentPenalty || 0), checkInSource: 'PHONE' },
+        update: { status: leave ? 'ON_LEAVE' : 'ABSENT', penalty: leave ? 0 : (session.office.absentPenalty || 0) },
+      });
+    }
   }
 
   async _loadManualSession(sessionId, orgId, now) {

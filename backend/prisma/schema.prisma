@@ -17,14 +17,16 @@ model Organization {
   leavePolicy        Json?
   allowDeviceCheckIn Boolean           @default(true)
   allowManualCheckIn Boolean           @default(false)
-  hasStudents        Boolean           @default(false)
-  openingTime        String            @default("08:00")
+  hasStudents              Boolean           @default(false)
+  requireFaceVerification  Boolean           @default(false)
+  openingTime              String            @default("08:00")
   timezone           String            @default("Africa/Lagos")
   adminLoginEvents   AdminLoginEvent[]
   departments        Department[]
   offices            Office[]
   students           Student[]
   users              User[]
+  manualPenalties    ManualPenalty[]
 
   @@map("organizations")
 }
@@ -52,6 +54,7 @@ model Office {
   publicIp              String?
   weeklySchedule        Json?
   completelyLatePenalty Int                 @default(0)
+  absentPenalty         Int                 @default(0)
   sessions              AttendanceSession[]
   organization          Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
   securitySettings      SecuritySettings?
@@ -120,6 +123,8 @@ model User {
   updatedSecSettings SecuritySettings[]    @relation("SettingsUpdater")
   studentCheckIns    StudentAttendance[]   @relation("StudentCheckInRecorder")
   studentCheckOuts   StudentAttendance[]   @relation("StudentCheckOutRecorder")
+  manualPenalties    ManualPenalty[]       @relation("EmployeeManualPenalties")
+  createdPenalties   ManualPenalty[]       @relation("CreatedManualPenalties")
   department         Department?           @relation("DepartmentEmployees", fields: [departmentId], references: [id])
   organization       Organization          @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
@@ -383,6 +388,22 @@ model BreakRecord {
   employee           User             @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@map("break_records")
+}
+
+model ManualPenalty {
+  id          String       @id @default(uuid())
+  orgId       String
+  employeeId  String
+  amount      Int
+  reason      String
+  createdById String
+  createdAt   DateTime     @default(now())
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  employee    User         @relation("EmployeeManualPenalties", fields: [employeeId], references: [id], onDelete: Cascade)
+  createdBy   User         @relation("CreatedManualPenalties", fields: [createdById], references: [id])
+
+  @@index([orgId, employeeId, createdAt])
+  @@map("manual_penalties")
 }
 
 model LeaveRequest {

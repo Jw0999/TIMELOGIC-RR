@@ -83,6 +83,29 @@ class LeaveService {
     return leave;
   }
 
+  async grantLeaveForEmployee(adminId, orgId, data) {
+    const { employeeId, leaveType, startDate, endDate, reason } = data;
+    const employee = await prisma.user.findFirst({
+      where: { id: employeeId, orgId, role: 'EMPLOYEE', status: { not: 'TERMINATED' } },
+      select: { id: true },
+    });
+    if (!employee) throw Object.assign(new Error('Employee not found.'), { status: 404 });
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    if (end < start) throw Object.assign(new Error('Leave end date must be on or after the start date.'), { status: 400 });
+    const totalDays = this._calcDays(start, end);
+    if (await this.checkConflicts(employeeId, start, end)) {
+      throw Object.assign(new Error('Leave dates overlap with an existing request.'), { status: 409 });
+    }
+    const balance = await prisma.leaveBalance.findFirst({ where: { employeeId, leaveType, year: start.getFullYear() } });
+    const leave = await prisma.leaveRequest.create({
+      data: { id: uuidv4(), employeeId, leaveType, startDate: start, endDate: end, totalDays, reason, attachmentUrls: [], status: 'APPROVED', approvedBy: adminId, approvedAt: new Date() },
+    });
+    if (balance) await this._adjustBalance(employeeId, leaveType, start.getFullYear(), { usedDelta: totalDays, remainingDelta: -totalDays });
+    await NotificationService.notifyEmployee(employeeId, `Your ${leaveType} leave has been approved by an administrator`);
+    return leave;
+  }
+
   async approveLeave(adminId, leaveId) {
     const leave = await this._findPendingLeave(leaveId);
 
@@ -134,6 +157,20 @@ class LeaveService {
       : { usedDelta: -leave.totalDays, remainingDelta: leave.totalDays };
 
     await this._adjustBalance(employeeId, leave.leaveType, leave.startDate.getFullYear(), balanceDelta);
+    return updated;
+  }
+
+  async stopLeaveForAdmin(adminId, orgId, leaveId) {
+    const leave = await prisma.leaveRequest.findFirst({ where: { id: leaveId, employee: { orgId }, status: 'APPROVED' } });
+    if (!leave) throw Object.assign(new Error('Approved leave not found.'), { status: 404 });
+    const today = new Date();
+    const updated = await prisma.leaveRequest.update({ where: { id: leaveId }, data: { status: 'CANCELLED', rejectionReason: `Stopped by administrator ${adminId}` } });
+    if (leave.startDate <= today) {
+      await this._adjustBalance(leave.employeeId, leave.leaveType, leave.startDate.getFullYear(), { usedDelta: -leave.totalDays, remainingDelta: leave.totalDays });
+    } else {
+      await this._adjustBalance(leave.employeeId, leave.leaveType, leave.startDate.getFullYear(), { usedDelta: -leave.totalDays, remainingDelta: leave.totalDays });
+    }
+    await NotificationService.notifyEmployee(leave.employeeId, 'Your approved leave was stopped by an administrator. You may check in again.');
     return updated;
   }
 

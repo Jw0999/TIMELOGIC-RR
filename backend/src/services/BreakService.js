@@ -66,11 +66,14 @@ class BreakService {
     }
 
     const serverNow = now;
-    const todayBreaks = await this.getDailyBreaks(employeeId, serverNow);
-    if (todayBreaks.length > 0) {
-      throw Object.assign(new Error('Only one break is allowed per employee per day. The existing break must be ended before it is recorded.'), { status: 400 });
+    const sessionBreaks = await prisma.breakRecord.findMany({
+      where: { attendanceRecordId: record.id },
+      orderBy: { startTime: 'asc' },
+    });
+    if (sessionBreaks.length > 0) {
+      throw Object.assign(new Error('Only one break is allowed per employee during this attendance session. A new break is available when the next session begins.'), { status: 400 });
     }
-    const check = await this.checkBreakPolicy(employeeId, policy, todayBreaks, breakType);
+    const check = await this.checkBreakPolicy(employeeId, policy, sessionBreaks, breakType);
     if (!check.allowed) throw Object.assign(new Error(check.reason), { status: 400 });
 
     return prisma.breakRecord.create({

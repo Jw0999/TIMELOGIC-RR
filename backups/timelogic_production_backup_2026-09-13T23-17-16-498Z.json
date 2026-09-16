@@ -1,0 +1,1040 @@
+{
+  "timestamp": "2026-09-13T23:17:12.705Z",
+  "superAdmin": {
+    "id": "5f9719f8-7b8e-4193-b2fb-365d96266099",
+    "orgId": "platform-org",
+    "departmentId": null,
+    "firstName": "Super",
+    "lastName": "Admin",
+    "email": "superadmin@acme.com",
+    "role": "SUPER_ADMIN",
+    "profileImageUrl": null,
+    "status": "ACTIVE",
+    "shiftType": "FLEXIBLE",
+    "adminLevel": null,
+    "lastLoginAt": "2026-09-13T23:17:12.392Z",
+    "createdAt": "2026-08-23T08:49:28.619Z",
+    "updatedAt": "2026-09-13T23:13:39.016Z",
+    "employeeCode": "SA001",
+    "checkInMethod": "PHONE",
+    "phone": null,
+    "faceBlockedUntil": null,
+    "faceMismatchCount": 0,
+    "faceLastMismatchAt": null,
+    "organization": {
+      "id": "platform-org",
+      "name": "Platform",
+      "allowDeviceCheckIn": true,
+      "allowManualCheckIn": false,
+      "hasStudents": false,
+      "openingTime": "08:00",
+      "timezone": "Africa/Lagos"
+    }
+  },
+  "organizations": [
+    {
+      "id": "d8b8129b-4bdd-472e-a6fd-6f20702f6883",
+      "name": "Loveth",
+      "industry": "Technology",
+      "subscriptionTier": "starter",
+      "createdAt": "2026-09-06T04:45:55.742Z",
+      "updatedAt": "2026-09-06T04:45:55.742Z",
+      "leavePolicy": {
+        "organization": "Loveth",
+        "policy": {
+          "ANNUAL": 14,
+          "SICK": 10,
+          "CASUAL": 5,
+          "MATERNITY": 90,
+          "PATERNITY": 14,
+          "UNPAID": 0,
+          "COMPASSIONATE": 3
+        }
+      },
+      "allowDeviceCheckIn": true,
+      "allowManualCheckIn": true,
+      "hasStudents": true,
+      "openingTime": "08:00",
+      "timezone": "Africa/Lagos",
+      "_count": {
+        "offices": 1,
+        "departments": 1,
+        "users": 1,
+        "students": 0
+      },
+      "offices": [
+        {
+          "id": "040f7933-1069-437d-8da9-131ede6d0752",
+          "name": "Main Office",
+          "address": "",
+          "timezone": "Africa/Lagos",
+          "isActive": true,
+          "wifiSSID": null,
+          "publicIp": null,
+          "openTime": "08:00",
+          "closeTime": "17:00",
+          "weeklySchedule": {
+            "friday": {
+              "openTime": "08:00",
+              "closeTime": "17:00"
+            },
+            "monday": {
+              "openTime": "08:00",
+              "closeTime": "17:00"
+            },
+            "sunday": {
+              "openTime": "",
+              "closeTime": ""
+            },
+            "tuesday": {
+              "openTime": "08:00",
+              "closeTime": "17:00"
+            },
+            "saturday": {
+              "openTime": "08:00",
+              "closeTime": "17:00"
+            },
+            "thursday": {
+              "openTime": "08:00",
+              "closeTime": "17:00"
+            },
+            "wednesday": {
+              "openTime": "08:00",
+              "closeTime": "17:00"
+            }
+          },
+          "breakMinutes": 60,
+          "graceMinutes": 30,
+          "lateAfterMinutes": 90,
+          "gracePenalty": 0,
+          "latePenalty": 0,
+          "completelyLatePenalty": 0,
+          "autoSessionMinutes": 60,
+          "breakStart": "13:00",
+          "breakEnd": "14:00",
+          "securitySettings": {
+            "id": "7e6851a0-5638-445e-b491-87cca71c81cc"
+          },
+          "_count": {
+            "sessions": 6
+          }
+        }
+      ],
+      "departments": [
+        {
+          "id": "ae31e7ae-afc1-492c-a33e-f2b7d4b0e25a",
+          "name": "General",
+          "breakPolicy": {
+            "id": "dde23d12-8549-4987-90a9-bef5a4628d9d",
+            "departmentId": "ae31e7ae-afc1-492c-a33e-f2b7d4b0e25a",
+            "policyName": "General Break Policy",
+            "maxLunchMinutes": 60,
+            "maxShortBreaks": 2,
+            "maxShortBreakMinutes": 15,
+            "totalDailyBreakLimit": 60,
+            "autoEndAfterMinutes": 120,
+            "requiresApproval": false,
+            "appliesTo": [
+              "MORNING",
+              "AFTERNOON",
+              "FLEXIBLE"
+            ],
+            "breakEnd": "14:00",
+            "breakStart": "13:00",
+            "overstayPenalty": 100
+          },
+          "manager": null,
+          "_count": {
+            "employees": 0
+          }
+        }
+      ],
+      "users": [
+        {
+          "id": "780d8c48-0c91-4932-a5cb-f706b43aa883",
+          "firstName": "as",
+          "lastName": "as",
+          "email": "as@gmail.com",
+          "role": "ADMIN",
+          "status": "ACTIVE",
+          "employeeCode": null,
+          "shiftType": "FLEXIBLE",
+          "profileImageUrl": null,
+          "lastLoginAt": null,
+          "createdAt": "2026-09-06T04:45:55.753Z",
+          "department": null,
+          "_count": {
+            "devices": 0,
+            "attendanceRecords": 6
+          },
+          "isTerminated": false
+        }
+      ]
+    },
+    {
+      "id": "2f176630-fbbe-40d6-af72-6ae924842fd3",
+      "name": "BEAMON UNIQUE ENTERPRISES",
+      "industry": "Technology",
+      "subscriptionTier": "business",
+      "createdAt": "2026-08-24T06:37:59.610Z",
+      "updatedAt": "2026-09-02T21:46:59.968Z",
+      "leavePolicy": {
+        "organization": "BEAMON UNIQUE ENTERPRISES",
+        "policy": {
+          "ANNUAL": 14,
+          "SICK": 10,
+          "CASUAL": 5,
+          "MATERNITY": 90,
+          "PATERNITY": 14,
+          "UNPAID": 0,
+          "COMPASSIONATE": 3
+        }
+      },
+      "allowDeviceCheckIn": true,
+      "allowManualCheckIn": true,
+      "hasStudents": true,
+      "openingTime": "08:00",
+      "timezone": "Africa/Lagos",
+      "_count": {
+        "offices": 1,
+        "departments": 5,
+        "users": 11,
+        "students": 12
+      },
+      "offices": [
+        {
+          "id": "bad5c97c-1a0a-425a-91d1-08b52507e5fd",
+          "name": "Main Office",
+          "address": "Opposite Ogombo Police Station",
+          "timezone": "Africa/Lagos",
+          "isActive": true,
+          "wifiSSID": "BEAMONUNIQUEPRINT",
+          "publicIp": "127.0.0.1",
+          "openTime": "08:00",
+          "closeTime": "19:30",
+          "weeklySchedule": {
+            "friday": {
+              "openTime": "08:00",
+              "closeTime": "19:30"
+            },
+            "monday": {
+              "openTime": "08:00",
+              "closeTime": "19:30"
+            },
+            "sunday": {
+              "openTime": "",
+              "closeTime": ""
+            },
+            "tuesday": {
+              "openTime": "08:00",
+              "closeTime": "19:30"
+            },
+            "saturday": {
+              "openTime": "08:00",
+              "closeTime": "19:30"
+            },
+            "thursday": {
+              "openTime": "09:00",
+              "closeTime": "19:30"
+            },
+            "wednesday": {
+              "openTime": "08:00",
+              "closeTime": "19:30"
+            }
+          },
+          "breakMinutes": 60,
+          "graceMinutes": 10,
+          "lateAfterMinutes": 20,
+          "gracePenalty": 500,
+          "latePenalty": 500,
+          "completelyLatePenalty": 500,
+          "autoSessionMinutes": 60,
+          "breakStart": "12:00",
+          "breakEnd": "14:00",
+          "securitySettings": {
+            "id": "0c4b4291-b1ff-4f5a-aa86-081c77f1a6d2"
+          },
+          "_count": {
+            "sessions": 18
+          }
+        }
+      ],
+      "departments": [
+        {
+          "id": "e834f8a2-2e11-4218-a899-f13277f60027",
+          "name": "Typist",
+          "breakPolicy": {
+            "id": "8fbda544-688e-4d6c-83e2-5fe126b84da0",
+            "departmentId": "e834f8a2-2e11-4218-a899-f13277f60027",
+            "policyName": "Typist Break Policy",
+            "maxLunchMinutes": 60,
+            "maxShortBreaks": 0,
+            "maxShortBreakMinutes": 0,
+            "totalDailyBreakLimit": 60,
+            "autoEndAfterMinutes": 120,
+            "requiresApproval": false,
+            "appliesTo": [
+              "MORNING",
+              "AFTERNOON",
+              "FLEXIBLE"
+            ],
+            "breakEnd": "13:00",
+            "breakStart": "12:00",
+            "overstayPenalty": 200
+          },
+          "manager": null,
+          "_count": {
+            "employees": 4
+          }
+        },
+        {
+          "id": "c869de4f-bf3c-4019-b24a-4b9cb3748f33",
+          "name": "Graphic Designer",
+          "breakPolicy": {
+            "id": "85dfa1f1-012a-4505-9c0c-280ef3dc2735",
+            "departmentId": "c869de4f-bf3c-4019-b24a-4b9cb3748f33",
+            "policyName": "Graphic Designer Break Policy",
+            "maxLunchMinutes": 60,
+            "maxShortBreaks": 0,
+            "maxShortBreakMinutes": 0,
+            "totalDailyBreakLimit": 60,
+            "autoEndAfterMinutes": 120,
+            "requiresApproval": false,
+            "appliesTo": [
+              "MORNING",
+              "AFTERNOON",
+              "FLEXIBLE"
+            ],
+            "breakEnd": "15:00",
+            "breakStart": "14:00",
+            "overstayPenalty": 200
+          },
+          "manager": null,
+          "_count": {
+            "employees": 1
+          }
+        },
+        {
+          "id": "a837b8a0-152c-43e5-ba87-328cce8d59f1",
+          "name": "Typist 2",
+          "breakPolicy": {
+            "id": "5036a34e-0adc-43b5-96eb-bb8480bc2d98",
+            "departmentId": "a837b8a0-152c-43e5-ba87-328cce8d59f1",
+            "policyName": "Typist 2 Break Policy",
+            "maxLunchMinutes": 60,
+            "maxShortBreaks": 0,
+            "maxShortBreakMinutes": 0,
+            "totalDailyBreakLimit": 60,
+            "autoEndAfterMinutes": 120,
+            "requiresApproval": false,
+            "appliesTo": [
+              "MORNING",
+              "AFTERNOON",
+              "FLEXIBLE"
+            ],
+            "breakEnd": "14:00",
+            "breakStart": "13:00",
+            "overstayPenalty": 200
+          },
+          "manager": null,
+          "_count": {
+            "employees": 1
+          }
+        },
+        {
+          "id": "d2de621a-c47e-4d89-9009-3c4a55a653ab",
+          "name": "Anyone",
+          "breakPolicy": {
+            "id": "9cc83547-aff8-4036-ab14-51e426cd2095",
+            "departmentId": "d2de621a-c47e-4d89-9009-3c4a55a653ab",
+            "policyName": "Anyone Break Policy",
+            "maxLunchMinutes": 60,
+            "maxShortBreaks": 0,
+            "maxShortBreakMinutes": 0,
+            "totalDailyBreakLimit": 60,
+            "autoEndAfterMinutes": 120,
+            "requiresApproval": false,
+            "appliesTo": [
+              "MORNING",
+              "AFTERNOON",
+              "FLEXIBLE"
+            ],
+            "breakEnd": "16:00",
+            "breakStart": "15:00",
+            "overstayPenalty": 200
+          },
+          "manager": null,
+          "_count": {
+            "employees": 1
+          }
+        },
+        {
+          "id": "8d316fc7-16bc-4eab-8ae4-059917fa838a",
+          "name": "Anyone 2",
+          "breakPolicy": {
+            "id": "b63c288e-db98-4513-b37b-e84139d42551",
+            "departmentId": "8d316fc7-16bc-4eab-8ae4-059917fa838a",
+            "policyName": "Anyone 2 Break Policy",
+            "maxLunchMinutes": 60,
+            "maxShortBreaks": 0,
+            "maxShortBreakMinutes": 0,
+            "totalDailyBreakLimit": 60,
+            "autoEndAfterMinutes": 120,
+            "requiresApproval": false,
+            "appliesTo": [
+              "MORNING",
+              "AFTERNOON",
+              "FLEXIBLE"
+            ],
+            "breakEnd": "17:00",
+            "breakStart": "16:00",
+            "overstayPenalty": 200
+          },
+          "manager": null,
+          "_count": {
+            "employees": 1
+          }
+        }
+      ],
+      "users": [
+        {
+          "id": "f5f3210d-96a6-4d0d-8a37-d9f615ab12b4",
+          "firstName": "Akenuwa",
+          "lastName": "Omonuwa",
+          "email": "akenuwaomonuwa@gmail.com",
+          "role": "EMPLOYEE",
+          "status": "ACTIVE",
+          "employeeCode": "EMP010",
+          "shiftType": "MORNING",
+          "profileImageUrl": "/uploads/faces/4ce393b3-f340-4965-a90e-ac5eb04f2048.jpeg",
+          "lastLoginAt": "2026-09-26T10:29:38.382Z",
+          "createdAt": "2026-08-24T12:38:10.857Z",
+          "department": {
+            "name": "Typist"
+          },
+          "_count": {
+            "devices": 1,
+            "attendanceRecords": 8
+          },
+          "isTerminated": false
+        },
+        {
+          "id": "51ecabe4-2df2-4620-866a-668ba5db805b",
+          "firstName": "eletu",
+          "lastName": "adedayo",
+          "email": "dayoiouwadamilare94@gmail.com",
+          "role": "EMPLOYEE",
+          "status": "ACTIVE",
+          "employeeCode": "EMP016",
+          "shiftType": "MORNING",
+          "profileImageUrl": "/uploads/faces/6086304e-40ac-40cc-829e-66b3ef6208b2.png",
+          "lastLoginAt": null,
+          "createdAt": "2026-08-31T19:08:27.893Z",
+          "department": null,
+          "_count": {
+            "devices": 0,
+            "attendanceRecords": 7
+          },
+          "isTerminated": false
+        },
+        {
+          "id": "b891030a-4645-4c48-9e67-98bf9fed6a2a",
+          "firstName": "ISRAEL",
+          "lastName": "OLUWATOSIN",
+          "email": "israeleli2363@gmail.com",
+          "role": "EMPLOYEE",
+          "status": "ACTIVE",
+          "employeeCode": "EMP002",
+          "shiftType": "MORNING",
+          "profileImageUrl": "/uploads/faces/98ac0e3d-5675-4510-8bbe-dad00e3d2cae.png",
+          "lastLoginAt": null,
+          "createdAt": "2026-08-24T08:38:52.659Z",
+          "department": {
+            "name": "Typist"
+          },
+          "_count": {
+            "devices": 0,
+            "attendanceRecords": 14
+          },
+          "isTerminated": false
+        },
+        {
+          "id": "60406f75-3ffd-4cda-b4e4-736a68bcb86f",
+          "firstName": "Lydia",
+          "lastName": "Akenuwa",
+          "email": "favelilly17@gmail.com",
+          "role": "EMPLOYEE",
+          "status": "ACTIVE",
+          "employeeCode": "EMP011",
+          "shiftType": "MORNING",
+          "profileImageUrl": "/uploads/faces/3b2b132a-f295-457f-b974-0675eedb2fa5.jpg",
+          "lastLoginAt": null,
+          "createdAt": "2026-08-24T16:31:37.942Z",
+          "department": {
+            "name": "Typist 2"
+          },
+          "_count": {
+            "devices": 0,
+            "attendanceRecords": 12
+          },
+          "isTerminated": false
+        },
+        {
+          "id": "090ff1a5-aa0e-4f5c-8735-c4b4bac1c9d2",
+          "firstName": "OLAMIDE",
+          "lastName": "AMOS",
+          "email": "olamideamos978@gmail.com",
+          "role": "EMPLOYEE",
+          "status": "ACTIVE",
+          "employeeCode": "EMP001",
+          "shiftType": "MORNING",
+          "profileImageUrl": "/uploads/faces/12015e55-9bc8-4230-9aa6-e4eecba56940.jpeg",
+          "lastLoginAt": "2026-09-24T08:30:43.530Z",
+          "createdAt": "2026-08-24T08:28:34.160Z",
+          "department": {
+            "name": "Anyone"
+          },
+          "_count": {
+            "devices": 1,
+            "attendanceRecords": 11
+          },
+          "isTerminated": false
+        },
+        {
+          "id": "03bb73b6-02ab-40e5-979e-7306c8f5ac50",
+          "firstName": "Raodah",
+          "lastName": "Olashubomi",
+          "email": "olashubomiraodah6@gmail.com",
+          "role": "EMPLOYEE",
+          "status": "ACTIVE",
+          "employeeCode": "EMP003",
+          "shiftType": "MORNING",
+          "profileImageUrl": "/uploads/faces/c7263ae3-eb02-4d04-9d84-041e666f06b3.jpg",
+          "lastLoginAt": null,
+          "createdAt": "2026-08-24T08:39:19.058Z",
+          "department": {
+            "name": "Anyone 2"
+          },
+          "_count": {
+            "devices": 0,
+            "attendanceRecords": 15
+          },
+          "isTerminated": false
+        },
+        {
+          "id": "42a3d15d-ab0b-4e89-b95d-e806929f290e",
+          "firstName": "RIDWAN",
+          "lastName": "BELLO",
+          "email": "yellowrammy012345@gmail.com",
+          "role": "EMPLOYEE",
+          "status": "ACTIVE",
+          "employeeCode": "EMP015",
+          "shiftType": "MORNING",
+          "profileImageUrl": "/uploads/faces/fc2621ad-398a-4763-b123-1ea0e4b2f1f5.jpg",
+          "lastLoginAt": null,
+          "createdAt": "2026-08-25T07:24:55.572Z",
+          "department": null,
+          "_count": {
+            "devices": 0,
+            "attendanceRecords": 10
+          },
+          "isTerminated": false
+        },
+        {
+          "id": "b93adad7-4474-40b5-a42a-f38661d540b6",
+          "firstName": "Yekini",
+          "lastName": "Aishat",
+          "email": "aishatabiola2009@gmail.com",
+          "role": "EMPLOYEE",
+          "status": "ACTIVE",
+          "employeeCode": "EMP012",
+          "shiftType": "MORNING",
+          "profileImageUrl": "/uploads/faces/bcf27c42-00c1-41fc-bb6e-fd1b611ed145.png",
+          "lastLoginAt": null,
+          "createdAt": "2026-08-24T18:25:29.634Z",
+          "department": {
+            "name": "Graphic Designer"
+          },
+          "_count": {
+            "devices": 0,
+            "attendanceRecords": 15
+          },
+          "isTerminated": false
+        },
+        {
+          "id": "dee19125-93ed-455a-8a18-3307833169a3",
+          "firstName": "Yinusa",
+          "lastName": "Kehinde",
+          "email": "seyiayinde99@gmail.com",
+          "role": "EMPLOYEE",
+          "status": "ACTIVE",
+          "employeeCode": "EMP005",
+          "shiftType": "MORNING",
+          "profileImageUrl": "/uploads/faces/d8a9ee7f-4772-4ab6-b7ad-1a63610a3835.jpg",
+          "lastLoginAt": null,
+          "createdAt": "2026-08-24T08:52:33.669Z",
+          "department": {
+            "name": "Typist"
+          },
+          "_count": {
+            "devices": 0,
+            "attendanceRecords": 10
+          },
+          "isTerminated": false
+        },
+        {
+          "id": "f206225b-5433-4847-aa19-4f5665f160ce",
+          "firstName": "BEAMON UNIQUE",
+          "lastName": "Front desk",
+          "email": "beamonunique@gmail.com",
+          "role": "ADMIN",
+          "status": "ACTIVE",
+          "employeeCode": null,
+          "shiftType": "FLEXIBLE",
+          "profileImageUrl": null,
+          "lastLoginAt": "2026-09-11T07:31:45.740Z",
+          "createdAt": "2026-08-24T06:37:59.780Z",
+          "department": null,
+          "_count": {
+            "devices": 0,
+            "attendanceRecords": 18
+          },
+          "isTerminated": false
+        },
+        {
+          "id": "66ae69c3-ce51-47a7-a071-d957af91c728",
+          "firstName": "ADEDAYO",
+          "lastName": "OLUWADAMILARE",
+          "email": "dayooluwadamilare94@gmail.com",
+          "role": "EMPLOYEE",
+          "status": "TERMINATED",
+          "employeeCode": "EMP006",
+          "shiftType": "MORNING",
+          "profileImageUrl": "/uploads/faces/2d948b00-211d-458a-a9ce-23edb9e06052.png",
+          "lastLoginAt": null,
+          "createdAt": "2026-08-24T09:00:12.960Z",
+          "department": {
+            "name": "Typist"
+          },
+          "_count": {
+            "devices": 0,
+            "attendanceRecords": 0
+          },
+          "isTerminated": true
+        }
+      ]
+    },
+    {
+      "id": "platform-org",
+      "name": "Platform",
+      "industry": "Technology",
+      "subscriptionTier": "enterprise",
+      "createdAt": "2026-08-23T08:49:28.609Z",
+      "updatedAt": "2026-08-23T08:49:28.609Z",
+      "leavePolicy": {
+        "organization": "Platform",
+        "policy": {
+          "ANNUAL": 14,
+          "SICK": 10,
+          "CASUAL": 5,
+          "MATERNITY": 90,
+          "PATERNITY": 14,
+          "UNPAID": 0,
+          "COMPASSIONATE": 3
+        }
+      },
+      "allowDeviceCheckIn": true,
+      "allowManualCheckIn": false,
+      "hasStudents": false,
+      "openingTime": "08:00",
+      "timezone": "Africa/Lagos",
+      "_count": {
+        "offices": 0,
+        "departments": 0,
+        "users": 1,
+        "students": 0
+      },
+      "offices": [],
+      "departments": [],
+      "users": [
+        {
+          "id": "5f9719f8-7b8e-4193-b2fb-365d96266099",
+          "firstName": "Super",
+          "lastName": "Admin",
+          "email": "superadmin@acme.com",
+          "role": "SUPER_ADMIN",
+          "status": "ACTIVE",
+          "employeeCode": "SA001",
+          "shiftType": "FLEXIBLE",
+          "profileImageUrl": null,
+          "lastLoginAt": "2026-09-13T23:17:12.392Z",
+          "createdAt": "2026-08-23T08:49:28.619Z",
+          "department": null,
+          "_count": {
+            "devices": 0,
+            "attendanceRecords": 0
+          },
+          "isTerminated": false
+        }
+      ]
+    }
+  ],
+  "reports": {
+    "totalOrgs": 3,
+    "totalEmployees": 9,
+    "totalAdmins": 3,
+    "presentToday": 15,
+    "lateToday": 0,
+    "openAlerts": 1,
+    "pendingLeaves": 0,
+    "recentAttendance": [
+      {
+        "id": "b09f4b95-f9b9-488d-9b33-e0724dc5a95c",
+        "employeeId": "f5f3210d-96a6-4d0d-8a37-d9f615ab12b4",
+        "sessionId": "75b55049-3076-4ebd-af51-5693474278fa",
+        "date": "2026-09-26T00:00:00.000Z",
+        "clockInTime": "2026-09-26T07:25:13.915Z",
+        "clockOutTime": "2026-09-26T19:10:00.000Z",
+        "status": "PRESENT",
+        "totalWorkHours": 11.75,
+        "totalBreakMinutes": 0,
+        "scanResult": "VALID",
+        "wifiVerified": true,
+        "deviceVerified": true,
+        "flagged": false,
+        "flagReason": null,
+        "reviewedBy": null,
+        "reviewNotes": null,
+        "createdAt": "2026-08-26T07:25:13.905Z",
+        "updatedAt": "2026-08-26T20:57:17.472Z",
+        "deviceId": "c0488d23-1f75-4236-af2f-14074ba12ecd",
+        "penalty": 500,
+        "wifiSSID": "BEAMONUNIQUEPRINT",
+        "checkInSource": "PHONE",
+        "checkOutSource": "SYSTEM",
+        "checkInRecordedById": null,
+        "checkOutRecordedById": null,
+        "employee": {
+          "firstName": "Akenuwa",
+          "lastName": "Omonuwa"
+        },
+        "session": {
+          "sessionName": "Main Office – 26/09/2026"
+        }
+      },
+      {
+        "id": "c993c5be-a512-413a-b91b-d45e6e015502",
+        "employeeId": "090ff1a5-aa0e-4f5c-8735-c4b4bac1c9d2",
+        "sessionId": "75b55049-3076-4ebd-af51-5693474278fa",
+        "date": "2026-09-26T00:00:00.000Z",
+        "clockInTime": "2026-09-26T07:17:18.996Z",
+        "clockOutTime": "2026-09-26T18:38:51.966Z",
+        "status": "PRESENT",
+        "totalWorkHours": 11.36,
+        "totalBreakMinutes": 56,
+        "scanResult": null,
+        "wifiVerified": false,
+        "deviceVerified": false,
+        "flagged": false,
+        "flagReason": null,
+        "reviewedBy": null,
+        "reviewNotes": null,
+        "createdAt": "2026-08-26T07:17:21.399Z",
+        "updatedAt": "2026-08-26T18:38:51.987Z",
+        "deviceId": null,
+        "penalty": 0,
+        "wifiSSID": null,
+        "checkInSource": "MANUAL",
+        "checkOutSource": "MANUAL",
+        "checkInRecordedById": "f206225b-5433-4847-aa19-4f5665f160ce",
+        "checkOutRecordedById": "f206225b-5433-4847-aa19-4f5665f160ce",
+        "employee": {
+          "firstName": "OLAMIDE",
+          "lastName": "AMOS"
+        },
+        "session": {
+          "sessionName": "Main Office – 26/09/2026"
+        }
+      },
+      {
+        "id": "d50ffbd8-fb47-4081-a74e-1b63dbff0e79",
+        "employeeId": "42a3d15d-ab0b-4e89-b95d-e806929f290e",
+        "sessionId": "75b55049-3076-4ebd-af51-5693474278fa",
+        "date": "2026-09-26T00:00:00.000Z",
+        "clockInTime": "2026-09-26T07:09:30.328Z",
+        "clockOutTime": "2026-09-26T18:36:15.091Z",
+        "status": "PRESENT",
+        "totalWorkHours": 11.45,
+        "totalBreakMinutes": 0,
+        "scanResult": null,
+        "wifiVerified": false,
+        "deviceVerified": false,
+        "flagged": false,
+        "flagReason": null,
+        "reviewedBy": null,
+        "reviewNotes": null,
+        "createdAt": "2026-08-26T07:09:32.094Z",
+        "updatedAt": "2026-08-26T18:36:15.219Z",
+        "deviceId": null,
+        "penalty": 0,
+        "wifiSSID": null,
+        "checkInSource": "MANUAL",
+        "checkOutSource": "MANUAL",
+        "checkInRecordedById": "f206225b-5433-4847-aa19-4f5665f160ce",
+        "checkOutRecordedById": "f206225b-5433-4847-aa19-4f5665f160ce",
+        "employee": {
+          "firstName": "RIDWAN",
+          "lastName": "BELLO"
+        },
+        "session": {
+          "sessionName": "Main Office – 26/09/2026"
+        }
+      },
+      {
+        "id": "b5011d37-c462-437f-9fd0-af67621eebc3",
+        "employeeId": "dee19125-93ed-455a-8a18-3307833169a3",
+        "sessionId": "75b55049-3076-4ebd-af51-5693474278fa",
+        "date": "2026-09-26T00:00:00.000Z",
+        "clockInTime": "2026-09-26T07:05:30.249Z",
+        "clockOutTime": "2026-09-26T19:10:00.000Z",
+        "status": "PRESENT",
+        "totalWorkHours": 12.07,
+        "totalBreakMinutes": 0,
+        "scanResult": null,
+        "wifiVerified": false,
+        "deviceVerified": false,
+        "flagged": false,
+        "flagReason": null,
+        "reviewedBy": null,
+        "reviewNotes": null,
+        "createdAt": "2026-08-26T07:05:32.094Z",
+        "updatedAt": "2026-08-26T20:57:17.466Z",
+        "deviceId": null,
+        "penalty": 0,
+        "wifiSSID": null,
+        "checkInSource": "MANUAL",
+        "checkOutSource": "SYSTEM",
+        "checkInRecordedById": "f206225b-5433-4847-aa19-4f5665f160ce",
+        "checkOutRecordedById": null,
+        "employee": {
+          "firstName": "Yinusa",
+          "lastName": "Kehinde"
+        },
+        "session": {
+          "sessionName": "Main Office – 26/09/2026"
+        }
+      },
+      {
+        "id": "d35f713f-e5c4-444f-80b5-2d2cdc7e94f4",
+        "employeeId": "03bb73b6-02ab-40e5-979e-7306c8f5ac50",
+        "sessionId": "75b55049-3076-4ebd-af51-5693474278fa",
+        "date": "2026-09-26T00:00:00.000Z",
+        "clockInTime": "2026-09-26T07:05:04.975Z",
+        "clockOutTime": "2026-09-26T18:42:47.738Z",
+        "status": "PRESENT",
+        "totalWorkHours": 11.63,
+        "totalBreakMinutes": 61,
+        "scanResult": null,
+        "wifiVerified": false,
+        "deviceVerified": false,
+        "flagged": false,
+        "flagReason": null,
+        "reviewedBy": null,
+        "reviewNotes": null,
+        "createdAt": "2026-08-26T07:05:06.402Z",
+        "updatedAt": "2026-08-26T18:42:47.421Z",
+        "deviceId": null,
+        "penalty": 0,
+        "wifiSSID": null,
+        "checkInSource": "MANUAL",
+        "checkOutSource": "MANUAL",
+        "checkInRecordedById": "f206225b-5433-4847-aa19-4f5665f160ce",
+        "checkOutRecordedById": "f206225b-5433-4847-aa19-4f5665f160ce",
+        "employee": {
+          "firstName": "Raodah",
+          "lastName": "Olashubomi"
+        },
+        "session": {
+          "sessionName": "Main Office – 26/09/2026"
+        }
+      },
+      {
+        "id": "b20d9074-bc19-49d5-b47d-53e69420fcc2",
+        "employeeId": "b93adad7-4474-40b5-a42a-f38661d540b6",
+        "sessionId": "75b55049-3076-4ebd-af51-5693474278fa",
+        "date": "2026-09-26T00:00:00.000Z",
+        "clockInTime": "2026-09-26T07:04:36.074Z",
+        "clockOutTime": "2026-09-26T18:47:13.332Z",
+        "status": "PRESENT",
+        "totalWorkHours": 11.71,
+        "totalBreakMinutes": 132,
+        "scanResult": null,
+        "wifiVerified": false,
+        "deviceVerified": false,
+        "flagged": false,
+        "flagReason": null,
+        "reviewedBy": null,
+        "reviewNotes": null,
+        "createdAt": "2026-08-26T07:04:37.498Z",
+        "updatedAt": "2026-08-26T18:47:12.520Z",
+        "deviceId": null,
+        "penalty": 0,
+        "wifiSSID": null,
+        "checkInSource": "MANUAL",
+        "checkOutSource": "MANUAL",
+        "checkInRecordedById": "f206225b-5433-4847-aa19-4f5665f160ce",
+        "checkOutRecordedById": "f206225b-5433-4847-aa19-4f5665f160ce",
+        "employee": {
+          "firstName": "Yekini",
+          "lastName": "Aishat"
+        },
+        "session": {
+          "sessionName": "Main Office – 26/09/2026"
+        }
+      },
+      {
+        "id": "4976f135-8cd3-4ae0-9451-bc25381adcee",
+        "employeeId": "b891030a-4645-4c48-9e67-98bf9fed6a2a",
+        "sessionId": "75b55049-3076-4ebd-af51-5693474278fa",
+        "date": "2026-09-26T00:00:00.000Z",
+        "clockInTime": "2026-09-26T07:04:24.349Z",
+        "clockOutTime": "2026-09-26T18:42:15.513Z",
+        "status": "PRESENT",
+        "totalWorkHours": 11.63,
+        "totalBreakMinutes": 64,
+        "scanResult": null,
+        "wifiVerified": false,
+        "deviceVerified": false,
+        "flagged": false,
+        "flagReason": null,
+        "reviewedBy": null,
+        "reviewNotes": null,
+        "createdAt": "2026-08-26T07:04:26.007Z",
+        "updatedAt": "2026-08-26T18:42:15.030Z",
+        "deviceId": null,
+        "penalty": 0,
+        "wifiSSID": null,
+        "checkInSource": "MANUAL",
+        "checkOutSource": "MANUAL",
+        "checkInRecordedById": "f206225b-5433-4847-aa19-4f5665f160ce",
+        "checkOutRecordedById": "f206225b-5433-4847-aa19-4f5665f160ce",
+        "employee": {
+          "firstName": "ISRAEL",
+          "lastName": "OLUWATOSIN"
+        },
+        "session": {
+          "sessionName": "Main Office – 26/09/2026"
+        }
+      },
+      {
+        "id": "0deeb60f-6bdf-4fb2-b757-1927ff2e93fb",
+        "employeeId": "090ff1a5-aa0e-4f5c-8735-c4b4bac1c9d2",
+        "sessionId": "3e3a7cab-c5c7-4e4d-b0a3-4ea593b9c2d8",
+        "date": "2026-09-25T00:00:00.000Z",
+        "clockInTime": "2026-09-25T07:26:12.528Z",
+        "clockOutTime": "2026-09-25T18:41:19.316Z",
+        "status": "PRESENT",
+        "totalWorkHours": 11.25,
+        "totalBreakMinutes": 126,
+        "scanResult": null,
+        "wifiVerified": false,
+        "deviceVerified": false,
+        "flagged": false,
+        "flagReason": null,
+        "reviewedBy": null,
+        "reviewNotes": null,
+        "createdAt": "2026-08-25T07:26:14.771Z",
+        "updatedAt": "2026-08-25T18:41:18.776Z",
+        "deviceId": null,
+        "penalty": 500,
+        "wifiSSID": null,
+        "checkInSource": "MANUAL",
+        "checkOutSource": "MANUAL",
+        "checkInRecordedById": "f206225b-5433-4847-aa19-4f5665f160ce",
+        "checkOutRecordedById": "f206225b-5433-4847-aa19-4f5665f160ce",
+        "employee": {
+          "firstName": "OLAMIDE",
+          "lastName": "AMOS"
+        },
+        "session": {
+          "sessionName": "Main Office – 25/09/2026"
+        }
+      },
+      {
+        "id": "89da04d0-b57c-42d6-92f9-cb0d9e1dc14b",
+        "employeeId": "42a3d15d-ab0b-4e89-b95d-e806929f290e",
+        "sessionId": "3e3a7cab-c5c7-4e4d-b0a3-4ea593b9c2d8",
+        "date": "2026-09-25T00:00:00.000Z",
+        "clockInTime": "2026-09-25T07:25:15.059Z",
+        "clockOutTime": "2026-09-25T18:41:01.885Z",
+        "status": "PRESENT",
+        "totalWorkHours": 11.26,
+        "totalBreakMinutes": 50,
+        "scanResult": null,
+        "wifiVerified": false,
+        "deviceVerified": false,
+        "flagged": false,
+        "flagReason": "Manually flagged",
+        "reviewedBy": "f206225b-5433-4847-aa19-4f5665f160ce",
+        "reviewNotes": null,
+        "createdAt": "2026-08-25T07:25:16.383Z",
+        "updatedAt": "2026-08-25T18:41:01.468Z",
+        "deviceId": null,
+        "penalty": 500,
+        "wifiSSID": null,
+        "checkInSource": "MANUAL",
+        "checkOutSource": "MANUAL",
+        "checkInRecordedById": "f206225b-5433-4847-aa19-4f5665f160ce",
+        "checkOutRecordedById": "f206225b-5433-4847-aa19-4f5665f160ce",
+        "employee": {
+          "firstName": "RIDWAN",
+          "lastName": "BELLO"
+        },
+        "session": {
+          "sessionName": "Main Office – 25/09/2026"
+        }
+      },
+      {
+        "id": "fbe8f3db-1e00-47e9-8998-d228ced8214e",
+        "employeeId": "60406f75-3ffd-4cda-b4e4-736a68bcb86f",
+        "sessionId": "3e3a7cab-c5c7-4e4d-b0a3-4ea593b9c2d8",
+        "date": "2026-09-25T00:00:00.000Z",
+        "clockInTime": "2026-09-25T07:09:32.997Z",
+        "clockOutTime": "2026-09-25T18:45:14.386Z",
+        "status": "PRESENT",
+        "totalWorkHours": 11.59,
+        "totalBreakMinutes": 104,
+        "scanResult": null,
+        "wifiVerified": false,
+        "deviceVerified": false,
+        "flagged": false,
+        "flagReason": null,
+        "reviewedBy": null,
+        "reviewNotes": null,
+        "createdAt": "2026-08-25T07:09:35.476Z",
+        "updatedAt": "2026-08-25T18:45:13.769Z",
+        "deviceId": null,
+        "penalty": 0,
+        "wifiSSID": null,
+        "checkInSource": "MANUAL",
+        "checkOutSource": "MANUAL",
+        "checkInRecordedById": "f206225b-5433-4847-aa19-4f5665f160ce",
+        "checkOutRecordedById": "f206225b-5433-4847-aa19-4f5665f160ce",
+        "employee": {
+          "firstName": "Lydia",
+          "lastName": "Akenuwa"
+        },
+        "session": {
+          "sessionName": "Main Office – 25/09/2026"
+        }
+      }
+    ],
+    "period": "September 2026"
+  },
+  "stats": {
+    "totalOrgs": 3,
+    "totalAdmins": 3,
+    "totalUsers": 10,
+    "openAlerts": 1
+  }
+}

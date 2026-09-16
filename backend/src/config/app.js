@@ -61,8 +61,8 @@ function createApp() {
   app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
   // Body parsing — capped to blunt large-payload DoS
-  app.use(express.json({ limit: '2mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+  app.use(express.json({ limit: '4mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '4mb' }));
 
   // Protect against HTTP Parameter Pollution (?a=1&a=2 attacks)
   app.use(hpp());

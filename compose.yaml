@@ -27,6 +27,12 @@ services:
       timeout: 5s
       retries: 20
 
+  deepface:
+    build: ./deepface-service
+    ports:
+      - "127.0.0.1:5001:5001"
+    restart: unless-stopped
+
 volumes:
   timelogic-postgres:
   timelogic-redis:

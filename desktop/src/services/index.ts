@@ -67,10 +67,14 @@ export const fetchManualAttendance = (params: { sessionId?: string; search?: str
     return { ...dashboard, employees: [...dashboard.employees, ...rest.flat()] };
   });
 };
-export const manualEmployeeCheckIn = (body: { employeeId: string; sessionId: string; password: string }) =>
+export const manualEmployeeCheckIn = (body: { employeeId: string; sessionId: string; password: string; faceImage?: string }) =>
   api.post<ApiEnvelope<ManualAttendanceResult>>('/admin/manual-attendance/check-in', body).then((r) => r.data);
 export const manualEmployeeCheckOut = (body: { employeeId: string; sessionId?: string; password: string }) =>
   api.post<ApiEnvelope<ManualAttendanceResult>>('/admin/manual-attendance/check-out', body).then((r) => r.data);
+export const fetchManualPenalties = (month: string) =>
+  api.get<any>(`/admin/penalties?month=${encodeURIComponent(month)}`).then((r) => r.data ?? []);
+export const createManualPenalty = (body: { employeeId: string; amount: number; reason: string }) =>
+  api.post<any>('/admin/penalties', body).then((r) => r.data);
 
 // ─── Employees ───────────────────────────────────────────────────────────────
 export const fetchEmployees = async () => {
@@ -98,8 +102,12 @@ export const fetchDepartments = () => api.get<any>('/admin/org').then((r) => (r.
 
 // ─── Leaves ──────────────────────────────────────────────────────────────────
 export const fetchPendingLeaves = () => api.get<any>('/leaves/pending').then((r) => r.data ?? []);
+export const fetchAdminLeaves = () => api.get<any>('/leaves/admin').then((r) => r.data ?? []);
+export const grantEmployeeLeave = (body: { employeeId: string; leaveType: string; startDate: string; endDate: string; reason: string }) =>
+  api.post<any>('/leaves/admin', body).then((r) => r.data);
 export const approveLeave       = (id: string) => api.put<any>(`/leaves/${id}/approve`, {});
 export const rejectLeave        = (id: string, reason: string) => api.put<any>(`/leaves/${id}/reject`, { reason });
+export const stopLeave           = (id: string) => api.put<any>(`/leaves/${id}/stop`, {}).then((r) => r.data);
 
 // ─── Breaks ──────────────────────────────────────────────────────────────────
 export const fetchDailyBreaks  = (date?: string) => api.get<any>(`/breaks/daily${date ? (date === 'all' ? '?all=true' : `?date=${encodeURIComponent(date)}`) : ''}`).then((r) => r.data ?? []);

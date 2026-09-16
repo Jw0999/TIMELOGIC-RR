@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, Calendar, Play, RefreshCw, Search } from 'lucide-react';
 import Header from '../components/Header';
-import { fetchDailyBreaks, fetchAllBreaks, startEmployeeBreak, endEmployeeBreak, fetchEmployees } from '../services';
+import { fetchDailyBreaks, fetchAllBreaks, startEmployeeBreak, endEmployeeBreak, fetchEmployees, fetchLiveAttendance } from '../services';
 import { useAuth } from '../context/AuthContext';
 
 const BREAK_COLORS: Record<string, string> = {
@@ -28,6 +28,7 @@ export default function Breaks() {
   const [date, setDate] = useState('');
   const [starting, setStarting] = useState<string | null>(null);
   const [employees, setEmployees] = useState<any[]>([]);
+  const [checkedInEmployees, setCheckedInEmployees] = useState<any[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState('');
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('All');
@@ -96,6 +97,8 @@ export default function Breaks() {
         const data = await fetchDailyBreaks(targetDate);
         setBreaks(data);
       }
+      const live = await fetchLiveAttendance();
+      setCheckedInEmployees(live.filter((record: any) => record.clockInTime && !record.clockOutTime));
     } catch (err) {
       console.error('Failed to load breaks:', err);
     } finally {
@@ -167,13 +170,13 @@ export default function Breaks() {
             : `${filtered.length} break record${filtered.length === 1 ? '' : 's'} for ${date}`
         }
         action={(
-          <button
+          <div className="flex items-center gap-3"><span className="text-xs font-semibold text-emerald-600">{breaks.filter((item) => !item.endTime).length} active breaks</span><button
             onClick={() => void load()}
             disabled={loading}
             className="flex items-center gap-2 px-3 py-2 rounded-xl border border-[var(--border)] text-sm font-semibold text-[var(--text-main)] hover:bg-[var(--hover-bg)] disabled:opacity-50"
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
-          </button>
+          </button></div>
         )}
       />
 
@@ -245,6 +248,14 @@ export default function Breaks() {
             </button>
           </div>
         )}
+
+        <div className="mb-5 rounded-2xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/60 dark:bg-emerald-950/20 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div><h2 className="font-bold text-[var(--text-main)]">Checked-in employees</h2><p className="text-xs text-[var(--text-muted)]">Employees currently checked in stay visible here while they take or end a break.</p></div>
+            <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300">{checkedInEmployees.length} active</span>
+          </div>
+          {checkedInEmployees.length === 0 ? <p className="text-sm text-[var(--text-muted)]">No employees are currently checked in.</p> : <div className="flex flex-wrap gap-2">{checkedInEmployees.map((record: any) => { const active = breaks.find((item) => item.employeeId === record.employeeId && !item.endTime); const name = record.employee ? `${record.employee.firstName} ${record.employee.lastName}` : record.employeeName ?? record.name ?? record.employeeId; return <div key={record.id ?? record.employeeId} className="inline-flex items-center gap-2 rounded-xl bg-[var(--card-bg)] border border-emerald-200 dark:border-emerald-900 px-3 py-2"><span className="w-2 h-2 rounded-full bg-emerald-500" /><span className="text-sm font-semibold text-[var(--text-main)]">{name}</span><span className="text-[11px] font-bold text-[var(--text-muted)]">{active ? `On ${String(active.breakType).replace('_', ' ')}` : 'Available'}</span></div>; })}</div>}
+        </div>
 
         {/* Search & Type filter */}
         <div className="flex flex-wrap items-center gap-3 mb-5">

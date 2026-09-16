@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle, CalendarClock, CheckCircle2, Clock3, LogIn, LogOut,
   LockKeyhole, RefreshCw, Search, UserCheck, X,
@@ -24,6 +24,22 @@ type ResultNotice = {
   penalty?: number | null;
   time?: string | null;
 };
+
+function FaceCapture({ onCapture }: { onCapture: (image: string) => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let stream: MediaStream | null = null;
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false }).then((next) => {
+      stream = next;
+      if (videoRef.current) { videoRef.current.srcObject = next; videoRef.current.onloadedmetadata = () => setReady(true); }
+    }).catch(() => {});
+    return () => stream?.getTracks().forEach((track) => track.stop());
+  }, []);
+  const capture = () => { const video = videoRef.current; const canvas = canvasRef.current; if (!video || !canvas) return; canvas.width = video.videoWidth; canvas.height = video.videoHeight; canvas.getContext('2d')?.drawImage(video, 0, 0); onCapture(canvas.toDataURL('image/jpeg', 0.75)); };
+  return <div className="space-y-2"><video ref={videoRef} autoPlay playsInline muted className="w-full rounded-xl bg-black max-h-48 object-cover" /><canvas ref={canvasRef} hidden /><button type="button" onClick={capture} disabled={!ready} className="w-full px-3 py-2 rounded-xl bg-slate-800 text-white text-sm font-bold disabled:opacity-40">Capture face for check-in</button></div>;
+}
 
 function formatTime(value?: string | null, timezone?: string | null) {
   if (!value) return '—';
@@ -67,6 +83,7 @@ export default function ManualCheckIn() {
   const [error, setError] = useState('');
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [password, setPassword] = useState('');
+  const [faceImage, setFaceImage] = useState('');
   const [confirmError, setConfirmError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<ResultNotice | null>(null);
@@ -113,6 +130,7 @@ export default function ManualCheckIn() {
     if (submitting) return;
     setPending(null);
     setPassword('');
+    setFaceImage('');
     setConfirmError('');
   };
 
@@ -125,7 +143,7 @@ export default function ManualCheckIn() {
     setSubmitting(true);
     setConfirmError('');
     try {
-      const body = { employeeId: pending.employee.id, sessionId: activeSessionId, password };
+      const body = { employeeId: pending.employee.id, sessionId: activeSessionId, password, faceImage: pending.kind === 'check-in' ? faceImage : undefined };
       const response = pending.kind === 'check-in'
         ? await manualEmployeeCheckIn(body)
         : await manualEmployeeCheckOut({
@@ -320,10 +338,11 @@ export default function ManualCheckIn() {
                   onChange={(event) => setPassword(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void confirmAction(); }}
                   className="w-full border border-[var(--input-border)] bg-[var(--input-bg)] text-[var(--text-main)] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
               </div>
+              {pending.kind === 'check-in' && <FaceCapture onCapture={setFaceImage} />}
             </div>
             <div className="px-6 pb-6 flex justify-end gap-3">
               <button onClick={closeConfirmation} disabled={submitting} className="px-4 py-2 border border-[var(--border)] rounded-xl text-sm font-semibold text-[var(--text-main)]">Cancel</button>
-              <button onClick={() => void confirmAction()} disabled={submitting || !password}
+              <button onClick={() => void confirmAction()} disabled={submitting || !password || (pending.kind === 'check-in' && !faceImage)}
                 className="px-5 py-2 bg-primary-700 hover:bg-primary-800 text-white rounded-xl text-sm font-bold disabled:opacity-50">
                 {submitting ? 'Authorizing...' : `Confirm ${pending.kind === 'check-in' ? 'Check In' : 'Check Out'}`}
               </button>

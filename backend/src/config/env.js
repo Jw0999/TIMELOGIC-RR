@@ -70,6 +70,7 @@ module.exports = {
   DATABASE_URL: localServiceUrl('DATABASE_URL'),
 
   REDIS_URL: localServiceUrl('REDIS_URL', 'redis://localhost:6379'),
+  DEEPFACE_URL: localServiceUrl('DEEPFACE_URL', 'http://localhost:5001'),
 
   JWT_ACCESS_SECRET: required('JWT_ACCESS_SECRET'),
   JWT_REFRESH_SECRET: required('JWT_REFRESH_SECRET'),

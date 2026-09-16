@@ -69,9 +69,7 @@ function officeHoursFor(value, office = {}) {
   if (parsedSchedule && typeof parsedSchedule === 'object' && !Array.isArray(parsedSchedule)) {
     const scheduleKey = Object.keys(parsedSchedule).find((candidate) => String(candidate).trim().toLowerCase() === key);
     if (scheduleKey === undefined) {
-      return fallbackOpen && fallbackClose
-        ? { openTime: fallbackOpen, closeTime: fallbackClose }
-        : null;
+      return null;
     }
     const day = parsedSchedule[scheduleKey];
     if (day === null || day === false || day === '') return null;

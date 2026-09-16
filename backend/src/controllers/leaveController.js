@@ -7,6 +7,13 @@ const requestLeave = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+const grantLeaveForEmployee = async (req, res, next) => {
+  try {
+    const leave = await LeaveService.grantLeaveForEmployee(req.user.id, req.user.orgId, req.body);
+    res.status(201).json({ success: true, data: leave });
+  } catch (err) { next(err); }
+};
+
 const approveLeave = async (req, res, next) => {
   try {
     const leave = await LeaveService.approveLeave(req.user.id, req.params.leaveId);
@@ -82,4 +89,23 @@ const getPendingLeaves = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { requestLeave, approveLeave, rejectLeave, cancelLeave, getBalance, getTeamCalendar, getMyLeaves, getPendingLeaves };
+const getAdminLeaves = async (req, res, next) => {
+  try {
+    const { prisma } = require('../config/database');
+    const leaves = await prisma.leaveRequest.findMany({
+      where: { employee: { orgId: req.user.orgId }, ...(req.query.status && req.query.status !== 'All' ? { status: req.query.status } : {}) },
+      include: { employee: { select: { id: true, firstName: true, lastName: true, departmentId: true, employeeCode: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json({ success: true, data: await LeaveService.withLifecycleStatus(leaves) });
+  } catch (err) { next(err); }
+};
+
+const stopLeaveForEmployee = async (req, res, next) => {
+  try {
+    const leave = await LeaveService.stopLeaveForAdmin(req.user.id, req.user.orgId, req.params.leaveId);
+    res.json({ success: true, data: leave });
+  } catch (err) { next(err); }
+};
+
+module.exports = { requestLeave, grantLeaveForEmployee, approveLeave, rejectLeave, cancelLeave, getBalance, getTeamCalendar, getMyLeaves, getPendingLeaves, getAdminLeaves, stopLeaveForEmployee };

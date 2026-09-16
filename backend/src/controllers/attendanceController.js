@@ -212,14 +212,33 @@ const getMonthlyPenalties = async (req, res, next) => {
       select: { id: true, firstName: true, lastName: true, employeeCode: true, department: { select: { name: true } } },
       orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
     });
-    const penalties = await prisma.attendanceRecord.groupBy({
-      by: ['employeeId'],
-      where: { ...(targetOrgId ? { employee: { orgId: targetOrgId } } : {}), date: { gte: start, lt: end } },
-      _sum: { penalty: true }, _count: { _all: true },
-    });
+    const [penalties, breakPenalties, manualPenalties] = await Promise.all([
+      prisma.attendanceRecord.groupBy({
+        by: ['employeeId'],
+        where: { ...(targetOrgId ? { employee: { orgId: targetOrgId } } : {}), date: { gte: start, lt: end } },
+        _sum: { penalty: true }, _count: { _all: true },
+      }),
+      prisma.breakRecord.groupBy({
+        by: ['employeeId'],
+        where: { ...(targetOrgId ? { employee: { orgId: targetOrgId } } : {}), startTime: { gte: start, lt: end } },
+        _sum: { penalty: true },
+      }),
+      prisma.manualPenalty.groupBy({
+        by: ['employeeId'],
+        where: { ...(targetOrgId ? { orgId: targetOrgId } : {}), createdAt: { gte: start, lt: end } },
+        _sum: { amount: true },
+      }),
+    ]);
     const totals = new Map(penalties.map((row) => [row.employeeId, row]));
+    const breakTotals = new Map(breakPenalties.map((row) => [row.employeeId, row._sum.penalty ?? 0]));
+    const manualTotals = new Map(manualPenalties.map((row) => [row.employeeId, row._sum.amount ?? 0]));
     res.json({ success: true, data: { month, daysInMonth, employees: employees.map((employee) => ({
-      ...employee, totalPenalty: totals.get(employee.id)?._sum.penalty ?? 0, attendanceCount: totals.get(employee.id)?._count._all ?? 0,
+      ...employee,
+      attendancePenalty: totals.get(employee.id)?._sum.penalty ?? 0,
+      breakPenalty: breakTotals.get(employee.id) ?? 0,
+      manualPenalty: manualTotals.get(employee.id) ?? 0,
+      totalPenalty: (totals.get(employee.id)?._sum.penalty ?? 0) + (breakTotals.get(employee.id) ?? 0) + (manualTotals.get(employee.id) ?? 0),
+      attendanceCount: totals.get(employee.id)?._count._all ?? 0,
     })) } });
   } catch (err) { next(err); }
 };

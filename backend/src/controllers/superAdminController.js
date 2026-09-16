@@ -5,6 +5,16 @@ const env = require('../config/env');
 const logger = require('../config/logger');
 const EmployeePolicy = require('../services/EmployeePolicyService');
 
+const defaultWeeklySchedule = (openTime = '08:00', closeTime = '17:00') => ({
+  monday: { openTime, closeTime },
+  tuesday: { openTime, closeTime },
+  wednesday: { openTime, closeTime },
+  thursday: { openTime, closeTime },
+  friday: { openTime, closeTime },
+  saturday: { openTime, closeTime },
+  sunday: null,
+});
+
 // GET /api/super/organizations — all orgs with full detail
 const listOrgs = async (req, res, next) => {
   try {
@@ -15,7 +25,7 @@ const listOrgs = async (req, res, next) => {
           select: {
             id: true, name: true, address: true, timezone: true, isActive: true,
             wifiSSID: true, publicIp: true, openTime: true, closeTime: true, weeklySchedule: true, breakMinutes: true,
-            graceMinutes: true, lateAfterMinutes: true, gracePenalty: true, latePenalty: true, completelyLatePenalty: true,
+            graceMinutes: true, lateAfterMinutes: true, gracePenalty: true, latePenalty: true, completelyLatePenalty: true, absentPenalty: true,
             autoSessionMinutes: true, breakStart: true, breakEnd: true,
             securitySettings: { select: { id: true } },
             _count: { select: { sessions: true } },
@@ -97,16 +107,17 @@ const createOrg = async (req, res, next) => {
               // Each org sets its OWN Wi-Fi (Android SSID) + public IP (iOS/web network).
               wifiSSID: (o.wifiSSID && o.wifiSSID.trim()) ? o.wifiSSID.trim() : null,
               publicIp: (o.publicIp && o.publicIp.trim()) ? o.publicIp.trim() : null,
-              openTime:  o.openTime  || openingTime,
-              closeTime: o.closeTime || '17:00',
+              openTime:  '00:00',
+              closeTime: '00:00',
               breakMinutes: Number.isFinite(+o.breakMinutes) ? parseInt(o.breakMinutes, 10) : 60,
               graceMinutes:       Number.isFinite(+o.graceMinutes)       ? parseInt(o.graceMinutes, 10)       : 30,
               lateAfterMinutes:   Number.isFinite(+o.lateAfterMinutes)   ? parseInt(o.lateAfterMinutes, 10)   : 90,
               gracePenalty:       Number.isFinite(+o.gracePenalty)       ? parseInt(o.gracePenalty, 10)       : 0,
               latePenalty:        Number.isFinite(+o.latePenalty)        ? parseInt(o.latePenalty, 10)        : 0,
               completelyLatePenalty: Number.isFinite(+o.completelyLatePenalty) ? parseInt(o.completelyLatePenalty, 10) : 0,
+              absentPenalty: Number.isFinite(+o.absentPenalty) ? parseInt(o.absentPenalty, 10) : 0,
               autoSessionMinutes: Number.isFinite(+o.autoSessionMinutes) ? parseInt(o.autoSessionMinutes, 10) : 60,
-              weeklySchedule: o.weeklySchedule || null,
+              weeklySchedule: o.weeklySchedule || defaultWeeklySchedule(),
               breakStart: o.breakStart || null,
               breakEnd:   o.breakEnd   || null,
             },
@@ -116,7 +127,7 @@ const createOrg = async (req, res, next) => {
 
       // Ensure at least one office
       const defaultOffice = createdOffices[0] ?? await tx.office.create({
-        data: { id: uuidv4(), orgId: org.id, name: 'Main Office', address: '', timezone, wifiSSID: null, openTime: openingTime, closeTime: '17:00', breakMinutes: 60 },
+        data: { id: uuidv4(), orgId: org.id, name: 'Main Office', address: '', timezone, wifiSSID: null, openTime: '00:00', closeTime: '00:00', weeklySchedule: defaultWeeklySchedule(), breakMinutes: 60 },
       });
 
       // 3. Default security settings for the first office
@@ -260,15 +271,14 @@ const updateOrg = async (req, res, next) => {
         if (o.timezone  !== undefined) data.timezone  = o.timezone;
         if (o.wifiSSID  !== undefined) data.wifiSSID  = (o.wifiSSID && o.wifiSSID.trim()) ? o.wifiSSID.trim() : null;
         if (o.publicIp  !== undefined) data.publicIp  = (o.publicIp && o.publicIp.trim()) ? o.publicIp.trim() : null;
-        if (o.openTime  !== undefined) data.openTime  = o.openTime || '08:00';
-        if (o.closeTime !== undefined) data.closeTime = o.closeTime || '17:00';
-        if (o.weeklySchedule !== undefined) data.weeklySchedule = o.weeklySchedule || null;
+        if (o.weeklySchedule !== undefined) data.weeklySchedule = o.weeklySchedule || defaultWeeklySchedule();
         if (o.breakMinutes !== undefined) data.breakMinutes = Number.isFinite(+o.breakMinutes) ? parseInt(o.breakMinutes, 10) : 60;
         if (o.graceMinutes !== undefined)       data.graceMinutes       = parseInt(o.graceMinutes, 10) || 0;
         if (o.lateAfterMinutes !== undefined)   data.lateAfterMinutes   = parseInt(o.lateAfterMinutes, 10) || 0;
         if (o.gracePenalty !== undefined)       data.gracePenalty       = parseInt(o.gracePenalty, 10) || 0;
         if (o.latePenalty !== undefined)        data.latePenalty        = parseInt(o.latePenalty, 10) || 0;
         if (o.completelyLatePenalty !== undefined) data.completelyLatePenalty = parseInt(o.completelyLatePenalty, 10) || 0;
+        if (o.absentPenalty !== undefined) data.absentPenalty = parseInt(o.absentPenalty, 10) || 0;
         if (o.autoSessionMinutes !== undefined) data.autoSessionMinutes = parseInt(o.autoSessionMinutes, 10) || 60;
         if (o.breakStart !== undefined) data.breakStart = o.breakStart || null;
         if (o.breakEnd   !== undefined) data.breakEnd   = o.breakEnd   || null;
@@ -415,8 +425,7 @@ const updateOfficeSecurity = async (req, res, next) => {
     const officeData = {};
     if (b.wifiSSID  !== undefined) officeData.wifiSSID  = (b.wifiSSID && b.wifiSSID.trim()) ? b.wifiSSID.trim() : null;
     if (b.publicIp  !== undefined) officeData.publicIp  = (b.publicIp && b.publicIp.trim()) ? b.publicIp.trim() : null;
-    if (b.openTime  !== undefined) officeData.openTime  = b.openTime || '08:00';
-    if (b.closeTime !== undefined) officeData.closeTime = b.closeTime || '17:00';
+    if (b.weeklySchedule !== undefined) officeData.weeklySchedule = b.weeklySchedule || defaultWeeklySchedule();
     if (b.breakMinutes !== undefined) officeData.breakMinutes = Number.isFinite(+b.breakMinutes) ? parseInt(b.breakMinutes, 10) : 60;
     if (b.graceMinutes !== undefined)       officeData.graceMinutes       = parseInt(b.graceMinutes, 10) || 0;
     if (b.lateAfterMinutes !== undefined)   officeData.lateAfterMinutes   = parseInt(b.lateAfterMinutes, 10) || 0;
@@ -433,7 +442,7 @@ const updateOfficeSecurity = async (req, res, next) => {
     // SecuritySettings fields (strip non-column keys)
     const {
       id, officeId: _o, createdAt, updatedAt, updatedBy: _u,
-      wifiSSID: _w, publicIp: _pi, openTime: _ot, closeTime: _ct, breakMinutes: _bm,
+      wifiSSID: _w, publicIp: _pi, openTime: _ot, closeTime: _ct, weeklySchedule: _ws, breakMinutes: _bm,
       graceMinutes: _g, lateAfterMinutes: _la, gracePenalty: _gp, latePenalty: _lp, completelyLatePenalty: _clp,
       autoSessionMinutes: _as, breakStart: _bs, breakEnd: _be,
       ...settingsData

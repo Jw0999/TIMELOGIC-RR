@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { body } = require('express-validator');
+const { body, query } = require('express-validator');
 const ctrl = require('../controllers/adminController');
 const { authenticate } = require('../middleware/auth');
 const { isAdmin, isSuperAdmin } = require('../middleware/roleGuard');
@@ -8,20 +8,32 @@ const upload = require('../middleware/upload');
 const { prisma } = require('../config/database');
 const { stationLimiter } = require('../middleware/rateLimiter');
 const studentRoutes = require('./students');
+const { validateFaceEnrollment, hasValidEnrolledFace } = require('../utils/faceVerify');
+const fs = require('fs');
 
 // Secure employee station. The admin session must already be authenticated;
 // the employee then confirms their own password for each manual action.
 router.get('/manual-attendance', authenticate, isAdmin, ctrl.getManualAttendance);
+router.get('/manual-attendance/employee', authenticate, isAdmin, [query('email').isEmail().normalizeEmail()], validate, ctrl.findManualEmployee);
 router.post('/manual-attendance/check-in', authenticate, isAdmin, stationLimiter, [
   body('employeeId').isUUID(),
   body('sessionId').isUUID(),
   body('password').notEmpty(),
+  body('faceImage').optional({ nullable: true }).isString(),
 ], validate, ctrl.manualCheckIn);
 router.post('/manual-attendance/check-out', authenticate, isAdmin, stationLimiter, [
   body('employeeId').isUUID(),
   body('sessionId').optional({ nullable: true }).isUUID(),
   body('password').notEmpty(),
+  body('faceImage').optional({ nullable: true }).isString(),
 ], validate, ctrl.manualCheckOut);
+
+router.get('/penalties', authenticate, isAdmin, ctrl.listPenalties);
+router.post('/penalties', authenticate, isAdmin, [
+  body('employeeId').isUUID(),
+  body('amount').isInt({ min: 1 }),
+  body('reason').trim().isLength({ min: 2, max: 500 }),
+], validate, ctrl.createPenalty);
 
 // Organisation
 router.get('/org', authenticate, isAdmin, ctrl.getOrg);
@@ -80,11 +92,19 @@ router.post('/users/:userId/face',
   isAdmin,
   async (req, res, next) => {
     try {
+      const targetOrgId = await ctrl.resolveAdminOrgId(req);
       const employee = await prisma.user.findFirst({
-        where: { id: req.params.userId, orgId: req.user.orgId, role: 'EMPLOYEE' },
-        select: { id: true },
+        where: { id: req.params.userId, orgId: targetOrgId, role: 'EMPLOYEE' },
+        select: { id: true, profileImageUrl: true },
       });
       if (!employee) return res.status(404).json({ success: false, message: 'Employee not found.' });
+      if (employee.profileImageUrl && hasValidEnrolledFace(employee.profileImageUrl)) {
+        return res.status(400).json({
+          success: false,
+          code: 'FACE_ALREADY_ENROLLED',
+          message: 'Employee face is already enrolled. Re-enrollment is not permitted.',
+        });
+      }
       next();
     } catch (err) { next(err); }
   },
@@ -94,6 +114,7 @@ router.post('/users/:userId/face',
       if (!req.file) {
         return res.status(400).json({ success: false, message: 'No photo received. Make sure the field name is "photo".' });
       }
+      await validateFaceEnrollment(req.file.path);
       const url = `/uploads/faces/${req.file.filename}`;
 
       const user = await prisma.user.update({
@@ -104,7 +125,10 @@ router.post('/users/:userId/face',
         select: { id: true, firstName: true, lastName: true, profileImageUrl: true },
       });
       res.json({ success: true, data: user });
-    } catch (err) { next(err); }
+    } catch (err) {
+      if (req.file?.path) fs.promises.unlink(req.file.path).catch(() => {});
+      next(err);
+    }
   }
 );
 

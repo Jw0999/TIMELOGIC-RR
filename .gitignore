@@ -41,3 +41,11 @@ mobile/.expo-export-check/
 # OS
 .DS_Store
 Thumbs.db
+
+# Vite cache
+.vite/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo

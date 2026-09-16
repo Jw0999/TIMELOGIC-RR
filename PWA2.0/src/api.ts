@@ -48,13 +48,19 @@ async function request<T>(path: string, options: RequestInit = {}, retry = true)
     clearSession();
     throw new Error('Your session expired. Please sign in again.');
   }
-  if (!response.ok) throw new Error(body?.message || `Request failed (${response.status})`);
+  if (!response.ok) {
+    const error = new Error(body?.message || `Request failed (${response.status})`) as Error & { code?: string; status?: number };
+    error.code = body?.code;
+    error.status = response.status;
+    throw error;
+  }
   return body as T;
 }
 
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, data: unknown) => request<T>(path, { method: 'POST', body: JSON.stringify(data) }),
+  put: <T>(path: string, data: unknown) => request<T>(path, { method: 'PUT', body: JSON.stringify(data) }),
 };
 
 export async function login(identifier: string, password: string) {
@@ -68,12 +74,15 @@ export async function login(identifier: string, password: string) {
 }
 
 export interface AdminUser { id: string; firstName: string; lastName: string; role: string; orgId: string; organization?: Organization }
-export interface Organization { id: string; name: string; allowManualCheckIn: boolean; timezone?: string | null }
+export interface Organization { id: string; name: string; allowManualCheckIn: boolean; hasStudents?: boolean; requireFaceVerification?: boolean; timezone?: string | null }
 export interface Attendance { sessionId?: string; clockInTime?: string | null; clockOutTime?: string | null; status?: string | null; penalty?: number | null; session?: { office?: { timezone?: string | null } | null } | null }
-export interface Employee { id: string; firstName: string; lastName: string; employeeCode?: string | null; department?: { name?: string | null } | string | null; checkInMethod: string; attendance?: Attendance | null }
+export interface Employee { id: string; firstName: string; lastName: string; email?: string | null; employeeCode?: string | null; profileImageUrl?: string | null; hasFaceEnrolled?: boolean; department?: { name?: string | null } | string | null; checkInMethod: string; attendance?: Attendance | null }
 export interface Session { id: string; sessionName?: string | null; office?: { name?: string | null; timezone?: string | null } | string | null; startTime?: string | null; endTime?: string | null }
 export interface Dashboard { enabled: boolean; serverTime: string; organization: Organization; activeSessions: Session[]; selectedSession: Session | null; employees: Employee[]; total?: number; totalPages?: number }
+export interface LiveAttendance { employeeId: string; clockInTime?: string | null; clockOutTime?: string | null; employee?: Employee }
 export interface ActionResult { record?: Attendance; status?: string; penalty?: number; clockInTime?: string; clockOutTime?: string; serverTime?: string }
+export interface BreakRecord { id: string; employeeId: string; breakType: string; startTime: string; endTime?: string | null; durationMinutes?: number | null; lifecycleStatus?: string }
+export interface Student { id: string; firstName: string; lastName: string; studentCode: string; className?: string | null; status: string; todayAttendance?: { id: string; checkInTime: string; checkOutTime?: string | null } | null }
 
 export async function getMe() { return (await api.get<{ data: AdminUser }>('/auth/me')).data; }
 export async function getDashboard(sessionId?: string, search?: string) {
@@ -82,9 +91,57 @@ export async function getDashboard(sessionId?: string, search?: string) {
   if (search) query.set('search', search);
   return (await api.get<{ data: Dashboard }>(`/admin/manual-attendance?${query}`)).data;
 }
-export async function manualCheckIn(employeeId: string, sessionId: string, password: string) {
-  return (await api.post<{ data: ActionResult }>('/admin/manual-attendance/check-in', { employeeId, sessionId, password })).data;
+export async function findManualEmployee(email: string) {
+  const query = new URLSearchParams({ email });
+  return (await api.get<{ data: Employee }>(`/admin/manual-attendance/employee?${query}`)).data;
+}
+export async function manualCheckIn(employeeId: string, sessionId: string, password: string, faceImage?: string) {
+  return (await api.post<{ data: ActionResult }>('/admin/manual-attendance/check-in', { employeeId, sessionId, password, faceImage })).data;
 }
 export async function manualCheckOut(employeeId: string, sessionId: string | undefined, password: string) {
   return (await api.post<{ data: ActionResult }>('/admin/manual-attendance/check-out', { employeeId, sessionId, password })).data;
+}
+export async function startEmployeeBreak(employeeId: string, breakType = 'LUNCH') {
+  return (await api.post<{ data: BreakRecord }>(`/admin/breaks/${employeeId}/start`, { breakType })).data;
+}
+export async function endEmployeeBreak(employeeId: string, breakId: string) {
+  return (await api.put<{ data: BreakRecord }>(`/admin/breaks/${employeeId}/${breakId}/end`, {})).data;
+}
+export async function getEmployeeBreak(employeeId: string) {
+  try {
+    const records = (await api.get<{ data: BreakRecord[] }>(`/breaks/daily/${employeeId}`)).data;
+    return records.find((record) => !record.endTime) ?? null;
+  } catch (error) {
+    const status = (error as Error & { status?: number }).status;
+    if (status === 404) return null;
+    throw error;
+  }
+}
+export async function getLiveAttendance() {
+  return (await api.get<{ data: LiveAttendance[] }>('/attendance/live')).data;
+}
+export async function getStudents(search = '') {
+  const query = new URLSearchParams({ limit: '200', status: 'ACTIVE' });
+  if (search.trim()) query.set('search', search.trim());
+  return (await api.get<{ data: { students: Student[] } }>(`/students?${query}`)).data;
+}
+export async function checkInStudent(studentId: string) {
+  return (await api.post<{ data: Student }>(`/students/${studentId}/check-in`, {})).data;
+}
+export async function checkOutStudent(studentId: string) {
+  return (await api.post<{ data: Student }>(`/students/${studentId}/check-out`, {})).data;
+}
+export async function enrollFace(employeeId: string, photoBlob: Blob): Promise<{ success: boolean; data: { id: string; firstName: string; lastName: string; profileImageUrl: string } }> {
+  const formData = new FormData();
+  formData.append('photo', photoBlob, 'face.jpg');
+  const response = await fetch(`${API_URL}/admin/users/${employeeId}/face`, {
+    method: 'POST',
+    headers: { ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
+    body: formData,
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.message || 'Failed to enroll face.');
+  }
+  return response.json();
 }

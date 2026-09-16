@@ -14,14 +14,17 @@ export default function Dashboard() {
   const [stats,   setStats]   = useState<any>(null);
   const [orgs,    setOrgs]    = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
   useEffect(() => {
     const load = () => Promise.all([
       fetchSystemStats().catch(() => null),
-      fetchAllOrgs().catch(() => []),
-    ]).then(([s, o]) => { setStats(s); setOrgs(o); }).finally(() => setLoading(false));
+      fetchAllOrgs(),
+    ]).then(([s, o]) => { setStats(s); setOrgs(o); setLoadError(''); }).catch((error) => {
+      setLoadError(error instanceof Error ? error.message : 'Could not load live Super Admin data.');
+    }).finally(() => setLoading(false));
     load();
     const t = setInterval(load, 20_000);
     return () => clearInterval(t);
@@ -52,6 +55,7 @@ export default function Dashboard() {
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-5 space-y-5">
+        {loadError && <div className="rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 p-4 text-sm text-amber-800 dark:text-amber-300">{loadError} Refresh the page after signing in again.</div>}
 
         {/* Page heading */}
         <div>

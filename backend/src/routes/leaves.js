@@ -11,9 +11,19 @@ router.post('/', authenticate, [
   body('endDate').isISO8601(),
 ], validate, ctrl.requestLeave);
 
+router.post('/admin', authenticate, isAdmin, [
+  body('employeeId').isUUID(),
+  body('leaveType').isIn(['ANNUAL', 'SICK', 'CASUAL', 'MATERNITY', 'PATERNITY', 'UNPAID', 'COMPASSIONATE']),
+  body('startDate').isISO8601(),
+  body('endDate').isISO8601(),
+  body('reason').trim().notEmpty(),
+], validate, ctrl.grantLeaveForEmployee);
+
 router.get('/mine', authenticate, ctrl.getMyLeaves);
 
 router.get('/pending', authenticate, isAdmin, ctrl.getPendingLeaves);
+router.get('/admin', authenticate, isAdmin, ctrl.getAdminLeaves);
+router.put('/:leaveId/stop', authenticate, isAdmin, ctrl.stopLeaveForEmployee);
 
 router.get('/team-calendar', authenticate, ctrl.getTeamCalendar);
 

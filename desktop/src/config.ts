@@ -1,3 +1,4 @@
 const configuredApiUrl = import.meta.env.VITE_API_URL?.trim().replace(/\/$/, '');
-export const API_URL = configuredApiUrl || 'https://timelogic-backend.onrender.com/api';
+const localApiUrl = 'http://localhost:5000/api';
+export const API_URL = configuredApiUrl || localApiUrl;
 export const SOCKET_URL = API_URL.replace(/\/api$/, '');

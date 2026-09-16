@@ -16,6 +16,7 @@ import Emergency from './pages/Emergency';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import Students from './pages/Students';
+import Penalties from './pages/Penalties';
 
 function Guard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -64,6 +65,7 @@ function AppRoutes() {
       <Route path="/attendance" element={<Guard><Layout><Attendance /></Layout></Guard>} />
       <Route path="/manual-attendance" element={<Guard><Layout><ManualCheckIn /></Layout></Guard>} />
       <Route path="/employees"  element={<Guard><Layout><Employees /></Layout></Guard>} />
+      <Route path="/penalties"  element={<Guard><Layout><Penalties /></Layout></Guard>} />
       <Route path="/students"   element={<Guard><CapabilityGuard capability="hasStudents"><Layout><Students /></Layout></CapabilityGuard></Guard>} />
       <Route path="/leaves"     element={<Guard><Layout><Leaves /></Layout></Guard>} />
       <Route path="/breaks"     element={<Guard><Layout><Breaks /></Layout></Guard>} />

@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, CalendarClock, Users, ClipboardList,
   UmbrellaOff, Coffee, ShieldAlert, Zap, BarChart3, LogOut, Settings,
-  GraduationCap, UserCheck, type LucideIcon,
+  GraduationCap, UserCheck, ReceiptText, type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import logo from '../assets/logo.jpg';
@@ -16,6 +16,7 @@ const NAV: { to: string; label: string; icon: LucideIcon; capability?: Capabilit
   { to: '/attendance', label: 'Attendance',     icon: ClipboardList },
   { to: '/manual-attendance', label: 'Manual Check-In', icon: UserCheck },
   { to: '/employees',  label: 'Employees',      icon: Users },
+  { to: '/penalties',  label: 'Penalties',      icon: ReceiptText },
   { to: '/students',   label: 'Students',       icon: GraduationCap, capability: 'hasStudents' },
   { to: '/leaves',     label: 'Leave Requests', icon: UmbrellaOff },
   { to: '/breaks',     label: 'Break Records',  icon: Coffee },
