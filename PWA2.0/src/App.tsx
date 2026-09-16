@@ -69,6 +69,16 @@ const formatDepartment = (employee: Employee) =>
 const hasEnrolledFace = (emp: Employee): boolean =>
   Boolean(emp.hasFaceEnrolled || emp.profileImageUrl === 'enrolled');
 
+// Check if an attendance timestamp belongs to today
+const isDateToday = (timeStr?: string | null, serverTime?: string | null): boolean => {
+  if (!timeStr) return false;
+  const d = new Date(timeStr);
+  const now = new Date(serverTime || Date.now());
+  return d.getUTCFullYear() === now.getUTCFullYear() &&
+         d.getUTCMonth() === now.getUTCMonth() &&
+         d.getUTCDate() === now.getUTCDate();
+};
+
 /* ==========================================================================
    Admin Login Screen
    ========================================================================== */
@@ -870,8 +880,10 @@ function App() {
                 (() => {
                   const emp = identifiedEmployee;
                   const attendance = emp.attendance;
-                  const isCheckedIn = Boolean(attendance?.clockInTime);
-                  const isCheckedOut = Boolean(attendance?.clockOutTime);
+                  const hasOpenCheckIn = Boolean(attendance?.clockInTime && !attendance?.clockOutTime);
+                  const isCheckedOutToday = Boolean(attendance?.clockInTime && attendance?.clockOutTime && isDateToday(attendance.clockInTime, dashboard?.serverTime));
+                  const isCheckedIn = hasOpenCheckIn || isCheckedOutToday;
+                  const isCheckedOut = isCheckedOutToday;
                   const faceReady = hasEnrolledFace(emp);
                   const onBreak = Boolean(breaks[emp.id]);
 
@@ -1135,8 +1147,10 @@ function App() {
                   <div className="employee-grid">
                     {filteredEmployees.map((emp) => {
                       const attendance = emp.attendance;
-                      const isCheckedIn = Boolean(attendance?.clockInTime);
-                      const isCheckedOut = Boolean(attendance?.clockOutTime);
+                      const hasOpenCheckIn = Boolean(attendance?.clockInTime && !attendance?.clockOutTime);
+                      const isCheckedOutToday = Boolean(attendance?.clockInTime && attendance?.clockOutTime && isDateToday(attendance.clockInTime, dashboard?.serverTime));
+                      const isCheckedIn = hasOpenCheckIn || isCheckedOutToday;
+                      const isCheckedOut = isCheckedOutToday;
                       const faceReady = hasEnrolledFace(emp);
 
                       return (

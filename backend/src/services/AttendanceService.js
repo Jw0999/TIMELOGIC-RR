@@ -648,11 +648,14 @@ class AttendanceService {
       const now = await getCurrentServerTime();
       const todayStart = new Date(now);
       todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date(now);
+      todayEnd.setHours(23, 59, 59, 999);
 
       record = await prisma.attendanceRecord.findFirst({
         where: {
           employeeId: employee.id,
-          clockInTime: { gte: todayStart },
+          clockInTime: { gte: todayStart, lte: todayEnd },
+          clockOutTime: { not: null },
         },
         orderBy: { clockInTime: 'desc' },
         select: { sessionId: true, clockInTime: true, clockOutTime: true },
