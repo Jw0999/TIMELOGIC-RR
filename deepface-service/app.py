@@ -1,6 +1,7 @@
 import os
 import traceback
 
+# TimeLogic DeepFace Microservice v1.0.2
 # Force CPU inference and limit memory to stay well within Render Free tier (512MB RAM)
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
