@@ -17,6 +17,7 @@
     "dist:linux": "npm run build && electron-builder --linux appimage deb tar.gz --x64",
     "dist:linux:appimage": "npm run build && electron-builder --linux appimage --x64",
     "dist:linux:windows": "npm run build && electron-builder --linux dir --x64 && node scripts/build-deb.js",
+    "dist:linux:pacman": "bash scripts/build-pacman.sh",
     "dist:win": "npm run build && electron-builder --win nsis --x64",
     "dist:win:unsigned": "npm run build && electron-builder --win nsis --x64 -c.win.signAndEditExecutable=false"
   },

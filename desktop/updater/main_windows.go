@@ -164,11 +164,11 @@ func main() {
 	// 6. Notify user of success
 	showMessage(
 		"TimeLogic Admin — Update Complete",
-		"✓ TimeLogic Admin has been successfully updated to v1.0.17!\n\n"+
-			"• Strict department break windows enforced\n"+
-			"• Overdue breaks auto-closed\n"+
-			"• Student check-ins and fraud alerts fixed\n\n"+
-			"The application is now connected to the production server:\n"+
+		"✓ TimeLogic Admin has been successfully updated!\n\n"+
+			"• Live biometric verification & check-in integration\n"+
+			"• Manual & absent penalties management\n"+
+			"• Strict department break windows & leave approvals\n\n"+
+			"Connected to production backend:\n"+
 			"https://timelogic-backend.onrender.com\n\n"+
 			"You can now log in normally.",
 		MB_ICONINFO,
