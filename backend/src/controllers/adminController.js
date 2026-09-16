@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const EmergencyControlService = require('../services/EmergencyControlService');
 const AttendanceService = require('../services/AttendanceService');
 const EmployeePolicy = require('../services/EmployeePolicyService');
+const { hasValidEnrolledFace } = require('../utils/faceVerify');
 
 // ── Organization / Office / Department ────────────────────────────────────────
 
@@ -114,6 +115,7 @@ const listUsers = async (req, res, next) => {
           role: true, status: true, shiftType: true,
           profileImageUrl: true, employeeCode: true,
           phone: true, checkInMethod: true,
+          faceEncodingData: true,
           department: {
             select: {
               id: true,
@@ -130,7 +132,15 @@ const listUsers = async (req, res, next) => {
       }),
       prisma.user.count({ where }),
     ]);
-    res.json({ success: true, data: users, total, page: +page, totalPages: Math.ceil(total / +limit) });
+    const mappedUsers = users.map((u) => {
+      const hasFace = Boolean(hasValidEnrolledFace(u));
+      return {
+        ...u,
+        hasFaceEnrolled: hasFace,
+        faceEncodingData: undefined,
+      };
+    });
+    res.json({ success: true, data: mappedUsers, total, page: +page, totalPages: Math.ceil(total / +limit) });
   } catch (err) { next(err); }
 };
 
@@ -342,10 +352,11 @@ const PLAN_NAMES  = { starter: 'Starter', business: 'Business', enterprise: 'Ent
 const createEmployee = async (req, res, next) => {
   try {
     const { firstName, lastName, email, password, employeeCode, departmentId, shiftType, phone, checkInMethod = 'PHONE' } = req.body;
+    const targetOrgId = await resolveAdminOrgId(req);
 
     // ── Subscription enforcement ──────────────────────────────────────────────
     const org = await prisma.organization.findUnique({
-      where: { id: req.user.orgId },
+      where: { id: targetOrgId },
       select: {
         subscriptionTier: true, name: true,
         allowDeviceCheckIn: true, allowManualCheckIn: true,
@@ -356,7 +367,7 @@ const createEmployee = async (req, res, next) => {
     const limit  = PLAN_LIMITS[tier] ?? 20;
     if (limit !== Infinity) {
       const count = await prisma.user.count({
-        where: { orgId: req.user.orgId, role: 'EMPLOYEE', status: { not: 'TERMINATED' } },
+        where: { orgId: targetOrgId, role: 'EMPLOYEE', status: { not: 'TERMINATED' } },
       });
       if (count >= limit) {
         return res.status(403).json({
@@ -374,12 +385,12 @@ const createEmployee = async (req, res, next) => {
     const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
     if (existing) return res.status(400).json({ success: false, message: 'Email already in use.' });
     if (employeeCode) {
-      const codeOwner = await prisma.user.findFirst({ where: { orgId: req.user.orgId, employeeCode } });
+      const codeOwner = await prisma.user.findFirst({ where: { orgId: targetOrgId, employeeCode } });
       if (codeOwner) return res.status(400).json({ success: false, message: 'Employee code already in use.' });
     }
     if (departmentId) {
       const department = await prisma.department.findFirst({
-        where: { id: departmentId, orgId: req.user.orgId }, select: { id: true },
+        where: { id: departmentId, orgId: targetOrgId }, select: { id: true },
       });
       if (!department) return res.status(400).json({ success: false, message: 'Department does not belong to your organization.' });
     }
@@ -387,7 +398,7 @@ const createEmployee = async (req, res, next) => {
     const user = await prisma.user.create({
       data: {
         id: uuidv4(),
-        orgId: req.user.orgId,
+        orgId: targetOrgId,
         firstName, lastName,
         email: email.toLowerCase(),
         employeeCode: employeeCode || null,

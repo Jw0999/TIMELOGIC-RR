@@ -1,8 +1,10 @@
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
+const fs = require('fs');
 const { prisma } = require('../config/database');
 const env = require('../config/env');
 const upload = require('../middleware/upload');
+const { validateFaceEnrollment } = require('../utils/faceVerify');
 
 const asNumber = (value, fallback) => Number.isFinite(Number(value)) ? Number(value) : fallback;
 const clean = (value) => String(value ?? '').trim();
@@ -114,13 +116,27 @@ async function createEmployee(req, res, next) {
       const department = await prisma.department.findFirst({ where: { id: departmentId, orgId: resolved.id }, select: { id: true } });
       if (!department) return res.status(400).json({ success: false, message: 'Selected department does not belong to this organization.' });
     }
+    let faceEncodingData = null;
+    let profileImageUrl = null;
+    if (req.file) {
+      try {
+        const fileBuffer = fs.readFileSync(req.file.path);
+        await validateFaceEnrollment(req.file.path, fileBuffer);
+        faceEncodingData = fileBuffer;
+        profileImageUrl = `/uploads/faces/${req.file.filename}`;
+      } catch (faceErr) {
+        if (req.file.path) fs.promises.unlink(req.file.path).catch(() => {});
+        return res.status(400).json({ success: false, message: faceErr.message || 'Face photo is invalid.' });
+      }
+    }
     const employee = await prisma.user.create({ data: {
       id: uuidv4(), orgId: resolved.id, firstName: clean(data.firstName), lastName: clean(data.lastName), email,
       employeeCode: employeeCode || null, passwordHash: await bcrypt.hash(data.password, Number(env.BCRYPT_ROUNDS) || 12),
       role: 'EMPLOYEE', status: 'ACTIVE', phone: clean(data.phone) || null, shiftType: clean(data.shiftType) || 'MORNING',
       checkInMethod: method,
       departmentId,
-      profileImageUrl: req.file ? `/uploads/faces/${req.file.filename}` : null,
+      profileImageUrl,
+      faceEncodingData,
     }, select: { id: true, firstName: true, lastName: true, email: true, employeeCode: true, orgId: true, checkInMethod: true, profileImageUrl: true } });
     res.status(201).json({ success: true, data: { employee, message: 'Employee registered successfully.' } });
   } catch (err) { next(err); }

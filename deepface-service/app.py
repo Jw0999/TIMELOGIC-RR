@@ -1,6 +1,16 @@
+import os
+import traceback
+
+# Force CPU inference and limit memory to stay well within Render Free tier (512MB RAM)
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['TF_NUM_INTEROP_THREADS'] = '1'
+os.environ['TF_NUM_INTRAOP_THREADS'] = '1'
+
 from flask import Flask, request, jsonify
 from deepface import DeepFace
-import traceback
 
 app = Flask(__name__)
 
@@ -24,13 +34,16 @@ def verify():
         if not data or 'img1' not in data or 'img2' not in data:
             return jsonify({'error': 'img1 and img2 are required'}), 400
 
+        anti_spoofing = bool(data.get('anti_spoofing', False))
+
         result = DeepFace.verify(
             img1_path=data['img1'],
             img2_path=data['img2'],
             model_name=data.get('model_name', 'Facenet512'),
             detector_backend=data.get('detector_backend', 'opencv'),
             distance_metric=data.get('distance_metric', 'cosine'),
-            anti_spoofing=data.get('anti_spoofing', True),
+            enforce_detection=False,
+            anti_spoofing=anti_spoofing,
         )
 
         return jsonify({
@@ -54,12 +67,22 @@ def validate():
         faces = DeepFace.extract_faces(
             img_path=image,
             detector_backend='opencv',
-            enforce_detection=True,
+            enforce_detection=False,
             align=True,
             anti_spoofing=False,
         )
-        if len(faces) != 1:
-            return jsonify({'valid': False, 'error': 'Enrollment image must contain exactly one face.'}), 400
+        # Filter confident detections
+        confident_faces = [f for f in faces if f.get('confidence', 0) >= 0.45]
+        if not confident_faces:
+            # If no face reached 0.45 confidence, check if any face was detected at all
+            if faces and faces[0].get('confidence', 0) >= 0.25:
+                confident_faces = [faces[0]]
+            else:
+                return jsonify({'valid': False, 'error': 'No face detected. Please ensure your face is clearly visible in the camera frame.'}), 400
+
+        if len(confident_faces) > 1:
+            return jsonify({'valid': False, 'error': 'Multiple faces detected. Only one person should be in front of the camera.'}), 400
+
         return jsonify({'valid': True})
     except ValueError as e:
         return jsonify({'valid': False, 'error': str(e)}), 400

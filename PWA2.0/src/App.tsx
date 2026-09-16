@@ -67,7 +67,7 @@ const formatDepartment = (employee: Employee) =>
 
 // Check if an employee has a face registered
 const hasEnrolledFace = (emp: Employee): boolean =>
-  Boolean(emp.hasFaceEnrolled || emp.profileImageUrl);
+  Boolean(emp.hasFaceEnrolled || emp.profileImageUrl === 'enrolled');
 
 /* ==========================================================================
    Admin Login Screen

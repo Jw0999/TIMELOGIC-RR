@@ -552,6 +552,7 @@ class AttendanceService {
         select: {
           id: true, firstName: true, lastName: true, employeeCode: true,
           email: true, checkInMethod: true, phone: true, profileImageUrl: true,
+          faceEncodingData: true,
           department: { select: { name: true } },
           attendanceRecords: selectedSession ? {
             where: { sessionId: selectedSession.id, date: recordDate },
@@ -596,7 +597,7 @@ class AttendanceService {
       enabled: true, serverTime: now, organization,
       activeSessions, selectedSession: selectedSession ?? null,
       employees: employees.map((employee) => {
-        const hasFace = Boolean(employee.profileImageUrl && hasValidEnrolledFace(employee.profileImageUrl));
+        const hasFace = Boolean(hasValidEnrolledFace(employee));
         return {
           ...employee,
           profileImageUrl: hasFace ? 'enrolled' : null,
@@ -625,6 +626,7 @@ class AttendanceService {
         email: true,
         employeeCode: true,
         profileImageUrl: true,
+        faceEncodingData: true,
         department: { select: { name: true } },
       },
     });
@@ -657,7 +659,7 @@ class AttendanceService {
       });
     }
 
-    const hasFace = Boolean(employee.profileImageUrl && hasValidEnrolledFace(employee.profileImageUrl));
+    const hasFace = Boolean(hasValidEnrolledFace(employee));
     return {
       ...employee,
       hasFaceEnrolled: hasFace,
@@ -669,7 +671,7 @@ class AttendanceService {
   async manualCheckIn(adminId, adminOrgId, { employeeId, sessionId, password, faceImage }) {
     const clockInTime = await getCurrentServerTime();
     const employee = await this._loadEmployeeForChannel(employeeId, 'MANUAL', true);
-    if (employee.orgId !== adminOrgId) {
+    if (adminOrgId !== 'platform-org' && employee.orgId !== adminOrgId) {
       throw Object.assign(new Error('Employee not found.'), { status: 404 });
     }
     if (!password || !(await bcrypt.compare(password, employee.passwordHash))) {
@@ -677,7 +679,7 @@ class AttendanceService {
     }
 
     // ── Face verification (after password passes) ──────────────────────────
-    const hasFace = Boolean(employee.profileImageUrl && hasValidEnrolledFace(employee.profileImageUrl));
+    const hasFace = Boolean(hasValidEnrolledFace(employee));
     if (hasFace) {
       // Employee has a verified face enrolled on disk → must verify
       if (!faceImage) {
@@ -690,7 +692,7 @@ class AttendanceService {
     }
     // else: no valid face enrolled + org doesn't require it → password-only (backwards compatible)
 
-    const session = await this._loadManualSession(sessionId, adminOrgId, clockInTime);
+    const session = await this._loadManualSession(sessionId, employee.orgId, clockInTime);
     if (!officeHoursFor(clockInTime, session.office)) throw Object.assign(new Error('This office is closed today.'), { status: 400 });
     await this._assertEmployeeMayCheckIn(employeeId, clockInTime, session.office.timezone);
 
@@ -710,7 +712,7 @@ class AttendanceService {
 
   async manualCheckOut(adminId, adminOrgId, { employeeId, sessionId, password, faceImage }) {
     const employee = await this._loadEmployeeForChannel(employeeId, 'MANUAL', true);
-    if (employee.orgId !== adminOrgId) {
+    if (adminOrgId !== 'platform-org' && employee.orgId !== adminOrgId) {
       throw Object.assign(new Error('Employee not found.'), { status: 404 });
     }
     if (!password || !(await bcrypt.compare(password, employee.passwordHash))) {

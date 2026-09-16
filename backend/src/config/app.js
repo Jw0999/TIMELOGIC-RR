@@ -4,9 +4,11 @@ const cors = require('cors');
 const hpp = require('hpp');
 const compression = require('compression');
 const morgan = require('morgan');
+const fs = require('fs');
 const path = require('path');
 
 const env = require('./env');
+const { prisma } = require('./database');
 const { apiLimiter } = require('../middleware/rateLimiter');
 const { errorHandler, notFound } = require('../middleware/errorHandler');
 
@@ -74,6 +76,32 @@ function createApp() {
   app.use('/uploads', express.static(uploadRoot, {
     setHeaders: (res) => res.set('Cache-Control', 'no-store'),
   }));
+
+  // Resilient biometric image serving fallback from PostgreSQL
+  app.get('/uploads/faces/:filename', async (req, res, next) => {
+    try {
+      const filename = path.basename(req.params.filename);
+      const user = await prisma.user.findFirst({
+        where: {
+          profileImageUrl: { contains: filename },
+          faceEncodingData: { not: null },
+        },
+        select: { faceEncodingData: true },
+      });
+      if (!user || !user.faceEncodingData || user.faceEncodingData.length === 0) {
+        return res.status(404).json({ success: false, message: 'Image not found' });
+      }
+      try {
+        const targetDir = path.join(uploadRoot, 'faces');
+        if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+        fs.writeFileSync(path.join(targetDir, filename), user.faceEncodingData);
+      } catch {}
+      res.set('Cache-Control', 'no-store');
+      res.type('image/jpeg').send(user.faceEncodingData);
+    } catch (err) {
+      next(err);
+    }
+  });
 
   // Global per-IP rate limit (anti-DDoS / abuse). The login route has its own
   // stricter brute-force limiter (see routes/auth.js → authLimiter).

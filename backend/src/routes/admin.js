@@ -92,13 +92,17 @@ router.post('/users/:userId/face',
   isAdmin,
   async (req, res, next) => {
     try {
-      const targetOrgId = await ctrl.resolveAdminOrgId(req);
+      const where = { id: req.params.userId, role: 'EMPLOYEE' };
+      if (req.user.role !== 'SUPER_ADMIN') {
+        const targetOrgId = await ctrl.resolveAdminOrgId(req);
+        where.orgId = targetOrgId;
+      }
       const employee = await prisma.user.findFirst({
-        where: { id: req.params.userId, orgId: targetOrgId, role: 'EMPLOYEE' },
-        select: { id: true, profileImageUrl: true },
+        where,
+        select: { id: true, profileImageUrl: true, faceEncodingData: true },
       });
       if (!employee) return res.status(404).json({ success: false, message: 'Employee not found.' });
-      if (employee.profileImageUrl && hasValidEnrolledFace(employee.profileImageUrl)) {
+      if (hasValidEnrolledFace(employee)) {
         return res.status(400).json({
           success: false,
           code: 'FACE_ALREADY_ENROLLED',
@@ -114,13 +118,15 @@ router.post('/users/:userId/face',
       if (!req.file) {
         return res.status(400).json({ success: false, message: 'No photo received. Make sure the field name is "photo".' });
       }
-      await validateFaceEnrollment(req.file.path);
+      const fileBuffer = fs.readFileSync(req.file.path);
+      await validateFaceEnrollment(req.file.path, fileBuffer);
       const url = `/uploads/faces/${req.file.filename}`;
 
       const user = await prisma.user.update({
         where: { id: req.params.userId },
         data: {
           profileImageUrl: url,
+          faceEncodingData: fileBuffer,
         },
         select: { id: true, firstName: true, lastName: true, profileImageUrl: true },
       });

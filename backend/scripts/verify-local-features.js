@@ -314,9 +314,10 @@ async function main() {
   step('manual check-out is blocked before the office close time');
 
   const closeNow = new Date();
+  const currentHHMM = `${String(closeNow.getUTCHours()).padStart(2, '0')}:${String(closeNow.getUTCMinutes()).padStart(2, '0')}`;
   await prisma.office.update({
     where: { id: officeId },
-    data: { closeTime: `${String(closeNow.getUTCHours()).padStart(2, '0')}:${String(closeNow.getUTCMinutes()).padStart(2, '0')}` },
+    data: { closeTime: currentHHMM, weeklySchedule: null },
   });
   const manualCheckOut = await request('/admin/manual-attendance/check-out', {
     method: 'POST',
