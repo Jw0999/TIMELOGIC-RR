@@ -284,14 +284,30 @@ function App() {
   }, []);
 
   // Dashboard Loader
-  async function load(quiet = false) {
+  async function load(quiet = false, forceResetSession = false) {
     if (!quiet) setLoading(true);
     setError('');
     try {
-      const next = await getDashboard(sessionId || undefined, search.trim() || undefined);
+      const targetSessionId = forceResetSession ? undefined : (sessionId || undefined);
+      let next: Dashboard;
+      try {
+        next = await getDashboard(targetSessionId, search.trim() || undefined);
+      } catch (err) {
+        if (targetSessionId) {
+          console.warn('Dashboard query with sessionId failed, falling back to clean query:', err);
+          setSessionId('');
+          next = await getDashboard(undefined, search.trim() || undefined);
+        } else {
+          throw err;
+        }
+      }
+
       setDashboard(next);
-      if (!sessionId && next.selectedSession?.id) {
+
+      if (next.selectedSession?.id) {
         setSessionId(next.selectedSession.id);
+      } else if (sessionId && !next.activeSessions?.some((s) => s.id === sessionId)) {
+        setSessionId('');
       }
 
       // Load active breaks for checked-in staff
@@ -447,6 +463,33 @@ function App() {
             },
           };
         }
+      });
+
+      // Optimistically update dashboard list so staff roster immediately reflects new state
+      setDashboard((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          employees: prev.employees.map((e) => {
+            if (e.id !== employee.id) return e;
+            return {
+              ...e,
+              attendance:
+                type === 'check_in'
+                  ? {
+                      ...(e.attendance || {}),
+                      sessionId: sessionId || e.attendance?.sessionId,
+                      clockInTime: result.clockInTime || new Date().toISOString(),
+                      clockOutTime: null,
+                      status: result.status || e.attendance?.status || 'PRESENT',
+                    }
+                  : {
+                      ...(e.attendance || {}),
+                      clockOutTime: result.clockOutTime || new Date().toISOString(),
+                    },
+            };
+          }),
+        };
       });
 
       // Start auto-reset timer for the next person in line
@@ -712,7 +755,7 @@ function App() {
           </div>
 
           <div className="station-actions">
-            <button className="btn secondary" onClick={() => void load()} disabled={loading}>
+            <button className="btn secondary" onClick={() => void load(false, true)} disabled={loading}>
               <RefreshCw size={15} className={loading ? 'spin' : ''} />
               <span>Refresh Station</span>
             </button>

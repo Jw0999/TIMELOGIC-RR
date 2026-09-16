@@ -511,11 +511,29 @@ class AttendanceService {
       },
       orderBy: { startTime: 'desc' },
     });
-    const selectedSession = sessionId
-      ? activeSessions.find((session) => session.id === sessionId)
-      : activeSessions[0];
-    if (sessionId && !selectedSession) {
-      throw Object.assign(new Error('Active session not found for this organization.'), { status: 404 });
+    let selectedSession = null;
+    if (sessionId) {
+      selectedSession = activeSessions.find((session) => session.id === sessionId) || null;
+      if (!selectedSession) {
+        selectedSession = await prisma.attendanceSession.findFirst({
+          where: {
+            id: sessionId,
+            office: { orgId: adminOrgId },
+          },
+          select: {
+            id: true, sessionName: true, startTime: true, endTime: true,
+            office: {
+              select: {
+                id: true, name: true, timezone: true, openTime: true, closeTime: true,
+                graceMinutes: true, lateAfterMinutes: true, gracePenalty: true, latePenalty: true, completelyLatePenalty: true,
+              },
+            },
+          },
+        });
+      }
+    }
+    if (!selectedSession && activeSessions.length > 0) {
+      selectedSession = activeSessions[0];
     }
 
     if (!organization.allowManualCheckIn) {
@@ -542,6 +560,11 @@ class AttendanceService {
         ],
       } : {}),
     };
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(now);
+    todayEnd.setHours(23, 59, 59, 999);
+
     const recordDate = selectedSession ? attendanceDate(now, {
       ...selectedSession.office,
       openingReference: selectedSession.startTime,
@@ -572,26 +595,48 @@ class AttendanceService {
       }),
       prisma.user.count({ where }),
     ]);
-    const openRecords = employees.length ? await prisma.attendanceRecord.findMany({
-      where: {
-        employeeId: { in: employees.map((employee) => employee.id) },
-        clockInTime: { not: null },
-        clockOutTime: null,
-        session: { office: { orgId: adminOrgId } },
-      },
-      orderBy: { clockInTime: 'desc' },
-      select: {
-        id: true, employeeId: true, sessionId: true,
-        clockInTime: true, clockOutTime: true, status: true, penalty: true,
-        checkInSource: true, checkOutSource: true,
-        checkInRecorder: { select: { id: true, firstName: true, lastName: true } },
-        checkOutRecorder: { select: { id: true, firstName: true, lastName: true } },
-        session: { select: { office: { select: { name: true, timezone: true } } } },
-      },
-    }) : [];
+    const [openRecords, todayRecords] = employees.length ? await Promise.all([
+      prisma.attendanceRecord.findMany({
+        where: {
+          employeeId: { in: employees.map((employee) => employee.id) },
+          clockInTime: { not: null },
+          clockOutTime: null,
+          session: { office: { orgId: adminOrgId } },
+        },
+        orderBy: { clockInTime: 'desc' },
+        select: {
+          id: true, employeeId: true, sessionId: true,
+          clockInTime: true, clockOutTime: true, status: true, penalty: true,
+          checkInSource: true, checkOutSource: true,
+          checkInRecorder: { select: { id: true, firstName: true, lastName: true } },
+          checkOutRecorder: { select: { id: true, firstName: true, lastName: true } },
+          session: { select: { office: { select: { name: true, timezone: true } } } },
+        },
+      }),
+      prisma.attendanceRecord.findMany({
+        where: {
+          employeeId: { in: employees.map((employee) => employee.id) },
+          clockInTime: { gte: todayStart, lte: todayEnd },
+          session: { office: { orgId: adminOrgId } },
+        },
+        orderBy: { clockInTime: 'desc' },
+        select: {
+          id: true, employeeId: true, sessionId: true,
+          clockInTime: true, clockOutTime: true, status: true, penalty: true,
+          checkInSource: true, checkOutSource: true,
+          checkInRecorder: { select: { id: true, firstName: true, lastName: true } },
+          checkOutRecorder: { select: { id: true, firstName: true, lastName: true } },
+          session: { select: { office: { select: { name: true, timezone: true } } } },
+        },
+      }),
+    ]) : [[], []];
     const openByEmployee = new Map();
     for (const record of openRecords) {
       if (!openByEmployee.has(record.employeeId)) openByEmployee.set(record.employeeId, record);
+    }
+    const todayByEmployee = new Map();
+    for (const record of todayRecords) {
+      if (!todayByEmployee.has(record.employeeId)) todayByEmployee.set(record.employeeId, record);
     }
     return {
       enabled: true, serverTime: now, organization,
@@ -602,7 +647,7 @@ class AttendanceService {
           ...employee,
           profileImageUrl: hasFace ? 'enrolled' : null,
           hasFaceEnrolled: hasFace,
-          attendance: openByEmployee.get(employee.id) ?? employee.attendanceRecords?.[0] ?? null,
+          attendance: openByEmployee.get(employee.id) ?? employee.attendanceRecords?.[0] ?? todayByEmployee.get(employee.id) ?? null,
           attendanceRecords: undefined,
         };
       }),
