@@ -197,6 +197,21 @@ const getHistory = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+const resolveAdminOrgId = async (req) => {
+  const headerOrgId = req.headers['x-organization-id'];
+  if (headerOrgId) return headerOrgId;
+  if (req.query.orgId) return req.query.orgId;
+  if (req.user?.role === 'SUPER_ADMIN' && req.user?.orgId === 'platform-org') {
+    const orgWithUsers = await prisma.organization.findFirst({
+      where: { id: { not: 'platform-org' } },
+      orderBy: { users: { _count: 'desc' } },
+      select: { id: true },
+    });
+    if (orgWithUsers) return orgWithUsers.id;
+  }
+  return req.user?.orgId;
+};
+
 const getMonthlyPenalties = async (req, res, next) => {
   try {
     const month = String(req.query.month || '');
@@ -205,8 +220,11 @@ const getMonthlyPenalties = async (req, res, next) => {
     const start = new Date(Date.UTC(year, monthNumber - 1, 1));
     const end = new Date(Date.UTC(year, monthNumber, 1));
     const daysInMonth = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
-    const targetOrgId = req.headers['x-organization-id'] || req.query.orgId || (req.user.orgId !== 'platform-org' ? req.user.orgId : null);
-    const orgWhere = targetOrgId ? { orgId: targetOrgId } : (req.user.orgId !== 'platform-org' ? { orgId: req.user.orgId } : {});
+    const targetOrgId = await resolveAdminOrgId(req);
+    const orgWhere = targetOrgId && targetOrgId !== 'platform-org' ? { orgId: targetOrgId } : {};
+    const orgFilter = targetOrgId && targetOrgId !== 'platform-org' ? { employee: { orgId: targetOrgId } } : {};
+    const manualOrgFilter = targetOrgId && targetOrgId !== 'platform-org' ? { orgId: targetOrgId } : {};
+
     const employees = await prisma.user.findMany({
       where: { ...orgWhere, role: 'EMPLOYEE', status: { not: 'TERMINATED' } },
       select: { id: true, firstName: true, lastName: true, employeeCode: true, department: { select: { name: true } } },
@@ -215,22 +233,22 @@ const getMonthlyPenalties = async (req, res, next) => {
     const [penalties, breakPenalties, manualPenalties, statusPenalties] = await Promise.all([
       prisma.attendanceRecord.groupBy({
         by: ['employeeId'],
-        where: { ...(targetOrgId ? { employee: { orgId: targetOrgId } } : {}), date: { gte: start, lt: end } },
+        where: { ...orgFilter, date: { gte: start, lt: end } },
         _sum: { penalty: true }, _count: { _all: true },
       }),
       prisma.breakRecord.groupBy({
         by: ['employeeId'],
-        where: { ...(targetOrgId ? { employee: { orgId: targetOrgId } } : {}), startTime: { gte: start, lt: end } },
+        where: { ...orgFilter, startTime: { gte: start, lt: end } },
         _sum: { penalty: true },
       }),
       prisma.manualPenalty.groupBy({
         by: ['employeeId'],
-        where: { ...(targetOrgId ? { orgId: targetOrgId } : {}), createdAt: { gte: start, lt: end } },
+        where: { ...manualOrgFilter, createdAt: { gte: start, lt: end } },
         _sum: { amount: true },
       }),
       prisma.attendanceRecord.groupBy({
         by: ['employeeId', 'status'],
-        where: { ...(targetOrgId ? { employee: { orgId: targetOrgId } } : {}), date: { gte: start, lt: end }, penalty: { gt: 0 } },
+        where: { ...orgFilter, date: { gte: start, lt: end }, penalty: { gt: 0 } },
         _sum: { penalty: true },
       }),
     ]);
@@ -263,6 +281,8 @@ const getMonthlyPenalties = async (req, res, next) => {
 
       return {
         ...employee,
+        id: employee.id,
+        employeeId: employee.id,
         attendancePenalty: attPenalty,
         breakPenalty: brkPenalty,
         overBreakPenalty: brkPenalty,

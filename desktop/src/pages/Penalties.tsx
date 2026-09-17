@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Coffee,
   DollarSign,
@@ -41,7 +43,9 @@ type Penalty = {
 };
 
 type MonthlyTotal = {
-  employeeId: string;
+  id?: string;
+  employeeId?: string;
+  employeeCode?: string | null;
   attendancePenalty: number;
   breakPenalty: number;
   overBreakPenalty?: number;
@@ -71,6 +75,22 @@ export default function Penalties() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [waivingEmployeeId, setWaivingEmployeeId] = useState<string | null>(null);
 
+  const monthLabel = useMemo(() => {
+    try {
+      const [y, m] = month.split('-').map(Number);
+      const d = new Date(Date.UTC(y, m - 1, 1));
+      return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+    } catch {
+      return month;
+    }
+  }, [month]);
+
+  const stepMonth = (delta: number) => {
+    const [y, m] = month.split('-').map(Number);
+    const d = new Date(Date.UTC(y, m - 1 + delta, 1));
+    setMonth(d.toISOString().slice(0, 7));
+  };
+
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -80,9 +100,18 @@ export default function Penalties() {
         fetchManualPenalties(month),
         fetchMonthlyPenalties(month),
       ]);
+
+      const rawMonthly: MonthlyTotal[] = Array.isArray(monthly)
+        ? monthly
+        : Array.isArray(monthly?.employees)
+        ? monthly.employees
+        : Array.isArray(monthly?.data?.employees)
+        ? monthly.data.employees
+        : [];
+
       setEmployees(employeeRows);
       setPenalties(penaltyRows);
-      setAutomaticTotals(monthly?.employees ?? []);
+      setAutomaticTotals(rawMonthly);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load penalties.');
     } finally {
@@ -101,6 +130,18 @@ export default function Penalties() {
     }, {});
   }, [penalties]);
 
+  const findAutomatic = useCallback(
+    (emp: Employee) => {
+      return automaticTotals.find(
+        (item: any) =>
+          item.id === emp.id ||
+          item.employeeId === emp.id ||
+          (item.employeeCode && emp.employeeCode && item.employeeCode === emp.employeeCode)
+      );
+    },
+    [automaticTotals]
+  );
+
   const overallStats = useMemo(() => {
     let totalManual = 0;
     let totalAuto = 0;
@@ -111,7 +152,7 @@ export default function Penalties() {
 
     for (const emp of employees) {
       const manual = totals[emp.id] ?? 0;
-      const autoObj = automaticTotals.find((a) => a.employeeId === emp.id);
+      const autoObj = findAutomatic(emp);
       const auto =
         autoObj?.autoPenalty != null
           ? autoObj.autoPenalty
@@ -135,7 +176,7 @@ export default function Penalties() {
       grandTotal: totalManual + totalAuto,
       employeesWithPenalties,
     };
-  }, [employees, totals, automaticTotals]);
+  }, [employees, totals, findAutomatic]);
 
   const filteredEmployees = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -167,7 +208,7 @@ export default function Penalties() {
   };
 
   const handleWaiveAutoPenalties = async (employee: Employee, autoAmount: number) => {
-    const confirmMsg = `Remove all auto penalties (${money(autoAmount)}) for ${employee.firstName} ${employee.lastName} for ${month}?\n\nThis will clear Over Break, Lateness, and Completely Late penalties for this month.`;
+    const confirmMsg = `Remove all auto penalties (${money(autoAmount)}) for ${employee.firstName} ${employee.lastName} for ${monthLabel}?\n\nThis will clear Over Break, Lateness, and Completely Late penalties for this month.`;
     if (!window.confirm(confirmMsg)) return;
 
     setWaivingEmployeeId(employee.id);
@@ -189,15 +230,31 @@ export default function Penalties() {
     <div className="flex flex-col h-full overflow-hidden">
       <Header
         title="Penalties"
-        subtitle="Manage manual penalties alongside automatic lateness, completely late, and over-break penalties"
+        subtitle={`Showing penalties for ${monthLabel} — Manual alongside automatic Over Break, Lateness, and Completely Late penalties`}
         action={
           <div className="flex items-center gap-2">
-            <input
-              type="month"
-              value={month}
-              onChange={(event) => setMonth(event.target.value)}
-              className="border border-[var(--input-border)] bg-[var(--input-bg)] text-[var(--text-main)] rounded-xl px-3 py-2 text-sm"
-            />
+            <div className="flex items-center rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] overflow-hidden">
+              <button
+                onClick={() => stepMonth(-1)}
+                className="p-2 hover:bg-[var(--hover-bg)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
+                title="Previous month"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <input
+                type="month"
+                value={month}
+                onChange={(event) => setMonth(event.target.value)}
+                className="bg-transparent text-[var(--text-main)] px-2 py-2 text-sm focus:outline-none"
+              />
+              <button
+                onClick={() => stepMonth(1)}
+                className="p-2 hover:bg-[var(--hover-bg)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
+                title="Next month"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
             <button
               onClick={() => void load()}
               disabled={loading}
@@ -245,7 +302,7 @@ export default function Penalties() {
             <p className="text-xl font-bold text-red-600 dark:text-red-400 mt-2">
               {money(overallStats.grandTotal)}
             </p>
-            <p className="text-[11px] text-[var(--text-muted)] mt-1">For {month}</p>
+            <p className="text-[11px] text-[var(--text-muted)] mt-1">{monthLabel}</p>
           </div>
 
           <div className="bg-[var(--card-bg)] p-4 rounded-2xl border border-[var(--border)]">
@@ -278,7 +335,7 @@ export default function Penalties() {
             <p className="text-xl font-bold text-[var(--text-main)] mt-2">
               {overallStats.employeesWithPenalties} / {employees.length}
             </p>
-            <p className="text-[11px] text-[var(--text-muted)] mt-1">Have penalties this month</p>
+            <p className="text-[11px] text-[var(--text-muted)] mt-1">In {monthLabel}</p>
           </div>
         </div>
 
@@ -286,9 +343,9 @@ export default function Penalties() {
         <div className="bg-[var(--card-bg)] rounded-2xl border border-[var(--border)] overflow-hidden">
           <div className="px-5 py-4 border-b border-[var(--border)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <h2 className="font-bold text-[var(--text-main)]">Employee Penalties Overview</h2>
+              <h2 className="font-bold text-[var(--text-main)]">Employee Penalties Overview ({monthLabel})</h2>
               <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                Full breakdown of manual and automatic penalties (Over Break, Lateness, Completely Late)
+                Monthly auto penalties (Over Break, Lateness, Completely Late) alongside manual adjustments
               </p>
             </div>
             <div className="relative max-w-xs w-full">
@@ -326,7 +383,7 @@ export default function Penalties() {
                   {filteredEmployees.map((employee) => {
                     const rows = penalties.filter((penalty) => penalty.employeeId === employee.id);
                     const manualTotal = totals[employee.id] ?? 0;
-                    const automatic = automaticTotals.find((item) => item.employeeId === employee.id);
+                    const automatic = findAutomatic(employee);
 
                     const autoTotal =
                       automatic?.autoPenalty != null
@@ -337,6 +394,7 @@ export default function Penalties() {
                     const lateness = automatic?.latenessPenalty ?? 0;
                     const completelyLate = automatic?.completelyLatePenalty ?? 0;
                     const absent = automatic?.absentPenalty ?? 0;
+                    const attPenalty = automatic?.attendancePenalty ?? 0;
                     const grandTotal = manualTotal + autoTotal;
 
                     return (
@@ -378,7 +436,7 @@ export default function Penalties() {
                                 {lateness > 0 && (
                                   <span
                                     className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
-                                    title="Lateness grace penalty"
+                                    title="Lateness penalty"
                                   >
                                     <Clock size={10} />
                                     Late: {money(lateness)}
@@ -401,12 +459,14 @@ export default function Penalties() {
                                     Absent: {money(absent)}
                                   </span>
                                 )}
-                                {overBreak === 0 && lateness === 0 && completelyLate === 0 && absent === 0 && (
-                                  (automatic?.attendancePenalty ?? 0) > 0 && (
-                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
-                                      Late: {money(automatic?.attendancePenalty ?? 0)}
-                                    </span>
-                                  )
+                                {lateness === 0 && completelyLate === 0 && absent === 0 && attPenalty > 0 && (
+                                  <span
+                                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
+                                    title="Attendance penalty"
+                                  >
+                                    <Clock size={10} />
+                                    Late: {money(attPenalty)}
+                                  </span>
                                 )}
                               </div>
                             </div>
@@ -465,9 +525,9 @@ export default function Penalties() {
         <div className="bg-[var(--card-bg)] rounded-2xl border border-[var(--border)] overflow-hidden">
           <div className="px-5 py-4 border-b border-[var(--border)] flex items-center justify-between">
             <div>
-              <h2 className="font-bold text-[var(--text-main)]">Manual Penalty History</h2>
+              <h2 className="font-bold text-[var(--text-main)]">Manual Penalty History ({monthLabel})</h2>
               <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                Directly added organization penalties for {month}
+                Directly added organization penalties for {monthLabel}
               </p>
             </div>
             <span className="text-xs font-semibold text-[var(--text-muted)] bg-[var(--hover-bg)] px-2.5 py-1 rounded-full">
@@ -477,7 +537,7 @@ export default function Penalties() {
 
           {penalties.length === 0 ? (
             <p className="p-5 text-sm text-[var(--text-muted)]">
-              No manual penalties recorded for {month}.
+              No manual penalties recorded for {monthLabel}.
             </p>
           ) : (
             <div className="divide-y divide-[var(--border)]">
