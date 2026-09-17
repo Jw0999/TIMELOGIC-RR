@@ -455,19 +455,22 @@ const employeeSummary = async (req, res, next) => {
       select: { id: true },
     });
     if (!employee) return res.status(404).json({ success: false, message: 'Employee not found.' });
-    const [penalties, breakPenalties, attendanceCount] = await Promise.all([
+    const [penalties, breakPenalties, manualPenalties, attendanceCount] = await Promise.all([
       prisma.attendanceRecord.aggregate({ where: { employeeId: employee.id }, _sum: { penalty: true } }),
       prisma.breakRecord.aggregate({ where: { employeeId: employee.id }, _sum: { penalty: true } }),
+      prisma.manualPenalty.aggregate({ where: { employeeId: employee.id }, _sum: { amount: true } }),
       prisma.attendanceRecord.count({ where: { employeeId: employee.id } }),
     ]);
     const attendancePenalty = penalties._sum.penalty ?? 0;
     const breakPenalty = breakPenalties._sum.penalty ?? 0;
+    const manualPenalty = manualPenalties._sum.amount ?? 0;
     res.json({
       success: true,
       data: {
         attendancePenalty,
         breakPenalty,
-        totalPenalty: attendancePenalty + breakPenalty,
+        manualPenalty,
+        totalPenalty: attendancePenalty + breakPenalty + manualPenalty,
         attendanceCount,
       },
     });
@@ -575,6 +578,68 @@ const createPenalty = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+const deletePenalty = async (req, res, next) => {
+  try {
+    const targetOrgId = await resolveAdminOrgId(req);
+    const { id } = req.params;
+    const penalty = await prisma.manualPenalty.findFirst({
+      where: { id, orgId: targetOrgId },
+    });
+    if (!penalty) return res.status(404).json({ success: false, message: 'Manual penalty not found.' });
+    await prisma.manualPenalty.delete({ where: { id } });
+    res.json({ success: true, message: 'Penalty removed successfully.' });
+  } catch (err) { next(err); }
+};
+
+const waiveEmployeeAutoPenalties = async (req, res, next) => {
+  try {
+    const targetOrgId = await resolveAdminOrgId(req);
+    const { employeeId } = req.params;
+    const month = String(req.query.month || '');
+    const employee = await prisma.user.findFirst({
+      where: { id: employeeId, orgId: targetOrgId, role: 'EMPLOYEE' },
+      select: { id: true },
+    });
+    if (!employee) return res.status(404).json({ success: false, message: 'Employee not found.' });
+
+    let dateFilter = {};
+    const monthMatch = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(month);
+    if (monthMatch) {
+      const start = new Date(Date.UTC(Number(monthMatch[1]), Number(monthMatch[2]) - 1, 1));
+      const end = new Date(Date.UTC(Number(monthMatch[1]), Number(monthMatch[2]), 1));
+      dateFilter = { gte: start, lt: end };
+    }
+
+    const [updatedAttendance, updatedBreaks] = await Promise.all([
+      prisma.attendanceRecord.updateMany({
+        where: {
+          employeeId,
+          ...(monthMatch ? { date: dateFilter } : {}),
+          penalty: { gt: 0 },
+        },
+        data: { penalty: 0 },
+      }),
+      prisma.breakRecord.updateMany({
+        where: {
+          employeeId,
+          ...(monthMatch ? { startTime: dateFilter } : {}),
+          penalty: { gt: 0 },
+        },
+        data: { penalty: 0 },
+      }),
+    ]);
+
+    res.json({
+      success: true,
+      message: 'Auto penalties removed successfully.',
+      cleared: {
+        attendanceRecords: updatedAttendance.count,
+        breakRecords: updatedBreaks.count,
+      },
+    });
+  } catch (err) { next(err); }
+};
+
 module.exports = {
   getOrg, updateOrg,
   createOffice,
@@ -585,6 +650,6 @@ module.exports = {
   emergencyStopAll, emergencyLockSystem, emergencyInvalidateQR, emergencyRevert,
   getNotifications, createEmployee,
   getManualAttendance, findManualEmployee, manualCheckIn, manualCheckOut,
-  listPenalties, createPenalty,
+  listPenalties, createPenalty, deletePenalty, waiveEmployeeAutoPenalties,
   resolveAdminOrgId,
 };

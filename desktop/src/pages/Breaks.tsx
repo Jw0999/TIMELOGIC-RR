@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, Calendar, Play, RefreshCw, Search } from 'lucide-react';
 import Header from '../components/Header';
-import { fetchDailyBreaks, fetchAllBreaks, startEmployeeBreak, endEmployeeBreak, fetchEmployees, fetchLiveAttendance } from '../services';
+import { fetchDailyBreaks, fetchAllBreaks, startEmployeeBreak, endEmployeeBreak, fetchEmployees, fetchLiveAttendance, waiveBreakPenalty } from '../services';
 import { useAuth } from '../context/AuthContext';
 
 const BREAK_COLORS: Record<string, string> = {
@@ -363,9 +363,23 @@ export default function Breaks() {
                         <td className="px-4 py-3 font-bold text-slate-700 dark:text-slate-300">
                           {b.durationMinutes ?? '—'}m
                           {b.penalty > 0 && (
-                            <span className="block text-xs text-red-600 font-semibold">
-                              Penalty ₦{Number(b.penalty).toLocaleString()}
-                            </span>
+                            <div className="mt-1">
+                              <span className="block text-xs text-red-600 font-semibold">
+                                Penalty ₦{Number(b.penalty).toLocaleString()}
+                              </span>
+                              <button
+                                onClick={async () => {
+                                  if (window.confirm(`Waive break penalty of ₦${Number(b.penalty).toLocaleString()} for ${b.employee?.firstName}?`)) {
+                                    await waiveBreakPenalty(b.id);
+                                    void load();
+                                  }
+                                }}
+                                className="text-[10px] text-rose-600 hover:text-rose-800 underline font-medium"
+                                title="Waive break penalty"
+                              >
+                                Waive
+                              </button>
+                            </div>
                           )}
                         </td>
                         <td className="px-4 py-3">

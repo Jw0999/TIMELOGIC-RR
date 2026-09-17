@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Search, AlertTriangle, Wifi, Smartphone, Flag, UserCheck, RefreshCw } from 'lucide-react';
 import Header from '../components/Header';
-import { fetchAttendance, fetchLiveAttendance, fetchAttendanceForDate, fetchMonthlyPenalties, flagRecord, approveRecord } from '../services';
+import { fetchAttendance, fetchLiveAttendance, fetchAttendanceForDate, fetchMonthlyPenalties, flagRecord, approveRecord, waiveRecordPenalty } from '../services';
 import { useAuth } from '../context/AuthContext';
 
 const STATUS_STYLE: Record<string, string> = {
@@ -176,16 +176,32 @@ export default function Attendance() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <button
-                        onClick={async () => {
-                          if (r.flagged) await approveRecord(r.id);
-                          else await flagRecord(r.id, 'Manually flagged');
-                          load();
-                        }}
-                        className={`text-xs font-semibold px-2.5 py-1 rounded-lg transition ${r.flagged ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                      >
-                        <Flag size={11} className="inline mr-1" />{r.flagged ? 'Unflag' : 'Flag'}
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={async () => {
+                            if (r.flagged) await approveRecord(r.id);
+                            else await flagRecord(r.id, 'Manually flagged');
+                            load();
+                          }}
+                          className={`text-xs font-semibold px-2.5 py-1 rounded-lg transition ${r.flagged ? 'bg-orange-100 text-orange-700 hover:bg-orange-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                        >
+                          <Flag size={11} className="inline mr-1" />{r.flagged ? 'Unflag' : 'Flag'}
+                        </button>
+                        {Boolean(r.penalty && r.penalty > 0) && (
+                          <button
+                            onClick={async () => {
+                              if (window.confirm(`Waive penalty of ₦${Number(r.penalty).toLocaleString()} for ${r.employee?.firstName}?`)) {
+                                await waiveRecordPenalty(r.id);
+                                load();
+                              }
+                            }}
+                            className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 transition"
+                            title="Waive penalty on this record"
+                          >
+                            Waive
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>;
                 })}

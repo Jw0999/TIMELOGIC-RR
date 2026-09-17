@@ -57,5 +57,6 @@ router.put('/records/:recordId/flag', authenticate, isAdmin, [
 ], validate, ctrl.flagRecord);
 
 router.put('/records/:recordId/approve', authenticate, isAdmin, ctrl.approveRecord);
+router.put('/records/:recordId/waive-penalty', authenticate, isAdmin, ctrl.waiveRecordPenalty);
 
 module.exports = router;

@@ -212,7 +212,7 @@ const getMonthlyPenalties = async (req, res, next) => {
       select: { id: true, firstName: true, lastName: true, employeeCode: true, department: { select: { name: true } } },
       orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
     });
-    const [penalties, breakPenalties, manualPenalties] = await Promise.all([
+    const [penalties, breakPenalties, manualPenalties, statusPenalties] = await Promise.all([
       prisma.attendanceRecord.groupBy({
         by: ['employeeId'],
         where: { ...(targetOrgId ? { employee: { orgId: targetOrgId } } : {}), date: { gte: start, lt: end } },
@@ -228,20 +228,73 @@ const getMonthlyPenalties = async (req, res, next) => {
         where: { ...(targetOrgId ? { orgId: targetOrgId } : {}), createdAt: { gte: start, lt: end } },
         _sum: { amount: true },
       }),
+      prisma.attendanceRecord.groupBy({
+        by: ['employeeId', 'status'],
+        where: { ...(targetOrgId ? { employee: { orgId: targetOrgId } } : {}), date: { gte: start, lt: end }, penalty: { gt: 0 } },
+        _sum: { penalty: true },
+      }),
     ]);
     const totals = new Map(penalties.map((row) => [row.employeeId, row]));
     const breakTotals = new Map(breakPenalties.map((row) => [row.employeeId, row._sum.penalty ?? 0]));
     const manualTotals = new Map(manualPenalties.map((row) => [row.employeeId, row._sum.amount ?? 0]));
-    res.json({ success: true, data: { month, daysInMonth, employees: employees.map((employee) => ({
-      ...employee,
-      attendancePenalty: totals.get(employee.id)?._sum.penalty ?? 0,
-      breakPenalty: breakTotals.get(employee.id) ?? 0,
-      manualPenalty: manualTotals.get(employee.id) ?? 0,
-      totalPenalty: (totals.get(employee.id)?._sum.penalty ?? 0) + (breakTotals.get(employee.id) ?? 0) + (manualTotals.get(employee.id) ?? 0),
-      attendanceCount: totals.get(employee.id)?._count._all ?? 0,
-    })) } });
+
+    const statusMap = new Map();
+    for (const sp of statusPenalties) {
+      if (!statusMap.has(sp.employeeId)) {
+        statusMap.set(sp.employeeId, { latenessPenalty: 0, completelyLatePenalty: 0, absentPenalty: 0 });
+      }
+      const entry = statusMap.get(sp.employeeId);
+      const sum = sp._sum.penalty ?? 0;
+      if (sp.status === 'COMPLETELY_LATE') {
+        entry.completelyLatePenalty += sum;
+      } else if (sp.status === 'ABSENT') {
+        entry.absentPenalty += sum;
+      } else {
+        entry.latenessPenalty += sum;
+      }
+    }
+
+    res.json({ success: true, data: { month, daysInMonth, employees: employees.map((employee) => {
+      const attPenalty = totals.get(employee.id)?._sum.penalty ?? 0;
+      const brkPenalty = breakTotals.get(employee.id) ?? 0;
+      const manPenalty = manualTotals.get(employee.id) ?? 0;
+      const autoPenalty = attPenalty + brkPenalty;
+      const breakdown = statusMap.get(employee.id) || { latenessPenalty: 0, completelyLatePenalty: 0, absentPenalty: 0 };
+
+      return {
+        ...employee,
+        attendancePenalty: attPenalty,
+        breakPenalty: brkPenalty,
+        overBreakPenalty: brkPenalty,
+        latenessPenalty: breakdown.latenessPenalty,
+        completelyLatePenalty: breakdown.completelyLatePenalty,
+        absentPenalty: breakdown.absentPenalty,
+        autoPenalty,
+        manualPenalty: manPenalty,
+        totalPenalty: autoPenalty + manPenalty,
+        attendanceCount: totals.get(employee.id)?._count._all ?? 0,
+      };
+    }) } });
   } catch (err) { next(err); }
 };
+
+const waiveRecordPenalty = async (req, res, next) => {
+  try {
+    const { recordId } = req.params;
+    const targetOrgId = req.headers['x-organization-id'] || req.query.orgId || (req.user.orgId !== 'platform-org' ? req.user.orgId : null);
+    const orgFilter = targetOrgId ? { employee: { orgId: targetOrgId } } : (req.user.orgId !== 'platform-org' ? { employee: { orgId: req.user.orgId } } : {});
+    const record = await prisma.attendanceRecord.findFirst({
+      where: { id: recordId, ...orgFilter },
+    });
+    if (!record) return res.status(404).json({ success: false, message: 'Attendance record not found.' });
+    const updated = await prisma.attendanceRecord.update({
+      where: { id: recordId },
+      data: { penalty: 0 },
+    });
+    res.json({ success: true, data: updated, message: 'Attendance penalty waived successfully.' });
+  } catch (err) { next(err); }
+};
+
 
 const flagRecord = async (req, res, next) => {
   try {
@@ -305,4 +358,4 @@ const getFlagged = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { network, issueChallenge, checkIn, checkOut, heartbeat, getStatus, getHistory, getMonthlyPenalties, getLiveAttendance, flagRecord, approveRecord, getFlagged, getCurrentSession };
+module.exports = { network, issueChallenge, checkIn, checkOut, heartbeat, getStatus, getHistory, getMonthlyPenalties, getLiveAttendance, flagRecord, approveRecord, waiveRecordPenalty, getFlagged, getCurrentSession };

@@ -50,6 +50,7 @@ export const fetchLiveAttendance = () =>
 export const fetchFlagged     = () => api.get<any>('/attendance/flagged').then((r) => r.data ?? []);
 export const flagRecord       = (id: string, reason: string) => api.put<any>(`/attendance/records/${id}/flag`, { reason });
 export const approveRecord    = (id: string) => api.put<any>(`/attendance/records/${id}/approve`, {});
+export const waiveRecordPenalty = (recordId: string) => api.put<any>(`/attendance/records/${recordId}/waive-penalty`, {}).then((r) => r.data);
 export const fetchManualAttendance = (params: { sessionId?: string; search?: string } = {}) => {
   const query = new URLSearchParams({ page: '1', limit: '200' });
   if (params.sessionId) query.set('sessionId', params.sessionId);
@@ -75,6 +76,11 @@ export const fetchManualPenalties = (month: string) =>
   api.get<any>(`/admin/penalties?month=${encodeURIComponent(month)}`).then((r) => r.data ?? []);
 export const createManualPenalty = (body: { employeeId: string; amount: number; reason: string }) =>
   api.post<any>('/admin/penalties', body).then((r) => r.data);
+export const deleteManualPenalty = (id: string) =>
+  api.delete<any>(`/admin/penalties/${id}`).then((r) => r.data);
+export const waiveEmployeeAutoPenalties = (employeeId: string, month?: string) =>
+  api.delete<any>(`/admin/penalties/auto/${employeeId}${month ? `?month=${encodeURIComponent(month)}` : ''}`).then((r) => r.data);
+
 
 // ─── Employees ───────────────────────────────────────────────────────────────
 export const fetchEmployees = async () => {
@@ -114,6 +120,8 @@ export const fetchDailyBreaks  = (date?: string) => api.get<any>(`/breaks/daily$
 export const fetchAllBreaks    = () => api.get<any>('/breaks/daily?all=true').then((r) => r.data ?? []);
 export const startEmployeeBreak = (employeeId: string, breakType: string, notes?: string) => api.post<any>(`/admin/breaks/${employeeId}/start`, { breakType, notes }).then((r) => r.data);
 export const endEmployeeBreak = (employeeId: string, breakId: string) => api.put<any>(`/admin/breaks/${employeeId}/${breakId}/end`, {}).then((r) => r.data);
+export const waiveBreakPenalty = (breakId: string) => api.put<any>(`/admin/breaks/${breakId}/waive-penalty`, {}).then((r) => r.data);
+
 export const fetchOrganizations = () => api.get<any>('/super/organizations').then((r) => r.data ?? []);
 
 // ─── Fraud Alerts ────────────────────────────────────────────────────────────

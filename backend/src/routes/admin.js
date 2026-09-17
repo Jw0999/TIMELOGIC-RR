@@ -34,6 +34,9 @@ router.post('/penalties', authenticate, isAdmin, [
   body('amount').isInt({ min: 1 }),
   body('reason').trim().isLength({ min: 2, max: 500 }),
 ], validate, ctrl.createPenalty);
+router.delete('/penalties/:id', authenticate, isAdmin, ctrl.deletePenalty);
+router.delete('/penalties/auto/:employeeId', authenticate, isAdmin, ctrl.waiveEmployeeAutoPenalties);
+
 
 // Organisation
 router.get('/org', authenticate, isAdmin, ctrl.getOrg);
@@ -148,6 +151,8 @@ router.post('/breaks/:employeeId/start', authenticate, isAdmin, [
   body('breakType').isIn(['LUNCH', 'SHORT_BREAK', 'PRAYER', 'PERSONAL', 'NURSING']),
 ], validate, require('../controllers/breakController').startBreakForEmployee);
 router.put('/breaks/:employeeId/:breakId/end', authenticate, isAdmin, require('../controllers/breakController').endBreakForEmployee);
+router.put('/breaks/:breakId/waive-penalty', authenticate, isAdmin, require('../controllers/breakController').waiveBreakPenalty);
+
 
 // Emergency
 router.post('/emergency/stop-all', authenticate, isAdmin, [
