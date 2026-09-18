@@ -2,12 +2,6 @@ import React from 'react';
 import { Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-const PLAN_COLOR: Record<string, string> = {
-  starter:    '#6B7280',
-  business:   '#2563EB',
-  enterprise: '#7C3AED',
-};
-
 const ORG_COLORS = ['#EF4444','#F59E0B','#10B981','#3B82F6','#8B5CF6'];
 
 export default function OrgList({ orgs }: { orgs: any[] }) {
@@ -41,9 +35,6 @@ export default function OrgList({ orgs }: { orgs: any[] }) {
                 {org._count?.users ?? 0} users · {org._count?.offices ?? 0} offices
               </p>
             </div>
-            <span className="text-[10px] font-bold capitalize" style={{ color: PLAN_COLOR[org.subscriptionTier ?? 'starter'] ?? '#6B7280' }}>
-              {org.subscriptionTier ?? 'starter'}
-            </span>
           </div>
         ))}
       </div>

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Users, CheckCircle, Clock, XCircle, AlertTriangle, ShieldAlert, Activity, Calendar } from 'lucide-react';
 import Header from '../components/Header';
 import StatCard from '../components/StatCard';
-import { fetchLiveStats, fetchAlerts, fetchPlanInfo } from '../services';
+import { fetchLiveStats, fetchAlerts } from '../services';
 import { useAuth } from '../context/AuthContext';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -17,25 +17,18 @@ function Spinner() {
   return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-600 border-t-transparent" /></div>;
 }
 
-const PLAN_COLORS: Record<string, string> = {
-  starter: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300',
-  business: 'bg-primary-100 text-primary-700 dark:bg-primary-900/30',
-  enterprise: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30',
-};
-
 export default function Dashboard() {
   const { serverNow, organizationTimezone } = useAuth();
   const [stats, setStats] = useState<any>(null);
   const [alerts, setAlerts] = useState<any[]>([]);
-  const [plan, setPlan] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const today = serverNow
     ? serverNow.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: organizationTimezone })
     : 'Loading current time...';
 
   const load = () => {
-    Promise.all([fetchLiveStats(), fetchAlerts(), fetchPlanInfo().catch(() => null)])
-      .then(([s, a, p]) => { setStats(s); setAlerts(Array.isArray(a) ? a.slice(0, 4) : []); setPlan(p); })
+    Promise.all([fetchLiveStats(), fetchAlerts()])
+      .then(([s, a]) => { setStats(s); setAlerts(Array.isArray(a) ? a.slice(0, 4) : []); })
       .catch(() => {})
       .finally(() => setLoading(false));
   };
@@ -55,35 +48,6 @@ export default function Dashboard() {
           <div className="text-center text-slate-400 py-16">Could not load dashboard data. Make sure the backend is running.</div>
         ) : (
           <>
-            {/* Subscription plan banner */}
-            {plan && (
-              <div className="bg-[var(--card-bg)] rounded-2xl border border-[var(--border)] shadow-sm p-4 flex items-center justify-between transition-colors">
-                <div className="flex items-center gap-3">
-                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${PLAN_COLORS[plan.plan] ?? 'bg-slate-100 text-slate-700'}`}>
-                    {plan.planName} Plan
-                  </span>
-                  <span className="text-sm text-[var(--text-muted)]">
-                    <strong className="text-[var(--text-main)]">{plan.activeEmployees}</strong>
-                    {plan.limit ? ` / ${plan.limit}` : ' '} active employees
-                    {plan.limit ? ` · ${plan.limit - plan.activeEmployees} slots remaining` : ' · Unlimited'}
-                  </span>
-                </div>
-                {plan.limit && (
-                  <div className="flex items-center gap-3">
-                    <div className="w-48 h-2 bg-[var(--border)] rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${(plan.activeEmployees / plan.limit) >= 0.9 ? 'bg-red-500' : (plan.activeEmployees / plan.limit) >= 0.7 ? 'bg-amber-500' : 'bg-primary-500'}`}
-                        style={{ width: `${Math.min((plan.activeEmployees / plan.limit) * 100, 100)}%` }}
-                      />
-                    </div>
-                    <span className="text-xs text-[var(--text-muted)] font-semibold">
-                      {Math.round((plan.activeEmployees / plan.limit) * 100)}%
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* Stats Grid */}
             <div className="grid grid-cols-4 gap-4">
               <StatCard label="Total Employees" value={stats.total ?? 0} icon={Users} color="text-primary-700" bgColor="bg-primary-100" />

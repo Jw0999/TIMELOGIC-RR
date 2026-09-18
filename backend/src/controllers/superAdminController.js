@@ -51,7 +51,7 @@ const listOrgs = async (req, res, next) => {
 const createOrg = async (req, res, next) => {
   try {
     const {
-      name, industry, subscriptionTier,
+      name, industry,
       allowDeviceCheckIn = true,
       allowManualCheckIn = false,
       hasStudents = false,
@@ -85,7 +85,7 @@ const createOrg = async (req, res, next) => {
           id: uuidv4(),
           name: String(name).trim(),
           industry: industry || 'General',
-          subscriptionTier: subscriptionTier || 'starter',
+          subscriptionTier: 'enterprise',
           allowDeviceCheckIn: Boolean(allowDeviceCheckIn),
           allowManualCheckIn: Boolean(allowManualCheckIn),
           hasStudents: Boolean(hasStudents),
@@ -195,7 +195,7 @@ const updateOrg = async (req, res, next) => {
   try {
     const { id } = req.params;
     const {
-      name, industry, subscriptionTier, offices = [],
+      name, industry, offices = [],
       allowDeviceCheckIn, allowManualCheckIn, hasStudents, openingTime, timezone,
     } = req.body;
 
@@ -240,7 +240,6 @@ const updateOrg = async (req, res, next) => {
         data: {
           ...(name !== undefined ? { name } : {}),
           ...(industry !== undefined ? { industry } : {}),
-          ...(subscriptionTier !== undefined ? { subscriptionTier } : {}),
           ...(allowDeviceCheckIn !== undefined ? { allowDeviceCheckIn } : {}),
           ...(allowManualCheckIn !== undefined ? { allowManualCheckIn } : {}),
           ...(hasStudents !== undefined ? { hasStudents } : {}),

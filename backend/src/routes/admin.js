@@ -48,25 +48,22 @@ router.post('/offices', authenticate, isSuperAdmin, [
   body('timezone').notEmpty(),
 ], validate, ctrl.createOffice);
 
-// Get org plan info (subscription tier + employee counts)
+// Get org plan info (all organizations now have unlimited capacity)
 router.get('/plan', authenticate, isAdmin, async (req, res, next) => {
   try {
-    const [org, active, total] = await Promise.all([
-      prisma.organization.findUnique({ where: { id: req.user.orgId }, select: { subscriptionTier: true, name: true } }),
+    const [active, total] = await Promise.all([
       prisma.user.count({ where: { orgId: req.user.orgId, role: 'EMPLOYEE', status: { not: 'TERMINATED' } } }),
       prisma.user.count({ where: { orgId: req.user.orgId, role: 'EMPLOYEE' } }),
     ]);
-    const tier = (org?.subscriptionTier ?? 'starter').toLowerCase();
-    const limits = { starter: 20, business: 60, enterprise: null };
     res.json({
       success: true,
       data: {
-        plan: tier,
-        planName: tier.charAt(0).toUpperCase() + tier.slice(1),
-        limit: limits[tier] ?? 20,
+        plan: 'unlimited',
+        planName: 'Unlimited',
+        limit: null,
         activeEmployees: active,
         totalEmployees: total,
-        canAddMore: limits[tier] === null || active < (limits[tier] ?? 20),
+        canAddMore: true,
       },
     });
   } catch (err) { next(err); }

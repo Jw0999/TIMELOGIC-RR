@@ -143,7 +143,6 @@ function OrganizationForm({ onBack }: { onBack: () => void }) {
   const [form, setForm] = useState({
     name: "",
     industry: "Technology",
-    subscriptionTier: "starter",
     allowDeviceCheckIn: true,
     allowManualCheckIn: true,
     hasStudents: false,
@@ -231,17 +230,7 @@ function OrganizationForm({ onBack }: { onBack: () => void }) {
                 ))}
               </select>
             </Field>
-            <Field label="Plan">
-              <select
-                className={input}
-                value={form.subscriptionTier}
-                onChange={(e) => update("subscriptionTier", e.target.value)}
-              >
-                <option value="starter">Starter</option>
-                <option value="business">Business</option>
-                <option value="enterprise">Enterprise</option>
-              </select>
-            </Field>
+
             <Field label="Company opening time">
               <input
                 className={input}

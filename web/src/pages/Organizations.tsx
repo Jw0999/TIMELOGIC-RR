@@ -5,14 +5,8 @@ import { fetchAllOrgs, createOrg, updateOrg, deleteOrg, fetchOrgUsers, fetchLeav
 import { downloadCSV } from '../utils/csv';
 
 const INDUSTRIES = ['Technology','Finance','Healthcare','Education','Logistics','Retail','Manufacturing','Non-profit','Government','Other'];
-const PLANS      = ['starter','business','enterprise'];
 const TIMEZONES  = ['Africa/Lagos','Africa/Accra','Africa/Nairobi','UTC','America/New_York','Europe/London','Asia/Dubai'];
 
-const PLAN_STYLE: Record<string, { bg: string; text: string }> = {
-  starter:    { bg: '#f3f4f6', text: '#374151' },
-  business:   { bg: '#dbeafe', text: '#1d4ed8' },
-  enterprise: { bg: '#ede9fe', text: '#6d28d9' },
-};
 const ORG_COLORS = ['#15803d','#0891b2','#7c3aed','#b45309','#be185d','#0369a1'];
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const;
 type WeeklySchedule = Record<typeof DAYS[number], { openTime: string; closeTime: string }>;
@@ -21,7 +15,7 @@ const weeklySchedule = (openTime = '08:00', closeTime = '17:00'): WeeklySchedule
 ) as WeeklySchedule;
 
 interface OrgFormData {
-  name: string; industry: string; subscriptionTier: string;
+  name: string; industry: string;
   allowDeviceCheckIn: boolean; allowManualCheckIn: boolean; hasStudents: boolean;
   timezone: string;
   offices: {
@@ -42,7 +36,7 @@ const newOffice = () => ({
   breakStart: '13:00', breakEnd: '14:00',
 });
 const defaultForm = (): OrgFormData => ({
-  name: '', industry: 'Technology', subscriptionTier: 'starter',
+  name: '', industry: 'Technology',
   allowDeviceCheckIn: true, allowManualCheckIn: false, hasStudents: false,
   timezone: 'Africa/Lagos',
   offices: [{ ...newOffice(), name: 'Main Office' }],
@@ -98,7 +92,6 @@ function OrgModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
       await createOrg({
         name: form.name.trim(),
         industry: form.industry,
-        subscriptionTier: form.subscriptionTier,
         allowDeviceCheckIn: form.allowDeviceCheckIn,
         allowManualCheckIn: form.allowManualCheckIn,
         hasStudents: form.hasStudents,
@@ -136,7 +129,6 @@ function OrgModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
           {step === 1 && <div className="space-y-4"><h3 className="font-bold text-[var(--text-main)] mb-3">Organization Information</h3>
             <div><label className={lbl}>Organization Name *</label><input className={inp} value={form.name} onChange={(e) => setForm((p) => ({...p, name: e.target.value}))} placeholder="e.g. Acme Corp" /></div>
             <div><label className={lbl}>Industry</label><select className={inp} value={form.industry} onChange={(e) => setForm((p) => ({...p, industry: e.target.value}))}>{INDUSTRIES.map((i) => <option key={i}>{i}</option>)}</select></div>
-            <div><label className={lbl}>Plan</label><select className={inp} value={form.subscriptionTier} onChange={(e) => setForm((p) => ({...p, subscriptionTier: e.target.value}))}>{PLANS.map((p) => <option key={p} value={p}>{p.charAt(0).toUpperCase()+p.slice(1)}</option>)}</select></div>
             <div className="p-4 bg-[var(--hover-bg)] rounded-xl border border-[var(--border)] space-y-3">
               <div>
                 <p className="text-sm font-bold text-[var(--text-main)]">Company attendance schedule</p>
@@ -271,7 +263,6 @@ function UsersModal({ org, onClose }: { org: any; onClose: () => void }) {
 function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void; onSaved: () => void }) {
   const [name, setName]       = useState(org.name ?? '');
   const [industry, setIndustry] = useState(org.industry ?? 'Technology');
-  const [tier, setTier]       = useState(org.subscriptionTier ?? 'starter');
   const [allowDeviceCheckIn, setAllowDeviceCheckIn] = useState(org.allowDeviceCheckIn ?? true);
   const [allowManualCheckIn, setAllowManualCheckIn] = useState(org.allowManualCheckIn ?? false);
   const [hasStudents, setHasStudents] = useState(org.hasStudents ?? false);
@@ -300,7 +291,6 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
       await updateOrg(org.id, {
         name: name.trim(),
         industry,
-        subscriptionTier: tier,
         allowDeviceCheckIn,
         allowManualCheckIn,
         hasStudents,
@@ -321,10 +311,7 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
         </div>
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {error && <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-sm text-red-700">{error}</div>}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="sm:col-span-2"><label className={lbl}>Organization Name</label><input className={inp} value={name} onChange={(e) => setName(e.target.value)}/></div>
-            <div><label className={lbl}>Plan</label><select className={inp} value={tier} onChange={(e) => setTier(e.target.value)}>{PLANS.map((p) => <option key={p} value={p}>{p[0].toUpperCase()+p.slice(1)}</option>)}</select></div>
-          </div>
+          <div><label className={lbl}>Organization Name</label><input className={inp} value={name} onChange={(e) => setName(e.target.value)}/></div>
           <div><label className={lbl}>Industry</label><select className={inp} value={industry} onChange={(e) => setIndustry(e.target.value)}>{INDUSTRIES.map((i) => <option key={i}>{i}</option>)}</select></div>
 
           <div className="p-4 bg-[var(--hover-bg)] rounded-xl border border-[var(--border)] space-y-3">
@@ -418,8 +405,7 @@ export default function Organizations() {
   const filtered = visible.filter((o) => {
     const q = search.toLowerCase();
     const matchSearch = !q || o.name?.toLowerCase().includes(q) || o.industry?.toLowerCase().includes(q);
-    const matchTab = tab === 0 || (tab === 1 && o.subscriptionTier === 'starter') || (tab === 2 && o.subscriptionTier === 'business') || (tab === 3 && o.subscriptionTier === 'enterprise');
-    return matchSearch && matchTab;
+    return matchSearch;
   });
 
   const handleDelete = async (id: string, name: string) => {
@@ -436,16 +422,13 @@ export default function Organizations() {
         title="Organizations"
         tabs={[
           { label: 'All', count: visible.length },
-          { label: 'Starter',    count: visible.filter((o) => o.subscriptionTier === 'starter').length },
-          { label: 'Business',   count: visible.filter((o) => o.subscriptionTier === 'business').length },
-          { label: 'Enterprise', count: visible.filter((o) => o.subscriptionTier === 'enterprise').length },
         ]}
         activeTab={tab} onTabChange={setTab}
         search={search} onSearch={setSearch}
         searchPlaceholder="Search organization…"
         action={<button onClick={() => setShowAdd(true)} className="flex items-center gap-2 bg-primary-700 hover:bg-primary-800 text-white text-sm font-bold px-4 py-2 rounded-xl transition shadow-sm shadow-primary-200/40"><Plus size={14}/>Add Organization</button>}
         onExport={() => downloadCSV('organizations', filtered.map((o) => ({
-          Name: o.name, Industry: o.industry ?? '', Plan: o.subscriptionTier ?? '',
+          Name: o.name, Industry: o.industry ?? '',
           Users: o._count?.users ?? 0, Offices: o._count?.offices ?? 0, Departments: o._count?.departments ?? 0,
           Created: o.createdAt ? new Date(o.createdAt).toLocaleDateString('en-GB') : '',
         })))}
@@ -458,7 +441,6 @@ export default function Organizations() {
                 <TH>ID</TH>
                 <TH className="min-w-[200px]">Organization</TH>
                 <TH>Industry</TH>
-                <TH>Plan</TH>
                 <TH className="min-w-[210px]">Capabilities</TH>
                 <TH>Users</TH>
                 <TH>Offices</TH>
@@ -467,15 +449,14 @@ export default function Organizations() {
             </thead>
             <tbody className="divide-y divide-[var(--border)]">
               {loading ? (
-                <tr><td colSpan={8} className="text-center py-14 text-[var(--text-muted)]">
+                <tr><td colSpan={7} className="text-center py-14 text-[var(--text-muted)]">
                   <div className="flex justify-center"><div className="animate-spin rounded-full h-6 w-6 border-2 border-primary-600 border-t-transparent"/></div>
                 </td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={8} className="text-center py-14">
+                <tr><td colSpan={7} className="text-center py-14">
                   <p className="text-sm font-semibold text-[var(--text-muted)]">No organizations found</p>
                 </td></tr>
               ) : filtered.map((o, idx) => {
-                const ps = PLAN_STYLE[o.subscriptionTier] ?? PLAN_STYLE.starter;
                 const color = ORG_COLORS[idx % ORG_COLORS.length];
                 const deviceEnabled = o.allowDeviceCheckIn ?? true;
                 const manualEnabled = o.allowManualCheckIn ?? false;
@@ -495,9 +476,6 @@ export default function Organizations() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-[var(--text-muted)]">{o.industry ?? '—'}</td>
-                    <td className="px-4 py-3">
-                      <span className="text-xs font-bold px-2.5 py-1 rounded-full capitalize" style={{ background: ps.bg, color: ps.text }}>{o.subscriptionTier}</span>
-                    </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1.5">
                         {deviceEnabled && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Device</span>}

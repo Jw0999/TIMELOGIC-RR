@@ -39,14 +39,13 @@ const getOrg = async (req, res, next) => {
 
 const updateOrg = async (req, res, next) => {
   try {
-    const { name, industry, subscriptionTier, requireFaceVerification } = req.body;
+    const { name, industry, requireFaceVerification } = req.body;
     const targetOrgId = await resolveAdminOrgId(req);
     const org = await prisma.organization.update({
       where: { id: targetOrgId },
       data: {
         ...(name !== undefined ? { name } : {}),
         ...(industry !== undefined ? { industry } : {}),
-        ...(subscriptionTier !== undefined ? { subscriptionTier } : {}),
         ...(requireFaceVerification !== undefined ? { requireFaceVerification: Boolean(requireFaceVerification) } : {}),
       },
     });
@@ -345,42 +344,19 @@ const getNotifications = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// Subscription plan employee limits
-const PLAN_LIMITS = { starter: 20, business: 60, enterprise: Infinity };
-const PLAN_NAMES  = { starter: 'Starter', business: 'Business', enterprise: 'Enterprise' };
-
 const createEmployee = async (req, res, next) => {
   try {
     const { firstName, lastName, email, password, employeeCode, departmentId, shiftType, phone, checkInMethod = 'PHONE' } = req.body;
     const targetOrgId = await resolveAdminOrgId(req);
 
-    // ── Subscription enforcement ──────────────────────────────────────────────
     const org = await prisma.organization.findUnique({
       where: { id: targetOrgId },
       select: {
-        subscriptionTier: true, name: true,
+        name: true,
         allowDeviceCheckIn: true, allowManualCheckIn: true,
       },
     });
     const allowedMethod = EmployeePolicy.assertMethodAllowed(org, checkInMethod);
-    const tier   = (org?.subscriptionTier ?? 'starter').toLowerCase();
-    const limit  = PLAN_LIMITS[tier] ?? 20;
-    if (limit !== Infinity) {
-      const count = await prisma.user.count({
-        where: { orgId: targetOrgId, role: 'EMPLOYEE', status: { not: 'TERMINATED' } },
-      });
-      if (count >= limit) {
-        return res.status(403).json({
-          success: false,
-          message: `Employee limit reached for your ${PLAN_NAMES[tier] ?? 'current'} plan (max ${limit} employees). Please upgrade your subscription to add more employees.`,
-          code: 'PLAN_LIMIT_REACHED',
-          limit,
-          current: count,
-          plan: tier,
-        });
-      }
-    }
-    // ─────────────────────────────────────────────────────────────────────────
 
     const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
     if (existing) return res.status(400).json({ success: false, message: 'Email already in use.' });

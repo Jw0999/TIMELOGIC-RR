@@ -53,7 +53,7 @@ async function createOrganization(req, res, next) {
     const result = await prisma.$transaction(async (tx) => {
       const org = await tx.organization.create({ data: {
         id: uuidv4(), name, industry: clean(payload.industry) || 'General',
-        subscriptionTier: clean(payload.subscriptionTier) || 'starter',
+        subscriptionTier: 'enterprise',
         allowDeviceCheckIn: payload.allowDeviceCheckIn !== false,
         allowManualCheckIn: Boolean(payload.allowManualCheckIn),
         hasStudents: Boolean(payload.hasStudents),

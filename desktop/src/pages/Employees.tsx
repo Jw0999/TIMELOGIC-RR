@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Search, UserPlus, Smartphone, X, Eye, Camera, Pencil, Settings2 } from 'lucide-react';
 import Header from '../components/Header';
-import { fetchEmployees, createEmployee, updateEmployee, suspendUser, activateUser, deleteEmployee, resetDevice, fetchDepartments, fetchPlanInfo, fetchEmployeeSummary } from '../services';
+import { fetchEmployees, createEmployee, updateEmployee, suspendUser, activateUser, deleteEmployee, resetDevice, fetchDepartments, fetchEmployeeSummary } from '../services';
 import { API_URL, SOCKET_URL } from '../config';
 import { getToken, authenticatedFetch } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -420,17 +420,15 @@ export default function Employees() {
   const [showAdd, setShowAdd] = useState(false);
   const [viewEmp, setViewEmp] = useState<any>(null);
   const [editEmp, setEditEmp] = useState<any>(null);
-  const [plan, setPlan] = useState<any>(null);
   const [loadError, setLoadError] = useState('');
 
   const load = () => {
     setLoadError('');
-    Promise.all([fetchEmployees(), fetchDepartments(), fetchPlanInfo().catch(() => null)])
-      .then(([e, d, p]) => {
+    Promise.all([fetchEmployees(), fetchDepartments()])
+      .then(([e, d]) => {
         const emps = e.filter((u: any) => u.role === 'EMPLOYEE');
         setEmployees(emps);
         setDepts(d);
-        setPlan(p);
         if (viewEmp) {
           const fresh = emps.find((u: any) => u.id === viewEmp.id);
           if (fresh) setViewEmp(fresh);
@@ -450,18 +448,11 @@ export default function Employees() {
     <div className="flex flex-col h-full overflow-hidden">
       <Header
         title="Employees"
-        subtitle={plan
-          ? `${employees.filter((e: any) => e.status !== 'TERMINATED').length} active · ${plan.planName} plan${plan.limit ? ` (${plan.activeEmployees}/${plan.limit} slots used)` : ' · Unlimited'}`
-          : `${employees.length} total`
-        }
+        subtitle={`${employees.filter((e: any) => e.status !== 'TERMINATED').length} active · ${employees.length} total`}
         action={
           availableMethods(organization).length === 0 ? (
             <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 text-sm font-semibold rounded-xl">
               <Settings2 size={15} />No check-in channel enabled
-            </div>
-          ) : plan && plan.limit && plan.activeEmployees >= plan.limit ? (
-            <div className="flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm font-semibold rounded-xl">
-              ⚠ Limit reached — upgrade plan
             </div>
           ) : (
             <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 bg-primary-700 hover:bg-primary-800 text-white text-sm font-semibold px-4 py-2 rounded-xl transition">

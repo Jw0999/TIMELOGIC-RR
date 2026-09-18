@@ -74,7 +74,7 @@ export default function SecuritySettings() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {[
                 { label: 'Organization', value: detail.office?.organization?.name ?? '—', icon: Building2, color: 'text-primary-700', bg: 'bg-primary-100 dark:bg-primary-900/40' },
-                { label: 'Plan', value: detail.office?.organization?.subscriptionTier ?? '—', icon: Shield, color: 'text-violet-600', bg: 'bg-violet-100 dark:bg-violet-900/40' },
+                { label: 'Timezone', value: detail.office?.timezone ?? 'Africa/Lagos', icon: Clock, color: 'text-violet-600', bg: 'bg-violet-100 dark:bg-violet-900/40' },
                 { label: 'Admins', value: detail.adminCount ?? 0, icon: Users, color: 'text-amber-600', bg: 'bg-amber-100 dark:bg-amber-900/40' },
                 { label: 'Employees', value: detail.employeeCount ?? 0, icon: Users, color: 'text-emerald-600', bg: 'bg-emerald-100 dark:bg-emerald-900/40' },
               ].map((s) => (
