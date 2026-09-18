@@ -1,23 +1,14 @@
-import { Header } from "@/components/Header";
-import { Hero } from "@/components/Hero";
-import { Features } from "@/components/Features";
-import { Platforms } from "@/components/Platforms";
-import { Achievements } from "@/components/Achievements";
-import { Contact } from "@/components/Contact";
-import { Footer } from "@/components/Footer";
-
 export default function Home() {
   return (
-    <>
-      <Header />
-      <main>
-        <Hero />
-        <Features />
-        <Platforms />
-        <Achievements />
-        <Contact />
-      </main>
-      <Footer />
-    </>
+    <main id="main" className="min-h-screen flex flex-col items-center justify-center p-8 text-center">
+      <div className="max-w-2xl mx-auto space-y-4">
+        <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl text-fg">
+          TimeLogic
+        </h1>
+        <p className="text-lg text-muted">
+          Clean slate ready for your new marketing website.
+        </p>
+      </div>
+    </main>
   );
 }
