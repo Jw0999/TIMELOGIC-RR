@@ -18,7 +18,6 @@ full Microsoft Defender Offline scan before using credentials on this computer.
 | `backend` | Express, Prisma, PostgreSQL, and Redis API | 5000 |
 | `desktop` | Electron admin app for Windows and Linux | 5173 |
 | `mobile` | Android-only Expo employee app | Expo/Metro |
-| `pwa` | Employee PWA | 5180 |
 | `web` | Super-admin web app | 3000 |
 | `website` | Marketing site | 3000 by default |
 
@@ -49,7 +48,7 @@ Then reopen the terminal so `java`, `adb`, and Docker are available on `PATH`.
 Each app is independent and has its own lockfile:
 
 ```powershell
-foreach ($app in 'backend','desktop','mobile','pwa','web','website') {
+foreach ($app in 'backend','desktop','mobile','web','website') {
   Push-Location $app
   npm.cmd ci
   Pop-Location
@@ -159,11 +158,7 @@ Run these commands from the `TIMELOGIC` project root, each in its own terminal:
 
 ```powershell
 npm.cmd --prefix web run dev
-npm.cmd --prefix pwa run dev
 npm.cmd --prefix website run dev -- -p 3001
 ```
 
 The website uses port 3001 above to avoid colliding with the super-admin app.
-To open the employee PWA from a phone on the same network, use
-`http://<computer-LAN-IPv4>:5180`; it automatically targets the backend on that
-same computer.
