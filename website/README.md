@@ -43,7 +43,7 @@ app/
   page.tsx       # composes the sections (server component)
   globals.css    # Tailwind v4 tokens, glass/glow helpers, reduced-motion
 components/
-  IntroLoader · Header · Hero · Features · Platforms · Achievements · Contact · Footer
+  Header · Hero · Features · Platforms · Achievements · Contact · Footer
   ui/ Logo · DownloadMenu · PhoneMockup · CountUp
 lib/
   site.ts        # ALL content + download links (edit here)
