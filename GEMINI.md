@@ -42,7 +42,6 @@ This document persists the architectural state, infrastructure endpoints, and cr
 | **Employee PWA** | `pwa` | Vite (`npm run build`) | `dist` | Employee mobile attendance & leave app |
 | **Admin Station PWA** | `PWA2.0` | Vite (`npm run build`) | `dist` | Kiosk & manual check-in station (`https://timelogic-desktopadmin.pages.dev`) |
 | **Marketing Website** | `website` | Next.js (`npm run build`) | `out` | Public landing website (`output: export`) |
-| **Public Form** | `FILL FORM` | Vite (`npm run build`) | `dist` | Self-service employee registration form |
 
 ---
 

@@ -21,7 +21,6 @@ const fraudRoutes      = require('../routes/fraud');
 const reportRoutes     = require('../routes/reports');
 const adminRoutes      = require('../routes/admin');
 const superAdminRoutes = require('../routes/superAdmin');
-const publicRegistrationRoutes = require('../routes/publicRegistration');
 const studentRoutes    = require('../routes/students');
 
 function createApp() {
@@ -127,7 +126,6 @@ function createApp() {
   app.use('/api/reports',    reportRoutes);
   app.use('/api/admin',      adminRoutes);
   app.use('/api/super',      superAdminRoutes);
-  app.use('/api/register',   publicRegistrationRoutes);
   app.use('/api/students',   studentRoutes);
 
   // 404 & error handling
