@@ -1,34 +1,35 @@
 @import "tailwindcss";
 
 /* ─────────────────────────────────────────────────────────────
-   TimeLogic design tokens (dark, navy, single blue accent)
+   TimeLogic Design System Tokens
+   Grounded, high-contrast, professional enterprise B2B palette.
    ───────────────────────────────────────────────────────────── */
 @theme {
-  --color-ink: #060b18;          /* page base, near-black navy */
-  --color-base: #0a1226;         /* slightly raised base */
-  --color-surface: #0d1730;      /* card surface */
-  --color-surface-2: #111d3a;    /* raised card */
+  --color-ink: #08090d;           /* Page background, deep obsidian */
+  --color-base: #0f1117;          /* Elevated surface */
+  --color-surface: #141721;       /* Container / card surface */
+  --color-surface-hover: #1b1f2e; /* Interactive hover surface */
+  --color-surface-elevated: #1f2436;
 
-  --color-brand: #2563eb;        /* primary blue */
-  --color-brand-strong: #1d4ed8; /* deep royal */
-  --color-brand-deep: #1e3a6e;   /* navy brand */
-  --color-sky: #60a5fa;          /* light accent */
+  --color-brand: #2563eb;         /* TimeLogic primary electric blue */
+  --color-brand-hover: #1d4ed8;   /* Primary active/hover */
+  --color-brand-subtle: rgba(37, 99, 235, 0.12); /* Tint/badge */
+  --color-sky: #60a5fa;           /* Accent blue */
 
-  --color-fg: #e9eefb;           /* primary text */
-  --color-muted: #9aabce;        /* secondary text */
-  --color-faint: #6b7ca3;        /* tertiary text */
-  --color-line: rgba(148, 173, 230, 0.12);
-  --color-line-strong: rgba(148, 173, 230, 0.22);
+  --color-fg: #f1f5f9;            /* Primary high-contrast text */
+  --color-muted: #94a3b8;         /* Secondary descriptive text */
+  --color-faint: #64748b;         /* Tertiary subtle labels */
+  --color-line: rgba(255, 255, 255, 0.08); /* Clean structural divider */
+  --color-line-strong: rgba(255, 255, 255, 0.15);
 
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
-  --radius-card: 20px;
-
-  --shadow-card: 0 1px 0 0 rgba(255, 255, 255, 0.04) inset,
-    0 20px 50px -20px rgba(2, 8, 23, 0.8);
-  --shadow-glow: 0 0 0 1px rgba(37, 99, 235, 0.3),
-    0 20px 60px -16px rgba(37, 99, 235, 0.45);
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
 }
 
 * {
@@ -38,6 +39,8 @@
 html {
   scroll-behavior: smooth;
   overflow-x: hidden;
+  background-color: var(--color-ink);
+  color-scheme: dark;
 }
 
 body {
@@ -57,113 +60,27 @@ body {
   color: #fff;
 }
 
-/* Anchor offset so sticky header never covers section tops */
-section[id] {
-  scroll-margin-top: 96px;
-}
-
-/* ── Reusable surface treatments ───────────────────────────── */
-.glass {
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.045),
-    rgba(255, 255, 255, 0.015)
-  );
-  border: 1px solid var(--color-line);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-}
-
-.card {
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.04),
-    rgba(255, 255, 255, 0.012)
-  );
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-card);
-}
-
-/* ── Light sections (white background, dark text) ──────────────
-   Re-maps the colour tokens within the scope so EVERY token-based
-   utility (text-fg / text-muted / text-faint / text-sky / borders /
-   .card / .glass) flips to a high-contrast dark-on-white treatment.
-   This is what makes Features + Achievements white with all text
-   clearly visible, without touching any component markup. */
-.section-light {
-  background: #ffffff;
-  color: #0b1220;
-  --color-fg: #0b1220;        /* headings / strong text */
-  --color-muted: #475569;     /* secondary text (slate-600) */
-  --color-faint: #64748b;     /* tertiary text (slate-500) */
-  --color-sky: #1d4ed8;       /* accent with real contrast on white */
-  --color-line: rgba(15, 23, 42, 0.1);
-  --color-line-strong: rgba(15, 23, 42, 0.16);
-}
-.section-light .card,
-.section-light .glass {
-  background: #f8fafc; /* subtle off-white so cards separate from the page */
-  border-color: rgba(15, 23, 42, 0.08);
-  box-shadow: 0 1px 2px rgba(2, 8, 23, 0.04), 0 18px 40px -28px rgba(2, 8, 23, 0.22);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-
-/* Hairline grid texture for premium depth */
-.grid-texture {
-  background-image: linear-gradient(rgba(148, 173, 230, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 173, 230, 0.05) 1px, transparent 1px);
-  background-size: 56px 56px;
-  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 75%);
-}
-
-/* Soft radial brand glow utility */
-.glow-radial {
-  background: radial-gradient(
-    closest-side,
-    rgba(37, 99, 235, 0.5),
-    rgba(37, 99, 235, 0)
-  );
-}
-
-/* Gradient text */
-.text-gradient {
-  background: linear-gradient(180deg, #ffffff 10%, #9fb6ee 130%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-/* Scrollbar */
-::-webkit-scrollbar {
-  width: 9px;
-  height: 9px;
-}
-::-webkit-scrollbar-track {
-  background: var(--color-ink);
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(148, 173, 230, 0.18);
-  border-radius: 999px;
-}
-
-/* Focus visibility for keyboard users */
+/* Subtle focus outline for keyboard accessibility */
 :focus-visible {
-  outline: 2px solid var(--color-sky);
-  outline-offset: 3px;
-  border-radius: 6px;
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
 }
 
-/* Honor reduced motion globally as a safety net */
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
-  }
+/* Restrained utility classes */
+.border-subtle {
+  border-color: var(--color-line);
+}
+
+.surface-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+}
+
+.surface-hover {
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+.surface-hover:hover {
+  background-color: var(--color-surface-hover);
+  border-color: var(--color-line-strong);
 }

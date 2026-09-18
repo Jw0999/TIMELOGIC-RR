@@ -1,201 +1,232 @@
 import { Header } from "@/components/Header";
-import { Check, PhoneCall, Sparkles, Shield, Building2, Zap } from "lucide-react";
+import { Footer } from "@/components/Footer";
+import { Button } from "@/components/ui/Button";
+import { Check, PhoneCall, HelpCircle } from "lucide-react";
 
 export default function PricingPage() {
   const plans = [
     {
       name: "Starter",
-      icon: Zap,
-      badge: "Small Teams",
-      employees: "20 Employees",
-      billing: "Paid per month",
+      capacity: "20 Employees",
+      billing: "Paid monthly",
+      description: "Designed for small commercial offices, studios, and single-location businesses eliminating buddy-punching.",
       sentences: [
-        "Ideal for small offices, studios, and boutique businesses eliminating buddy punching.",
+        "Ideal for boutique offices and studios seeking to eliminate proxy clock-ins.",
         "Full access to the dedicated biometric and employee-code Attendance Kiosk Station.",
-        "Real-time admin dashboard with live presence tracking and CSV attendance exports.",
+        "Real-time admin dashboard with live presence tracking and standard CSV exports.",
       ],
       features: [
         "Up to 20 registered employees",
-        "1 Active Kiosk Station Terminal",
+        "1 Active On-Premise Kiosk Station",
         "Biometric facial & employee PIN verification",
-        "Live Admin Dashboard with present rates",
-        "Standard Fraud Detection Alerts",
+        "Live Executive Presence Dashboard",
+        "Standard policy violation alerts",
         "1-Click CSV attendance report exports",
       ],
+      ctaText: "Activate Starter Plan",
       highlighted: false,
     },
     {
       name: "Enterprise",
-      icon: Shield,
-      badge: "Most Popular",
-      employees: "60 Employees",
-      billing: "Paid per month",
+      capacity: "60 Employees",
+      billing: "Paid monthly",
+      description: "Built for expanding companies, manufacturing plants, and multi-department teams requiring full operational oversight.",
       sentences: [
-        "Built for expanding companies, manufacturing plants, and multi-department teams.",
-        "Includes active break monitoring with automated policy enforcement and fraud detection.",
-        "Comprehensive department performance metrics and one-click direct Excel payroll exports.",
+        "Engineered for multi-department organizations, factories, and commercial facilities.",
+        "Full break monitoring with automated policy enforcement and instant overstay alarms.",
+        "Comprehensive department performance metrics with direct Microsoft Excel payroll integration.",
       ],
       features: [
         "Up to 60 registered employees",
-        "Multiple Kiosk Station Terminals",
+        "Multi-kiosk terminal support across departments",
         "Automated Fraud Detection & Incident Logging",
-        "Categorized Break Tracking (Lunch, Prayer, Nursing)",
+        "Granular Break Tracking (Lunch, Prayer, Nursing)",
         "Overstayed break alarms & resolution auditing",
         "Direct Microsoft Excel (.xlsx) payroll export",
-        "Department performance rankings",
+        "Departmental punctuality & overtime rankings",
       ],
+      ctaText: "Activate Enterprise Plan",
       highlighted: true,
     },
     {
       name: "Organisation",
-      icon: Building2,
-      badge: "Custom Scale",
-      employees: "Custom Employees",
-      billing: "Paid per month",
+      capacity: "Custom Employees",
+      billing: "Paid monthly / Custom terms",
+      description: "Tailored for large multi-branch corporations, educational institutions, and multi-location enterprises.",
       sentences: [
         "Engineered for large enterprises, multi-branch corporations, schools, and institutions.",
         "Supports multi-kiosk terminal networks with dedicated apprentice and student cohorts.",
-        "Dedicated enterprise account manager, custom SLA, and 24/7 priority onboarding support.",
+        "Dedicated enterprise account manager, custom SLA guarantee, and 24/7 priority onboarding support.",
       ],
       features: [
-        "Unlimited / custom employee capacity",
-        "Multi-branch & multi-location kiosk networks",
+        "Unlimited custom employee capacity",
+        "Multi-branch & multi-facility kiosk network",
         "Student & Apprentice cohort tracking portal",
         "Custom shift rules & multi-window break policies",
-        "Dedicated account manager & SLA guarantee",
-        "Tailored on-premise hardware setup assistance",
-        "24/7 priority telephone & on-site support",
+        "Dedicated enterprise account manager & SLA",
+        "On-premise hardware setup and staff enrollment assistance",
+        "24/7 priority telephone & on-site technical support",
       ],
+      ctaText: "Contact for Custom Deployment",
       highlighted: false,
     },
   ];
 
-  return (
-    <div className="min-h-screen w-full bg-[#060a16] text-white relative overflow-hidden flex flex-col justify-between">
-      {/* Background Ambience */}
-      <div className="pointer-events-none fixed -top-40 -left-40 h-[650px] w-[650px] rounded-full bg-gradient-to-br from-amber-300/20 via-orange-400/10 to-transparent blur-[150px]" />
-      <div className="pointer-events-none fixed top-1/2 right-0 h-[750px] w-[750px] rounded-full bg-gradient-to-tl from-indigo-600/25 via-blue-600/15 to-purple-900/15 blur-[160px]" />
-      <div className="pointer-events-none fixed inset-0 bg-radial from-transparent via-black/30 to-black/80" />
+  const faqs = [
+    {
+      q: "What hardware is required for an Attendance Kiosk Station?",
+      a: "TimeLogic is designed to run on standard office hardware. Any modern desktop computer, laptop, or tablet (Windows, macOS, Linux, or Android) with a front-facing camera can be paired as an authorized on-premise kiosk station in under 10 minutes.",
+    },
+    {
+      q: "How does TimeLogic prevent workers from spoofing check-ins?",
+      a: "Unlike mobile apps that rely on easily spoofed GPS signals, TimeLogic pairs with your physical office network and hardware terminal. Check-in requires employee PIN authentication paired with biometric facial verification synced directly with the server clock.",
+    },
+    {
+      q: "Can we support multiple shifts, grace periods, and break windows?",
+      a: "Yes. Shift start times, closing times, grace periods, late penalty thresholds, and break durations (such as lunch or prayer slots) are fully configurable per department or organization.",
+    },
+    {
+      q: "How quickly can TimeLogic be deployed in our organization?",
+      a: "Standard installations take less than 24 hours. Our technical team assists with account setup, kiosk pairing, and employee roster import directly over the phone or on-site.",
+    },
+  ];
 
+  return (
+    <div className="min-h-screen w-full bg-[#08090d] text-white flex flex-col justify-between">
       {/* Header */}
       <Header />
 
-      {/* Main Content */}
-      <main className="relative z-10 max-w-7xl mx-auto px-6 py-14 sm:py-20">
-        {/* Title Area */}
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-950/70 border border-blue-400/30 text-blue-300 text-xs font-semibold uppercase tracking-wider mb-5">
-            <Sparkles size={14} />
-            <span>Transparent Monthly Investment</span>
+      {/* Hero Header */}
+      <section className="pt-16 sm:pt-20 pb-16 border-b border-white/[0.08] bg-[#0b0d13]">
+        <div className="max-w-4xl mx-auto px-6 sm:px-8 text-center space-y-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-white/[0.05] border border-white/10 text-xs font-medium text-slate-300">
+            Deployment & Licensing
           </div>
 
-          <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-white leading-tight">
-            Predictable Plans Built For{" "}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-sky-300 to-indigo-300">
-              High-Integrity Teams
-            </span>
+          <h1 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight">
+            Transparent Monthly Deployment Plans
           </h1>
 
-          <p className="mt-5 text-slate-300/85 text-base sm:text-lg leading-relaxed">
-            Eliminate time-theft and save hundreds of operational hours. Choose the plan that fits your staff size, paid per month.
+          <p className="text-slate-400 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
+            Predictable monthly billing based on your verified employee headcount. No hidden hardware lock-in or per-check-in surcharges.
           </p>
         </div>
+      </section>
 
-        {/* 3 Pricing Cards Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
-          {plans.map((plan) => {
-            const Icon = plan.icon;
-
-            return (
+      {/* Pricing Cards */}
+      <section className="py-20 sm:py-24">
+        <div className="max-w-7xl mx-auto px-6 sm:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
+            {plans.map((plan) => (
               <div
                 key={plan.name}
-                className={`relative rounded-3xl p-8 sm:p-10 flex flex-col justify-between transition-all duration-300 hover:translate-y-[-4px] ${
+                className={`rounded-xl p-8 sm:p-9 flex flex-col justify-between transition-colors ${
                   plan.highlighted
-                    ? "bg-gradient-to-b from-[#0e1738] to-[#0a1027] border-2 border-blue-500/60 shadow-[0_0_50px_rgba(37,99,235,0.35)] ring-1 ring-blue-400/30"
-                    : "bg-[#090e21]/90 border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.6)]"
+                    ? "bg-[#10141f] border-2 border-blue-500/70 shadow-xl"
+                    : "bg-[#0d0f17] border border-white/[0.08]"
                 }`}
               >
-                {plan.highlighted && (
-                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-blue-600 text-white text-xs font-bold tracking-wide uppercase shadow-md">
-                    ★ Most Popular Choice
-                  </div>
-                )}
-
                 <div>
-                  {/* Header Row */}
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="inline-flex items-center gap-2 text-slate-300 font-semibold text-sm">
-                      <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-400/20 flex items-center justify-center text-blue-400">
-                        <Icon size={16} />
-                      </div>
-                      <span>{plan.name}</span>
-                    </div>
-
-                    <span className="text-xs font-semibold px-3 py-1 rounded-full bg-white/5 border border-white/10 text-slate-300">
-                      {plan.badge}
-                    </span>
+                  {/* Header */}
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-bold text-white tracking-tight">
+                      {plan.name}
+                    </h3>
+                    {plan.highlighted && (
+                      <span className="text-[11px] font-semibold uppercase tracking-wider px-2.5 py-0.5 rounded bg-blue-600 text-white">
+                        Recommended
+                      </span>
+                    )}
                   </div>
 
-                  {/* Employees & Billing */}
-                  <div className="my-6">
-                    <div className="text-3xl sm:text-4xl font-black text-white tracking-tight">
-                      {plan.employees}
+                  {/* Headcount */}
+                  <div className="mt-6 mb-2">
+                    <div className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+                      {plan.capacity}
                     </div>
-                    <div className="text-sm font-semibold text-blue-400 mt-1 uppercase tracking-wider">
+                    <div className="text-xs font-semibold uppercase tracking-wider text-blue-400 mt-1">
                       {plan.billing}
                     </div>
                   </div>
 
+                  <p className="text-xs text-slate-400 leading-relaxed mt-3">
+                    {plan.description}
+                  </p>
+
                   {/* 3 Brief Sentences */}
-                  <div className="space-y-2.5 py-4 border-y border-white/10 my-6">
-                    {plan.sentences.map((sentence, sIdx) => (
-                      <p
-                        key={sIdx}
-                        className="text-xs sm:text-sm text-slate-300 leading-relaxed font-normal"
-                      >
-                        • {sentence}
+                  <div className="my-6 py-5 border-y border-white/[0.08] space-y-2.5">
+                    {plan.sentences.map((sent, sIdx) => (
+                      <p key={sIdx} className="text-xs text-slate-300 leading-relaxed">
+                        • {sent}
                       </p>
                     ))}
                   </div>
 
-                  {/* Feature Checklist */}
+                  {/* Features */}
                   <div className="space-y-3 mb-8">
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-                      Everything Included:
-                    </span>
+                    <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                      Included Capabilities:
+                    </div>
                     {plan.features.map((feat) => (
-                      <div key={feat} className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-300">
-                        <Check size={16} className="text-emerald-400 flex-shrink-0 mt-0.5" />
+                      <div key={feat} className="flex items-start gap-2.5 text-xs text-slate-300">
+                        <Check size={14} className="text-blue-400 flex-shrink-0 mt-0.5" />
                         <span>{feat}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Call Now Action Button */}
-                <div className="pt-4">
-                  <a
+                {/* Call Button */}
+                <div className="pt-4 border-t border-white/[0.08]">
+                  <Button
+                    variant={plan.highlighted ? "primary" : "secondary"}
+                    size="md"
                     href="tel:09036627043"
-                    className={`w-full inline-flex items-center justify-center gap-2.5 py-3.5 px-6 rounded-full font-bold text-sm transition-all duration-300 ${
-                      plan.highlighted
-                        ? "bg-blue-600 hover:bg-blue-500 text-white shadow-[0_0_25px_rgba(37,99,235,0.6)] hover:scale-[1.02]"
-                        : "bg-white/10 hover:bg-white/15 text-white border border-white/15 hover:scale-[1.02]"
-                    }`}
+                    icon={<PhoneCall size={14} />}
+                    className="w-full"
                   >
-                    <PhoneCall size={15} />
-                    <span>Call Now: 09036627043</span>
-                  </a>
+                    Call To Deploy: 09036627043
+                  </Button>
                 </div>
               </div>
-            );
-          })}
+            ))}
+          </div>
         </div>
-      </main>
+      </section>
+
+      {/* Operational FAQs */}
+      <section className="py-20 border-t border-white/[0.08] bg-[#0b0d13]">
+        <div className="max-w-4xl mx-auto px-6 sm:px-8 space-y-12">
+          <div className="text-center space-y-2">
+            <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+              Frequently Asked Operational Questions
+            </h2>
+            <p className="text-sm text-slate-400">
+              Technical and logistical details regarding TimeLogic on-premise deployments.
+            </p>
+          </div>
+
+          <div className="space-y-6">
+            {faqs.map((faq, fIdx) => (
+              <div
+                key={fIdx}
+                className="p-6 rounded-xl bg-[#0f1118] border border-white/[0.08] space-y-2"
+              >
+                <div className="text-base font-bold text-white flex items-center gap-2">
+                  <HelpCircle size={16} className="text-blue-400 flex-shrink-0" />
+                  <span>{faq.q}</span>
+                </div>
+                <p className="text-sm text-slate-400 leading-relaxed pl-6">
+                  {faq.a}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* Footer */}
-      <footer className="relative z-10 w-full py-8 border-t border-white/10 text-center text-xs text-slate-500">
-        © {new Date().getFullYear()} TimeLogic Enterprise Attendance Systems. Call to activate: 09036627043.
-      </footer>
+      <Footer />
     </div>
   );
 }
