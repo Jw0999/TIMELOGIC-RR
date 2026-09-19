@@ -27,8 +27,24 @@ export default function SolutionPage() {
       caption: "Workforce Check-In Station and Administrator Device Authorization Portal",
     },
     {
-      id: "live-dashboard",
+      id: "face-biometrics",
       number: "02",
+      title: "One-Time Facial Biometric Enrollment & Face Lock",
+      category: "Biometric Identity",
+      lead:
+        "Buddy-punching and proxy clock-ins cost companies billions annually. TimeLogic's Attendance Station incorporates an intelligent, guided facial enrollment portal. Once enrolled, the employee's face template is permanently locked to their code for all future check-ins.",
+      points: [
+        "One-time permanent registration irreversibly binds facial geometry to employee code.",
+        "Automated on-device oval frame guidance ensures sharp biometric image capture.",
+        "Eliminates proxy punches: using coworker photos, masks, or borrowed IDs is rejected.",
+        "Sub-second on-premise facial match during live check-in sessions.",
+      ],
+      image: "/face.png",
+      caption: "TimeLogic Attendance Station: Guided One-Time Facial Biometric Enrollment & Lock",
+    },
+    {
+      id: "live-dashboard",
+      number: "03",
       title: "Real-Time Executive Attendance Intelligence",
       category: "Command Center",
       lead:
@@ -44,7 +60,7 @@ export default function SolutionPage() {
     },
     {
       id: "fraud-engine",
-      number: "03",
+      number: "04",
       title: "Automated Fraud Detection & Incident Auditing",
       category: "Security Auditing",
       lead:
@@ -60,7 +76,7 @@ export default function SolutionPage() {
     },
     {
       id: "break-tracking",
-      number: "04",
+      number: "05",
       title: "Granular Break Management & Floor Presence",
       category: "Policy Enforcement",
       lead:
@@ -77,7 +93,7 @@ export default function SolutionPage() {
     },
     {
       id: "apprentice-tracking",
-      number: "05",
+      number: "06",
       title: "Student & Apprentice Cohort Attendance",
       category: "Education & Training",
       lead:
@@ -93,7 +109,7 @@ export default function SolutionPage() {
     },
     {
       id: "payroll-reporting",
-      number: "06",
+      number: "07",
       title: "One-Click Payroll-Ready Analytics & Exports",
       category: "Payroll Acceleration",
       lead:
@@ -126,7 +142,7 @@ export default function SolutionPage() {
           </h1>
 
           <p className="text-slate-600 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
-            A comprehensive breakdown of our hardware-bound kiosk stations, live executive command center, automated fraud engine, and instant payroll analytics.
+            A comprehensive breakdown of our hardware-bound kiosk stations, facial biometric locks, live executive command center, automated fraud engine, and instant payroll analytics.
           </p>
         </div>
       </section>
@@ -167,7 +183,7 @@ export default function SolutionPage() {
             <div className="p-7 rounded-2xl bg-[#132a68] border-2 border-blue-400/50 shadow-lg space-y-3">
               <div className="flex items-center gap-2 text-emerald-300 font-semibold text-sm">
                 <CheckCircle2 size={16} />
-                <span>TimeLogic Kiosk System</span>
+                <span>TimeLogic Biometric Kiosk</span>
               </div>
               <p className="text-xs text-white leading-relaxed font-medium">
                 Attendance is locked to designated on-premise hardware terminals with facial biometrics and server-clock enforcement. Completely un-spoofable.
@@ -287,15 +303,6 @@ export default function SolutionPage() {
                     className="w-full h-auto object-cover"
                   />
                 </div>
-                {arch.secondaryImage && (
-                  <div className="rounded-xl border border-blue-400/20 bg-slate-900 overflow-hidden shadow-lg">
-                    <img
-                      src={arch.secondaryImage}
-                      alt={`${arch.caption} supplementary view`}
-                      className="w-full h-auto object-cover"
-                    />
-                  </div>
-                )}
                 <div className="text-[11px] text-blue-200/60 italic">
                   Fig {arch.number}: {arch.caption}
                 </div>
@@ -305,10 +312,10 @@ export default function SolutionPage() {
         </div>
       </section>
 
-      {/* ── SECTION 5: ARCHITECTURES 05 & 06 (WHITE BG) ── */}
+      {/* ── SECTION 5: ARCHITECTURES 05, 06 & 07 (WHITE BG) ── */}
       <section className="py-20 sm:py-28 bg-white text-slate-900 border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-6 sm:px-8 space-y-24">
-          {architectures.slice(4, 6).map((arch) => (
+          {architectures.slice(4, 7).map((arch) => (
             <div
               key={arch.id}
               className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-start"
@@ -351,6 +358,15 @@ export default function SolutionPage() {
                     className="w-full h-auto object-cover"
                   />
                 </div>
+                {arch.secondaryImage && (
+                  <div className="rounded-xl border border-slate-300 bg-slate-900 overflow-hidden shadow-md">
+                    <img
+                      src={arch.secondaryImage}
+                      alt={`${arch.caption} supplementary view`}
+                      className="w-full h-auto object-cover"
+                    />
+                  </div>
+                )}
                 <div className="text-[11px] text-slate-500 italic">
                   Fig {arch.number}: {arch.caption}
                 </div>

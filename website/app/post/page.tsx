@@ -51,6 +51,21 @@ export default function PostPage() {
       ],
     },
     {
+      id: "face-biometrics-enrollment",
+      heading: "Facial Biometric Enrollment: One-Time Permanent Registration & Lock",
+      module: "Biometric Identity Engine",
+      badge: "Face Verification",
+      image: "/face.png",
+      summary:
+        "The dedicated biometric registration terminal used to enroll and permanently bind an employee's facial geometry to their unique employee ID. Once captured within the guided oval alignment frame, the biometric template is cryptographically locked, preventing any future impersonation, proxy punches, or fraudulent attendance claims.",
+      keyCapabilities: [
+        "Guided oval alignment overlay with live camera positioning feedback.",
+        "Permanent cryptographic locking of face template to employee ID.",
+        "Eliminates proxy punches and buddy check-ins with tamper-resistant validation.",
+        "Sub-second local facial match during daily workforce check-in sessions.",
+      ],
+    },
+    {
       id: "break-room-live",
       heading: "Live Floor Presence: Break Room & Active Staff Monitor",
       module: "Floor Management",
@@ -140,7 +155,7 @@ export default function PostPage() {
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-extrabold text-slate-950 tracking-tight leading-tight">
-            Inside TimeLogic: All 8 Production System Screens
+            Inside TimeLogic: All 9 Production System Screens
           </h1>
 
           <p className="text-slate-600 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
@@ -349,13 +364,63 @@ export default function PostPage() {
         </div>
       </section>
 
-      {/* ── SECTION 6: BOTTOM CTA (BLUE BG) ── */}
-      <section className="py-22 bg-[#091534] text-white">
+      {/* ── SECTION 6: SCREEN 09 (BLUE BG) ── */}
+      <section className="py-20 sm:py-24 bg-[#0a1638] text-white border-y border-blue-900/60">
+        <div className="max-w-6xl mx-auto px-6 sm:px-8 space-y-20">
+          {screens.slice(8, 9).map((screen) => (
+            <article
+              key={screen.id}
+              className="p-8 sm:p-10 rounded-2xl bg-[#0f1f4e] border border-blue-400/20 shadow-xl space-y-8"
+            >
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 text-xs text-sky-400">
+                  <span className="font-mono font-bold">SCREEN 09</span>
+                  <span>•</span>
+                  <span className="font-semibold text-blue-200">{screen.module}</span>
+                </div>
+
+                <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+                  {screen.heading}
+                </h2>
+
+                <p className="text-sm text-blue-100/80 leading-relaxed max-w-3xl">
+                  {screen.summary}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-blue-400/30 bg-slate-900 shadow-2xl overflow-hidden ring-1 ring-white/10">
+                <div className="h-8 px-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between text-xs text-slate-400">
+                  <span className="font-mono text-[11px]">timelogic.app / {screen.id}</span>
+                  <span className="text-[11px] text-emerald-400 font-medium">Production Capture</span>
+                </div>
+                <img src={screen.image} alt={screen.heading} className="w-full h-auto object-cover" />
+              </div>
+
+              <div className="pt-4 border-t border-blue-400/20">
+                <div className="text-xs font-bold text-blue-200 uppercase tracking-wider mb-4">
+                  Operational Capabilities:
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {screen.keyCapabilities.map((cap, cIdx) => (
+                    <div key={cIdx} className="flex items-start gap-2.5 text-xs text-blue-100/90">
+                      <CheckCircle2 size={15} className="text-sky-400 flex-shrink-0 mt-0.5" />
+                      <span>{cap}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {/* ── SECTION 7: BOTTOM CTA (WHITE BG) ── */}
+      <section className="py-22 bg-white text-slate-900 border-t border-slate-200">
         <div className="max-w-4xl mx-auto px-6 sm:px-8 text-center space-y-6">
-          <h2 className="text-2xl sm:text-4xl font-extrabold text-white">
+          <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-950">
             Schedule a Live On-Premise Demonstration
           </h2>
-          <p className="text-blue-100/80 text-base max-w-lg mx-auto leading-relaxed">
+          <p className="text-slate-600 text-base max-w-lg mx-auto leading-relaxed">
             Speak directly with our technical deployment team to see these screens functioning on your company network.
           </p>
           <div className="pt-2 flex items-center justify-center gap-4 flex-wrap">
