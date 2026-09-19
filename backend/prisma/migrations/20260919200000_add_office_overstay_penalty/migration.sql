@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "offices" ADD COLUMN IF NOT EXISTS "overstayPenalty" INTEGER NOT NULL DEFAULT 0;

@@ -97,6 +97,14 @@ async function clearFailedMigrations() {
         // Ignore errors on this safety check
       }
 
+      // Safety: Ensure critical new columns exist even before migrations run
+      try {
+        await prisma.$executeRawUnsafe(`ALTER TABLE "offices" ADD COLUMN IF NOT EXISTS "overstayPenalty" INTEGER NOT NULL DEFAULT 0;`);
+        console.log('[Migration Cleanup] ✓ Ensured offices.overstayPenalty column exists');
+      } catch (colErr) {
+        // Ignore if table doesn't exist yet
+      }
+
       console.log('[Migration Cleanup] ✓ Migration database is clean\n');
       return true;
 
