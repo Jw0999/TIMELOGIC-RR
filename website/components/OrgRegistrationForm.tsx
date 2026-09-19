@@ -17,6 +17,8 @@ import {
   Trash2,
   AlertCircle,
   Sparkles,
+  Mail,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "./ui/Button";
 
@@ -60,14 +62,15 @@ export function OrgRegistrationForm({
   isCompact = false,
 }: OrgRegistrationFormProps) {
   const [step, setStep] = useState<number>(1);
-  const [selectedPlan, setSelectedPlan] = useState<PlanType>(initialPlan);
+  const [selectedPlan, setSelectedPlan] = useState<PlanType>(
+    initialPlan === "organisation" ? "enterprise" : initialPlan
+  );
   const [error, setError] = useState<string>("");
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [isCompleted, setIsCompleted] = useState<boolean>(false);
+  const [paymentInitiated, setPaymentInitiated] = useState<boolean>(false);
   const [refCode, setRefCode] = useState<string>("");
 
   useEffect(() => {
-    if (initialPlan) {
+    if (initialPlan && initialPlan !== "organisation") {
       setSelectedPlan(initialPlan);
     }
   }, [initialPlan]);
@@ -200,6 +203,10 @@ export function OrgRegistrationForm({
         setError("Please select a subscription tier.");
         return false;
       }
+      if (selectedPlan === "organisation") {
+        setError("Self-serve online registration is disabled for the Custom Organisation plan. Please contact our deployment team via email or phone below, or select Starter (₦20,000) or Enterprise (₦60,000) to proceed online.");
+        return false;
+      }
     }
 
     return true;
@@ -216,30 +223,59 @@ export function OrgRegistrationForm({
     setStep((prev) => Math.max(prev - 1, 1));
   };
 
-  const handleStageRegistration = () => {
-    setIsSubmitting(true);
-    setError("");
+  const stageRegistrationDetails = (plan: PlanType) => {
+    const generatedCode = `TL-ORG-${Math.floor(10000 + Math.random() * 90000)}`;
+    setRefCode(generatedCode);
 
-    setTimeout(() => {
-      const generatedCode = `TL-ORG-${Math.floor(10000 + Math.random() * 90000)}`;
-      setRefCode(generatedCode);
-      setIsSubmitting(false);
-      setIsCompleted(true);
-      try {
-        localStorage.setItem(
-          "timelogic_staged_org",
-          JSON.stringify({
-            refCode: generatedCode,
-            orgName: form.name,
-            adminEmail: form.admin.email,
-            selectedPlan,
-            stagedAt: new Date().toISOString(),
-          })
-        );
-      } catch {
-        // ignore local storage restrictions
-      }
-    }, 900);
+    const price = plan === "starter" ? "₦20,000" : "₦60,000";
+    const paystackUrl =
+      plan === "starter"
+        ? "https://paystack.shop/pay/eh6-mzczwq"
+        : "https://paystack.shop/pay/fx02rvbsve";
+
+    const payload = {
+      refCode: generatedCode,
+      orgName: form.name,
+      industry: form.industry,
+      timezone: form.timezone,
+      officeName: form.office.name,
+      officeAddress: form.office.address,
+      openTime: form.office.openTime,
+      closeTime: form.office.closeTime,
+      breakMinutes: form.office.breakMinutes,
+      breakStart: form.office.breakStart,
+      breakEnd: form.office.breakEnd,
+      adminName: `${form.admin.firstName} ${form.admin.lastName}`,
+      adminFirstName: form.admin.firstName,
+      adminLastName: form.admin.lastName,
+      adminEmail: form.admin.email,
+      adminPassword: form.admin.password,
+      selectedPlan: plan,
+      planName: plan === "starter" ? "Starter Plan (20 Employees)" : "Enterprise Plan (60 Employees)",
+      amount: price,
+      paystackUrl,
+      stagedAt: new Date().toISOString(),
+    };
+
+    try {
+      localStorage.setItem("timelogic_staged_org", JSON.stringify(payload));
+    } catch {
+      // ignore storage errors
+    }
+
+    return payload;
+  };
+
+  const handleOpenPaystack = () => {
+    if (selectedPlan === "organisation") return;
+    const payload = stageRegistrationDetails(selectedPlan);
+    setPaymentInitiated(true);
+    window.open(payload.paystackUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const handleGoToSuccess = () => {
+    stageRegistrationDetails(selectedPlan === "starter" ? "starter" : "enterprise");
+    window.location.href = "/success";
   };
 
   const stepTitles = [
@@ -255,8 +291,12 @@ export function OrgRegistrationForm({
     {
       id: "starter" as PlanType,
       name: "Starter",
+      price: "₦20,000",
+      period: "/ month",
       capacity: "20 Employees",
-      billing: "Paid monthly",
+      billing: "₦20,000 / month (Paid monthly)",
+      paystackUrl: "https://paystack.shop/pay/eh6-mzczwq",
+      isCustomContact: false,
       desc: "Designed for small single-location offices and clinics eliminating proxy check-ins.",
       badge: "Small Teams",
       highlights: [
@@ -269,8 +309,12 @@ export function OrgRegistrationForm({
     {
       id: "enterprise" as PlanType,
       name: "Enterprise",
+      price: "₦60,000",
+      period: "/ month",
       capacity: "60 Employees",
-      billing: "Paid monthly",
+      billing: "₦60,000 / month (Paid monthly)",
+      paystackUrl: "https://paystack.shop/pay/fx02rvbsve",
+      isCustomContact: false,
       desc: "Built for expanding companies, manufacturing plants, and multi-department teams.",
       badge: "Most Popular",
       highlights: [
@@ -283,10 +327,13 @@ export function OrgRegistrationForm({
     {
       id: "organisation" as PlanType,
       name: "Organisation",
+      price: "Custom",
+      period: "Pricing",
       capacity: "Custom Headcount",
-      billing: "Paid monthly / Custom",
+      billing: "Custom terms",
+      isCustomContact: true,
       desc: "Tailored for large multi-branch corporations, schools, and multi-site enterprises.",
-      badge: "Large Scale",
+      badge: "Contact Required",
       highlights: [
         "Custom employee headcount",
         "Multi-branch & facility network",
@@ -792,19 +839,19 @@ export function OrgRegistrationForm({
           </div>
         )}
 
-        {/* ── STEP 5: SELECT PLAN TIER (STARTER, ENTERPRISE, ORGANISATION) ── */}
+        {/* ── STEP 5: SELECT PLAN TIER (STARTER 20K, ENTERPRISE 60K, ORGANISATION CUSTOM) ── */}
         {step === 5 && (
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div className="border-b border-blue-400/20 pb-2">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
                   <Sparkles size={16} className="text-sky-400" />
-                  <span>Choose Your Deployment Tier</span>
+                  <span>Select Your Monthly Plan</span>
                 </h3>
                 <span className="text-xs font-semibold text-sky-400">Monthly Licensing</span>
               </div>
               <p className="text-xs text-blue-200/70 mt-0.5">
-                Select the headcount tier that fits your active personnel. You can adjust capacity at any time.
+                Starter (₦20k/mo) and Enterprise (₦60k/mo) can be provisioned online. Organisation tier requires custom consultation.
               </p>
             </div>
 
@@ -814,10 +861,17 @@ export function OrgRegistrationForm({
                 return (
                   <div
                     key={p.id}
-                    onClick={() => setSelectedPlan(p.id)}
+                    onClick={() => {
+                      setSelectedPlan(p.id);
+                      if (p.id === "organisation") {
+                        setError("");
+                      }
+                    }}
                     className={`p-5 rounded-xl cursor-pointer border-2 transition-all flex flex-col justify-between ${
                       isSelected
-                        ? "bg-[#10245a] border-sky-400 shadow-xl ring-2 ring-sky-400/30"
+                        ? p.isCustomContact
+                          ? "bg-[#181d3d] border-amber-400 shadow-xl ring-2 ring-amber-400/30"
+                          : "bg-[#10245a] border-sky-400 shadow-xl ring-2 ring-sky-400/30"
                         : "bg-[#081333] border-blue-400/20 hover:border-blue-400/40 hover:bg-[#0b1b46]"
                     }`}
                   >
@@ -828,6 +882,8 @@ export function OrgRegistrationForm({
                           className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                             p.id === "enterprise"
                               ? "bg-sky-500 text-slate-950"
+                              : p.isCustomContact
+                              ? "bg-amber-500/20 text-amber-300 border border-amber-400/30"
                               : "bg-blue-500/20 text-blue-200"
                           }`}
                         >
@@ -835,11 +891,20 @@ export function OrgRegistrationForm({
                         </span>
                       </div>
 
-                      <div className="text-xl sm:text-2xl font-extrabold text-white mt-1">
-                        {p.capacity}
+                      {/* Price Display */}
+                      <div className="mt-2 mb-1 flex items-baseline gap-1.5">
+                        <span className="text-2xl font-extrabold text-white">
+                          {p.price}
+                        </span>
+                        {p.period && (
+                          <span className="text-xs text-slate-300 font-medium">
+                            {p.period}
+                          </span>
+                        )}
                       </div>
-                      <div className="text-[11px] font-semibold uppercase tracking-wider text-sky-400 mb-3">
-                        {p.billing}
+
+                      <div className="text-[11px] font-semibold uppercase tracking-wider text-sky-400 mb-2">
+                        {p.capacity}
                       </div>
 
                       <p className="text-xs text-blue-100/75 leading-relaxed mb-4">
@@ -861,12 +926,18 @@ export function OrgRegistrationForm({
 
                     <div className="pt-4 mt-4 border-t border-blue-400/20 flex items-center justify-between">
                       <span className="text-xs font-semibold text-blue-200">
-                        {isSelected ? "Selected Tier" : "Click to Select"}
+                        {p.isCustomContact
+                          ? "Contact Required"
+                          : isSelected
+                          ? "Selected Tier"
+                          : "Click to Select"}
                       </span>
                       <div
                         className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
                           isSelected
-                            ? "border-sky-400 bg-sky-400 text-slate-950"
+                            ? p.isCustomContact
+                              ? "border-amber-400 bg-amber-400 text-slate-950"
+                              : "border-sky-400 bg-sky-400 text-slate-950"
                             : "border-blue-400/40"
                         }`}
                       >
@@ -877,36 +948,75 @@ export function OrgRegistrationForm({
                 );
               })}
             </div>
+
+            {/* ── ORGANISATION CONTACT CALLOUT WHEN SELECTED ── */}
+            {selectedPlan === "organisation" && (
+              <div className="p-5 rounded-xl bg-[#1c1f38] border-2 border-amber-400/60 shadow-xl space-y-4 animate-in fade-in duration-200">
+                <div className="flex items-start gap-3">
+                  <AlertCircle size={20} className="text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="text-sm font-bold text-amber-200">
+                      Organisation Plan: Online Checkout Disabled (Custom Headcount)
+                    </h4>
+                    <p className="text-xs text-slate-300 leading-relaxed mt-1">
+                      For large enterprises, multi-branch campuses, and apprentice training cohorts, our technical architecture team configures custom database instances and provides on-site terminal pairing. Please contact our deployment team directly via email or phone:
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-3 pt-1">
+                  <Button
+                    variant="outline"
+                    size="md"
+                    href="mailto:deployment@timelogic.app?subject=TimeLogic%20Custom%20Organisation%20Deployment%20Inquiry&body=Hello%20TimeLogic%20Team%2C%0A%0AWe%20would%20like%20to%20deploy%20TimeLogic%20for%20our%20organisation%20with%20custom%20headcount.%0A%0AOrganisation%20Name%3A%20...%0AEstimated%20Employees%3A%20...%0APhone%20Number%3A%20..."
+                    icon={<Mail size={15} />}
+                    className="w-full sm:w-auto justify-center text-white border-white/30 hover:bg-white/10 font-bold"
+                  >
+                    Email Deployment Team
+                  </Button>
+
+                  <Button
+                    variant="primary"
+                    size="md"
+                    href="tel:09036627043"
+                    icon={<PhoneCall size={15} />}
+                    className="w-full sm:w-auto justify-center bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold shadow-md hover:shadow-lg"
+                  >
+                    Call Phone: 09036627043
+                  </Button>
+                </div>
+
+                <p className="text-[11px] text-amber-300/80 italic">
+                  Tip: To continue self-serve registration online right now, click <strong>Starter (₦20,000)</strong> or <strong>Enterprise (₦60,000)</strong> above.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
-        {/* ── STEP 6: PAYMENT GATEWAY HAND-OFF ── */}
+        {/* ── STEP 6: PAYMENT GATEWAY HAND-OFF (PAYSTACK) ── */}
         {step === 6 && (
           <div className="space-y-5">
             <div className="border-b border-blue-400/20 pb-2">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <CreditCard size={16} className="text-sky-400" />
-                <span>TimeLogic Payment Gateway & Activation Handoff</span>
+                <span>TimeLogic Paystack Payment Gateway</span>
               </h3>
               <p className="text-xs text-blue-200/70 mt-0.5">
-                Review your staged registration details and prepare for gateway connection.
+                Complete your monthly license fee on Paystack. Once paid, your master admin credentials will be displayed and dispatched.
               </p>
             </div>
 
             {/* Summary Review Card */}
             <div className="p-4 rounded-xl bg-[#081333] border border-blue-400/30 space-y-3">
               <div className="text-xs font-bold uppercase tracking-wider text-sky-400">
-                Staged Registration Summary
+                Order & Account Provisioning Summary
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                 <div>
                   <span className="text-blue-300">Organisation:</span>{" "}
                   <strong className="text-white">{form.name || "N/A"}</strong>
-                </div>
-                <div>
-                  <span className="text-blue-300">Industry:</span>{" "}
-                  <strong className="text-white">{form.industry}</strong>
                 </div>
                 <div>
                   <span className="text-blue-300">Primary Office:</span>{" "}
@@ -921,82 +1031,76 @@ export function OrgRegistrationForm({
                   </strong>
                 </div>
                 <div>
-                  <span className="text-blue-300">Selected Plan Tier:</span>{" "}
+                  <span className="text-blue-300">Selected Plan:</span>{" "}
                   <strong className="text-sky-300 uppercase">
-                    {selectedPlan} (
-                    {selectedPlan === "starter"
-                      ? "20 Employees"
-                      : selectedPlan === "enterprise"
-                      ? "60 Employees"
-                      : "Custom Capacity"}
-                    )
+                    {selectedPlan === "starter" ? "Starter (20 Employees)" : "Enterprise (60 Employees)"}
                   </strong>
                 </div>
                 <div>
-                  <span className="text-blue-300">Billing Terms:</span>{" "}
-                  <strong className="text-white">Paid Monthly</strong>
+                  <span className="text-blue-300">Total Monthly Amount:</span>{" "}
+                  <strong className="text-emerald-400 text-sm">
+                    {selectedPlan === "starter" ? "₦20,000" : "₦60,000"} / month
+                  </strong>
+                </div>
+                <div>
+                  <span className="text-blue-300">Payment Channel:</span>{" "}
+                  <strong className="text-white">Paystack Official Gateway</strong>
                 </div>
               </div>
             </div>
 
-            {/* Gateway Integration Notice */}
-            <div className="p-5 rounded-2xl bg-gradient-to-br from-[#0c225a] to-[#081438] border-2 border-sky-400/50 shadow-xl space-y-4">
+            {/* Paystack Payment Card */}
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-[#0e2154] to-[#081438] border-2 border-sky-400/50 shadow-xl space-y-4">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2">
                   <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
                   <span className="text-sm font-bold text-white tracking-tight">
-                    Payment Gateway Connection Ready
+                    Paystack Checkout Ready ({selectedPlan === "starter" ? "₦20,000" : "₦60,000"})
                   </span>
                 </div>
                 <span className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-sky-500/20 border border-sky-400/30 text-sky-300">
-                  STAGE 1 VERIFICATION
+                  SECURE GATEWAY
                 </span>
               </div>
 
-              <div className="space-y-2 text-xs text-blue-100/85 leading-relaxed">
-                <p>
-                  <strong>Notice:</strong> Your organisation structure, break policies, and administrative credentials have been validated. Direct card/bank gateway processing is staged.
-                </p>
-                <p>
-                  To prevent unauthorized billing before on-premise hardware is connected, our deployment engineers verify your company network and attendance station first.
-                </p>
+              <p className="text-xs text-blue-100/85 leading-relaxed">
+                Click below to complete your payment on the official TimeLogic Paystack checkout page. After your transaction, return to view your confirmation and administrator access credentials.
+              </p>
+
+              <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
+                <Button
+                  variant="primary"
+                  size="lg"
+                  onClick={handleOpenPaystack}
+                  icon={<ExternalLink size={16} />}
+                  iconPosition="right"
+                  className="w-full sm:w-auto justify-center bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold shadow-lg hover:shadow-xl"
+                >
+                  Pay {selectedPlan === "starter" ? "₦20,000" : "₦60,000"} on Paystack
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={handleGoToSuccess}
+                  icon={<CheckCircle2 size={16} />}
+                  className="w-full sm:w-auto justify-center text-white border-white/30 hover:bg-white/10 font-bold"
+                >
+                  I Have Completed Payment
+                </Button>
               </div>
 
-              {isCompleted ? (
-                <div className="p-4 rounded-xl bg-emerald-500/15 border border-emerald-400/40 text-emerald-200 text-xs sm:text-sm space-y-2">
-                  <div className="flex items-center gap-2 font-bold text-emerald-300">
-                    <CheckCircle2 size={18} />
-                    <span>Registration Staged Successfully!</span>
-                  </div>
-                  <p>
-                    Reference Code: <strong className="font-mono text-white text-base">{refCode}</strong>
-                  </p>
-                  <p className="text-xs text-emerald-100/80">
-                    Your administrator profile has been reserved. Call our technical deployment lead now at <strong>09036627043</strong> to pair your first Attendance Kiosk Station.
-                  </p>
-                </div>
-              ) : (
-                <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
-                  <Button
-                    variant="primary"
-                    size="md"
-                    onClick={handleStageRegistration}
-                    disabled={isSubmitting}
-                    icon={<CreditCard size={15} />}
-                    className="w-full sm:w-auto justify-center shadow-lg hover:shadow-xl"
+              {paymentInitiated && (
+                <div className="p-3.5 rounded-xl bg-emerald-500/15 border border-emerald-400/30 text-emerald-200 text-xs flex items-center justify-between gap-3">
+                  <span>
+                    Paystack checkout opened in a new tab. Once payment succeeds, click <strong>"I Have Completed Payment"</strong> to view your provisioning receipt.
+                  </span>
+                  <button
+                    onClick={handleGoToSuccess}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-500 text-slate-950 font-bold hover:bg-emerald-400 flex-shrink-0 transition"
                   >
-                    {isSubmitting ? "Staging Organization Profile..." : "Proceed to Payment Gateway"}
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="md"
-                    href="tel:09036627043"
-                    icon={<PhoneCall size={14} />}
-                    className="w-full sm:w-auto justify-center text-white border-white/20 hover:bg-white/10"
-                  >
-                    Call Deployment Lead: 09036627043
-                  </Button>
+                    View Receipt →
+                  </button>
                 </div>
               )}
             </div>
@@ -1004,36 +1108,39 @@ export function OrgRegistrationForm({
         )}
 
         {/* ── FOOTER NAVIGATION CONTROLS ── */}
-        {!isCompleted && (
-          <div className="mt-7 pt-5 border-t border-blue-400/20 flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={handleBack}
-              disabled={step === 1}
-              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition ${
-                step === 1
-                  ? "opacity-30 cursor-not-allowed text-slate-400"
-                  : "text-blue-200 hover:text-white hover:bg-white/10 border border-blue-400/20"
+        <div className="mt-7 pt-5 border-t border-blue-400/20 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={handleBack}
+            disabled={step === 1}
+            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition ${
+              step === 1
+                ? "opacity-30 cursor-not-allowed text-slate-400"
+                : "text-blue-200 hover:text-white hover:bg-white/10 border border-blue-400/20"
+            }`}
+          >
+            <ChevronLeft size={16} />
+            <span>Back</span>
+          </button>
+
+          {step < 6 ? (
+            <Button
+              variant="primary"
+              size="md"
+              onClick={handleNext}
+              disabled={step === 5 && selectedPlan === "organisation"}
+              icon={<ChevronRight size={16} />}
+              iconPosition="right"
+              className={`shadow-md hover:shadow-lg font-bold ${
+                step === 5 && selectedPlan === "organisation"
+                  ? "opacity-40 cursor-not-allowed"
+                  : ""
               }`}
             >
-              <ChevronLeft size={16} />
-              <span>Back</span>
-            </button>
-
-            {step < 6 ? (
-              <Button
-                variant="primary"
-                size="md"
-                onClick={handleNext}
-                icon={<ChevronRight size={16} />}
-                iconPosition="right"
-                className="shadow-md hover:shadow-lg font-bold"
-              >
-                {step === 5 ? "Proceed to Payment Gateway" : "Continue"}
-              </Button>
-            ) : null}
-          </div>
-        )}
+              {step === 5 ? "Proceed to Payment Gateway" : "Continue"}
+            </Button>
+          ) : null}
+        </div>
       </div>
     </div>
   );
