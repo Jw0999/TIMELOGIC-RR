@@ -13,9 +13,9 @@ import {
   Cpu,
   Clock,
   FileSpreadsheet,
+  Building2,
 } from "lucide-react";
 import { Button } from "./ui/Button";
-import { OrgRegistrationForm } from "./OrgRegistrationForm";
 
 export function Hero() {
   return (
@@ -53,22 +53,27 @@ export function Hero() {
               Eliminate ghost workers, buddy-punching, and unmonitored breaks. TimeLogic locks daily check-ins to authorized on-premise kiosk stations, biometric facial verification, and live office network presence.
             </p>
 
-            {/* Action Call Button */}
+            {/* Action Buttons: Register Your Organisation Button & Direct Call Button */}
             <div className="pt-2 flex items-center gap-3.5 flex-wrap">
               <Button
                 variant="primary"
                 size="lg"
+                href="/register"
+                icon={<Building2 size={16} />}
+                className="shadow-lg hover:shadow-xl shadow-blue-600/30 font-bold"
+              >
+                Register Your Organisation
+              </Button>
+
+              <Button
+                variant="outline"
+                size="lg"
                 href="tel:09036627043"
                 icon={<PhoneCall size={16} />}
-                className="shadow-lg hover:shadow-xl shadow-blue-600/30"
+                className="text-white border-white/20 hover:bg-white/10"
               >
                 Call Deployment Team (09036627043)
               </Button>
-            </div>
-
-            {/* Fill Form For Organisation Registration (Super Admin Multi-Step Structure) */}
-            <div className="pt-4" id="register">
-              <OrgRegistrationForm />
             </div>
 
             {/* Operational Verification Highlights */}
@@ -97,7 +102,7 @@ export function Hero() {
             initial={{ opacity: 0, x: 40, scale: 0.95 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
             transition={{ duration: 0.75, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
-            className="lg:col-span-5 flex flex-col items-center justify-center relative lg:sticky lg:top-28 self-start"
+            className="lg:col-span-5 flex flex-col items-center justify-center relative"
           >
             {/* Ambient shield glow backdrop */}
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">

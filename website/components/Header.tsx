@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { PhoneCall, Menu, X } from "lucide-react";
+import { PhoneCall, Menu, X, Building2 } from "lucide-react";
 import { Logo, Wordmark } from "./ui/Logo";
 import { Button } from "./ui/Button";
 
@@ -59,16 +59,27 @@ export function Header({ onCallClick }: HeaderProps) {
           </nav>
         </div>
 
-        {/* Right: Direct Action Button */}
-        <div className="hidden sm:flex items-center gap-4">
+        {/* Right: Direct Action Buttons */}
+        <div className="hidden sm:flex items-center gap-3">
           <Button
-            variant="primary"
+            variant="outline"
             size="sm"
             href="tel:09036627043"
             onClick={onCallClick}
             icon={<PhoneCall size={13} />}
+            className="text-xs text-white border-white/20 hover:bg-white/10"
           >
             Call 09036627043
+          </Button>
+
+          <Button
+            variant="primary"
+            size="sm"
+            href="/register"
+            icon={<Building2 size={13} />}
+            className="text-xs font-bold shadow-md hover:shadow-lg"
+          >
+            Register Organisation
           </Button>
         </div>
 
@@ -113,12 +124,20 @@ export function Header({ onCallClick }: HeaderProps) {
             })}
           </nav>
 
-          <div className="pt-4 border-t border-white/[0.1] flex flex-col gap-3">
-            <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              Direct Deployment Line:
-            </div>
+          <div className="pt-4 border-t border-white/[0.1] flex flex-col gap-2.5">
             <Button
               variant="primary"
+              size="md"
+              href="/register"
+              onClick={() => setMobileMenuOpen(false)}
+              icon={<Building2 size={15} />}
+              className="w-full justify-center py-2.5 text-sm font-bold shadow-md"
+            >
+              Register Organisation
+            </Button>
+
+            <Button
+              variant="outline"
               size="md"
               href="tel:09036627043"
               onClick={() => {
@@ -126,7 +145,7 @@ export function Header({ onCallClick }: HeaderProps) {
                 if (onCallClick) onCallClick();
               }}
               icon={<PhoneCall size={15} />}
-              className="w-full justify-center py-3 text-base shadow-sm"
+              className="w-full justify-center py-2.5 text-sm text-white border-white/20 hover:bg-white/10"
             >
               Call 09036627043
             </Button>
