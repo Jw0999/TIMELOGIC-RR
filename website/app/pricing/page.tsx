@@ -176,18 +176,27 @@ export default function PricingPage() {
                   </div>
                 </div>
 
-                {/* Call Button */}
-                <div className="pt-4 border-t border-blue-400/20">
+                {/* Action Buttons: Register Button & Direct Call Button */}
+                <div className="pt-4 border-t border-blue-400/20 space-y-2.5">
                   <Button
                     variant={plan.highlighted ? "primary" : "outline"}
                     size="md"
-                    href="tel:09036627043"
-                    icon={<PhoneCall size={14} />}
-                    className={`w-full justify-center ${
+                    href={`/register?plan=${plan.name.toLowerCase()}`}
+                    className={`w-full justify-center font-bold transition-all ${
                       plan.highlighted
-                        ? "shadow-md hover:shadow-lg"
-                        : "text-white border-white/30 hover:bg-white/10"
+                        ? "bg-sky-400 hover:bg-sky-300 text-slate-950 shadow-md hover:shadow-lg ring-1 ring-sky-300"
+                        : "bg-blue-600 hover:bg-blue-500 text-white border-blue-500 shadow-xs"
                     }`}
+                  >
+                    Register {plan.name} Plan
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    href="tel:09036627043"
+                    icon={<PhoneCall size={13} />}
+                    className="w-full justify-center text-xs text-blue-200 border-white/20 hover:bg-white/10"
                   >
                     Call To Deploy: 09036627043
                   </Button>
