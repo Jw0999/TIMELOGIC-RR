@@ -66,7 +66,6 @@ export function OrgRegistrationForm({
     initialPlan === "organisation" ? "enterprise" : initialPlan
   );
   const [error, setError] = useState<string>("");
-  const [paymentInitiated, setPaymentInitiated] = useState<boolean>(false);
   const [refCode, setRefCode] = useState<string>("");
 
   useEffect(() => {
@@ -269,13 +268,7 @@ export function OrgRegistrationForm({
   const handleOpenPaystack = () => {
     if (selectedPlan === "organisation") return;
     const payload = stageRegistrationDetails(selectedPlan);
-    setPaymentInitiated(true);
-    window.open(payload.paystackUrl, "_blank", "noopener,noreferrer");
-  };
-
-  const handleGoToSuccess = () => {
-    stageRegistrationDetails(selectedPlan === "starter" ? "starter" : "enterprise");
-    window.location.href = "/success";
+    window.location.href = payload.paystackUrl;
   };
 
   const stepTitles = [
@@ -1064,10 +1057,10 @@ export function OrgRegistrationForm({
               </div>
 
               <p className="text-xs text-blue-100/85 leading-relaxed">
-                Click below to complete your payment on the official TimeLogic Paystack checkout page. After your transaction, return to view your confirmation and administrator access credentials.
+                Click below to complete your payment on the official TimeLogic Paystack checkout page. Once payment is confirmed, you will be redirected back to TimeLogic, and your master administrator credentials will be delivered directly to your email inbox.
               </p>
 
-              <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
+              <div className="pt-2">
                 <Button
                   variant="primary"
                   size="lg"
@@ -1078,31 +1071,7 @@ export function OrgRegistrationForm({
                 >
                   Pay {selectedPlan === "starter" ? "₦20,000" : "₦60,000"} on Paystack
                 </Button>
-
-                <Button
-                  variant="outline"
-                  size="lg"
-                  onClick={handleGoToSuccess}
-                  icon={<CheckCircle2 size={16} />}
-                  className="w-full sm:w-auto justify-center text-white border-white/30 hover:bg-white/10 font-bold"
-                >
-                  I Have Completed Payment
-                </Button>
               </div>
-
-              {paymentInitiated && (
-                <div className="p-3.5 rounded-xl bg-emerald-500/15 border border-emerald-400/30 text-emerald-200 text-xs flex items-center justify-between gap-3">
-                  <span>
-                    Paystack checkout opened in a new tab. Once payment succeeds, click <strong>"I Have Completed Payment"</strong> to view your provisioning receipt.
-                  </span>
-                  <button
-                    onClick={handleGoToSuccess}
-                    className="px-3 py-1.5 rounded-lg bg-emerald-500 text-slate-950 font-bold hover:bg-emerald-400 flex-shrink-0 transition"
-                  >
-                    View Receipt →
-                  </button>
-                </div>
-              )}
             </div>
           </div>
         )}
