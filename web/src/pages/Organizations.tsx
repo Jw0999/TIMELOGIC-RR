@@ -23,9 +23,10 @@ interface OrgFormData {
     breakMinutes: number;
     weeklySchedule: WeeklySchedule;
     graceMinutes: number; lateAfterMinutes: number; gracePenalty: number; latePenalty: number; completelyLatePenalty: number; absentPenalty: number;
+    overstayPenalty: number;
     breakStart: string; breakEnd: string;
   }[];
-  departments: { name: string; breakStart: string; breakEnd: string }[];
+  departments: { name: string; breakStart: string; breakEnd: string; overstayPenalty: number }[];
   admin: { firstName: string; lastName: string; email: string; password: string; confirmPassword: string };
 }
 const newOffice = () => ({
@@ -33,6 +34,7 @@ const newOffice = () => ({
   breakMinutes: 60,
   weeklySchedule: weeklySchedule(),
   graceMinutes: 30, lateAfterMinutes: 90, gracePenalty: 0, latePenalty: 0, completelyLatePenalty: 0, absentPenalty: 0,
+  overstayPenalty: 0,
   breakStart: '13:00', breakEnd: '14:00',
 });
 const defaultForm = (): OrgFormData => ({
@@ -40,7 +42,7 @@ const defaultForm = (): OrgFormData => ({
   allowDeviceCheckIn: true, allowManualCheckIn: false, hasStudents: false,
   timezone: 'Africa/Lagos',
   offices: [{ ...newOffice(), name: 'Main Office' }],
-  departments: [{ name: 'Engineering', breakStart: '13:00', breakEnd: '14:00' }],
+  departments: [{ name: 'Engineering', breakStart: '13:00', breakEnd: '14:00', overstayPenalty: 0 }],
   admin: { firstName: '', lastName: '', email: '', password: '', confirmPassword: '' },
 });
 
@@ -73,7 +75,7 @@ function OrgModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
   const [error, setError] = useState('');
   const updateAdmin  = (k: string, v: string) => setForm((p) => ({ ...p, admin: { ...p.admin, [k]: v } }));
   const updateOffice = (i: number, k: string, v: any) => setForm((p) => { const o = [...p.offices]; o[i] = { ...o[i], [k]: v }; return { ...p, offices: o }; });
-  const updateDept   = (i: number, k: string, v: string) => setForm((p) => { const d = [...p.departments]; d[i] = { ...d[i], [k]: v }; return { ...p, departments: d }; });
+  const updateDept   = (i: number, k: string, v: any) => setForm((p) => { const d = [...p.departments]; d[i] = { ...d[i], [k]: v }; return { ...p, departments: d }; });
   const inp = 'w-full border border-[var(--input-border)] bg-[var(--input-bg)] text-[var(--text-main)] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 placeholder-[var(--text-muted)]';
   const lbl = 'block text-xs font-semibold text-[var(--text-muted)] mb-1.5';
   const submit = async () => {
@@ -182,6 +184,7 @@ function OrgModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
                   <div><label className={lbl}>Late penalty (₦)</label><input className={inp} type="number" min={0} value={o.latePenalty} onChange={(e) => updateOffice(i,'latePenalty',e.target.value)}/></div>
                   <div><label className={lbl}>Completely late penalty (₦)</label><input className={inp} type="number" min={0} value={o.completelyLatePenalty} onChange={(e) => updateOffice(i,'completelyLatePenalty',e.target.value)}/></div>
                   <div><label className={lbl}>Unauthorized absence penalty (₦)</label><input className={inp} type="number" min={0} value={o.absentPenalty} onChange={(e) => updateOffice(i,'absentPenalty',e.target.value)}/></div>
+                  <div><label className={lbl}>Overstayed break penalty (₦)</label><input className={inp} type="number" min={0} value={o.overstayPenalty ?? 0} onChange={(e) => updateOffice(i,'overstayPenalty',e.target.value)}/></div>
                 </div>
                 <p className="text-[11px] text-[var(--text-muted)] mt-1">Deducted from salary. On-time within grace = ₦0. After grace = grace penalty. After "late after" = marked LATE + late penalty.</p>
               </div>
@@ -201,14 +204,15 @@ function OrgModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
             </div>))}
           </div>}
           {step === 3 && <div>
-            <div className="flex items-center justify-between mb-2"><h3 className="font-bold text-[var(--text-main)]">Departments</h3><button onClick={() => setForm((p) => ({...p, departments: [...p.departments, {name:'', breakStart:'13:00', breakEnd:'14:00'}]}))} className="text-xs font-semibold text-primary-600 flex items-center gap-1"><Plus size={12}/>Add</button></div>
-            <p className="text-xs text-[var(--text-muted)] mb-4">Each department sets its own break window. Employees inherit it from their department.</p>
+            <div className="flex items-center justify-between mb-2"><h3 className="font-bold text-[var(--text-main)]">Departments</h3><button onClick={() => setForm((p) => ({...p, departments: [...p.departments, {name:'', breakStart:'13:00', breakEnd:'14:00', overstayPenalty: 0}]}))} className="text-xs font-semibold text-primary-600 flex items-center gap-1"><Plus size={12}/>Add</button></div>
+            <p className="text-xs text-[var(--text-muted)] mb-4">Each department sets its own break window and overbreak penalty. Employees inherit it from their department.</p>
             {form.departments.map((d, i) => (
               <div key={i} className="flex flex-col sm:flex-row gap-2 sm:items-end mb-4 sm:mb-3">
                 <div className="flex-1"><label className={lbl}>Department {i+1}</label><input className={inp} value={d.name} onChange={(e) => updateDept(i, 'name', e.target.value)} placeholder="e.g. Engineering"/></div>
-                <div className="flex gap-2">
-                  <div className="flex-1 sm:w-28"><label className={lbl}>Break Start</label><input className={inp} type="time" value={d.breakStart} onChange={(e) => updateDept(i, 'breakStart', e.target.value)}/></div>
-                  <div className="flex-1 sm:w-28"><label className={lbl}>Break End</label><input className={inp} type="time" value={d.breakEnd} onChange={(e) => updateDept(i, 'breakEnd', e.target.value)}/></div>
+                <div className="flex flex-wrap sm:flex-nowrap gap-2">
+                  <div className="w-28"><label className={lbl}>Break Start</label><input className={inp} type="time" value={d.breakStart} onChange={(e) => updateDept(i, 'breakStart', e.target.value)}/></div>
+                  <div className="w-28"><label className={lbl}>Break End</label><input className={inp} type="time" value={d.breakEnd} onChange={(e) => updateDept(i, 'breakEnd', e.target.value)}/></div>
+                  <div className="w-28"><label className={lbl}>Overbreak (₦)</label><input className={inp} type="number" min={0} value={d.overstayPenalty ?? 0} onChange={(e) => updateDept(i, 'overstayPenalty', e.target.value)}/></div>
                   {form.departments.length > 1 && <button onClick={() => setForm((p) => ({...p, departments: p.departments.filter((_,idx) => idx !== i)}))} className="text-red-500 self-end pb-2.5"><X size={15}/></button>}
                 </div>
               </div>
@@ -273,14 +277,23 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
     breakMinutes: o.breakMinutes ?? 60,
     graceMinutes: o.graceMinutes ?? 30, lateAfterMinutes: o.lateAfterMinutes ?? 90,
     gracePenalty: o.gracePenalty ?? 0, latePenalty: o.latePenalty ?? 0, completelyLatePenalty: o.completelyLatePenalty ?? 0, absentPenalty: o.absentPenalty ?? 0,
+    overstayPenalty: o.overstayPenalty ?? 0,
     breakStart: o.breakStart ?? '13:00', breakEnd: o.breakEnd ?? '14:00',
     weeklySchedule: o.weeklySchedule ?? weeklySchedule('08:00', '17:00'),
+  })));
+  const [departments, setDepartments] = useState<any[]>(() => (org.departments ?? []).map((d: any) => ({
+    id: d.id,
+    name: d.name ?? '',
+    breakStart: d.breakPolicy?.breakStart ?? '13:00',
+    breakEnd: d.breakPolicy?.breakEnd ?? '14:00',
+    overstayPenalty: d.breakPolicy?.overstayPenalty ?? org.offices?.[0]?.overstayPenalty ?? 0,
   })));
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
   const inp = 'w-full border border-[var(--input-border)] bg-[var(--input-bg)] text-[var(--text-main)] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400';
   const lbl = 'block text-xs font-semibold text-[var(--text-muted)] mb-1.5';
   const updOffice = (i: number, k: string, v: any) => setOffices((p) => { const a = [...p]; a[i] = { ...a[i], [k]: v }; return a; });
+  const updDept = (i: number, k: string, v: any) => setDepartments((p) => { const a = [...p]; a[i] = { ...a[i], [k]: v }; return a; });
 
   const save = async () => {
     if (!name.trim()) { setError('Organization name is required.'); return; }
@@ -296,6 +309,7 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
         hasStudents,
         timezone,
         offices,
+        departments,
       });
       onSaved(); onClose();
     } catch (err: any) { setError(err?.message ?? 'Failed to save'); }
@@ -364,6 +378,7 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
                 <div><label className={lbl}>Late penalty (₦)</label><input className={inp} type="number" min={0} value={o.latePenalty} onChange={(e) => updOffice(i,'latePenalty',e.target.value)}/></div>
                 <div><label className={lbl}>Completely late penalty (₦)</label><input className={inp} type="number" min={0} value={o.completelyLatePenalty} onChange={(e) => updOffice(i,'completelyLatePenalty',e.target.value)}/></div>
                 <div><label className={lbl}>Unauthorized absence penalty (₦)</label><input className={inp} type="number" min={0} value={o.absentPenalty} onChange={(e) => updOffice(i,'absentPenalty',e.target.value)}/></div>
+                <div><label className={lbl}>Overstayed break penalty (₦)</label><input className={inp} type="number" min={0} value={o.overstayPenalty ?? 0} onChange={(e) => updOffice(i,'overstayPenalty',e.target.value)}/></div>
                 <div><label className={lbl}>Break Start</label><input className={inp} type="time" value={o.breakStart} onChange={(e) => updOffice(i,'breakStart',e.target.value)}/></div>
                 <div><label className={lbl}>Break End</label><input className={inp} type="time" value={o.breakEnd} onChange={(e) => updOffice(i,'breakEnd',e.target.value)}/></div>
               </div>
@@ -371,6 +386,25 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
               <div><label className={lbl}>Office Public IP — iOS / Web</label><input className={inp} value={o.publicIp} onChange={(e) => updOffice(i,'publicIp',e.target.value)} placeholder="e.g. 102.89.34.12"/></div>
             </div>
           ))}
+
+          {departments.length > 0 && (
+            <div className="pt-2">
+              <h3 className="font-bold text-[var(--text-main)] mb-1">Departments & Break Schedules</h3>
+              <p className="text-xs text-[var(--text-muted)] mb-3">Configure break window and overstay penalty per department.</p>
+              <div className="space-y-3">
+                {departments.map((d, i) => (
+                  <div key={d.id || i} className="p-4 bg-[var(--hover-bg)] rounded-xl border border-[var(--border)] space-y-2">
+                    <div className="font-semibold text-xs text-[var(--text-main)]">{d.name}</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div><label className={lbl}>Break Start</label><input className={inp} type="time" value={d.breakStart} onChange={(e) => updDept(i, 'breakStart', e.target.value)}/></div>
+                      <div><label className={lbl}>Break End</label><input className={inp} type="time" value={d.breakEnd} onChange={(e) => updDept(i, 'breakEnd', e.target.value)}/></div>
+                      <div><label className={lbl}>Overbreak penalty (₦)</label><input className={inp} type="number" min={0} value={d.overstayPenalty ?? 0} onChange={(e) => updDept(i, 'overstayPenalty', e.target.value)}/></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex justify-end gap-3 px-6 py-4 border-t border-[var(--border)]">
           <button onClick={onClose} className="px-4 py-2 border border-[var(--border)] text-sm font-semibold rounded-xl hover:bg-[var(--hover-bg)] transition text-[var(--text-main)]">Cancel</button>

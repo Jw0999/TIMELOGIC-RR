@@ -55,6 +55,7 @@ model Office {
   weeklySchedule        Json?
   completelyLatePenalty Int                 @default(0)
   absentPenalty         Int                 @default(0)
+  overstayPenalty       Int                 @default(0)
   sessions              AttendanceSession[]
   organization          Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
   securitySettings      SecuritySettings?

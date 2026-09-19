@@ -26,6 +26,7 @@ const listOrgs = async (req, res, next) => {
             id: true, name: true, address: true, timezone: true, isActive: true,
             wifiSSID: true, publicIp: true, openTime: true, closeTime: true, weeklySchedule: true, breakMinutes: true,
             graceMinutes: true, lateAfterMinutes: true, gracePenalty: true, latePenalty: true, completelyLatePenalty: true, absentPenalty: true,
+            overstayPenalty: true,
             autoSessionMinutes: true, breakStart: true, breakEnd: true,
             securitySettings: { select: { id: true } },
             _count: { select: { sessions: true } },
@@ -116,6 +117,7 @@ const createOrg = async (req, res, next) => {
               latePenalty:        Number.isFinite(+o.latePenalty)        ? parseInt(o.latePenalty, 10)        : 0,
               completelyLatePenalty: Number.isFinite(+o.completelyLatePenalty) ? parseInt(o.completelyLatePenalty, 10) : 0,
               absentPenalty: Number.isFinite(+o.absentPenalty) ? parseInt(o.absentPenalty, 10) : 0,
+              overstayPenalty: Number.isFinite(+o.overstayPenalty) ? parseInt(o.overstayPenalty, 10) : 0,
               autoSessionMinutes: Number.isFinite(+o.autoSessionMinutes) ? parseInt(o.autoSessionMinutes, 10) : 60,
               weeklySchedule: o.weeklySchedule || defaultWeeklySchedule(),
               breakStart: o.breakStart || null,
@@ -127,7 +129,7 @@ const createOrg = async (req, res, next) => {
 
       // Ensure at least one office
       const defaultOffice = createdOffices[0] ?? await tx.office.create({
-        data: { id: uuidv4(), orgId: org.id, name: 'Main Office', address: '', timezone, wifiSSID: null, openTime: '00:00', closeTime: '00:00', weeklySchedule: defaultWeeklySchedule(), breakMinutes: 60 },
+        data: { id: uuidv4(), orgId: org.id, name: 'Main Office', address: '', timezone, wifiSSID: null, openTime: '00:00', closeTime: '00:00', weeklySchedule: defaultWeeklySchedule(), breakMinutes: 60, overstayPenalty: 0 },
       });
 
       // 3. Default security settings for the first office
@@ -163,10 +165,13 @@ const createOrg = async (req, res, next) => {
         select: { id: true, firstName: true, lastName: true, email: true, role: true },
       });
 
-      // 6. Break policy for each department (each carries its OWN break window)
+      // 6. Break policy for each department (each carries its OWN break window & overstay penalty)
       for (let i = 0; i < createdDepts.length; i++) {
         const dept = createdDepts[i];
         const src  = departments[i] || {};
+        const overstayPen = Number.isFinite(+src.overstayPenalty)
+          ? parseInt(src.overstayPenalty, 10)
+          : (Number.isFinite(+defaultOffice.overstayPenalty) ? parseInt(defaultOffice.overstayPenalty, 10) : 50);
         await tx.breakPolicy.create({
           data: {
             id: uuidv4(),
@@ -178,6 +183,7 @@ const createOrg = async (req, res, next) => {
             totalDailyBreakLimit: defaultOffice.breakMinutes ?? 90,
             breakStart: (src.breakStart && src.breakStart.trim()) ? src.breakStart.trim() : null,
             breakEnd:   (src.breakEnd && src.breakEnd.trim())   ? src.breakEnd.trim()   : null,
+            overstayPenalty: overstayPen,
             appliesTo: ['MORNING', 'AFTERNOON', 'FLEXIBLE'],
           },
         });
@@ -195,7 +201,7 @@ const updateOrg = async (req, res, next) => {
   try {
     const { id } = req.params;
     const {
-      name, industry, offices = [],
+      name, industry, offices = [], departments = [],
       allowDeviceCheckIn, allowManualCheckIn, hasStudents, openingTime, timezone,
     } = req.body;
 
@@ -278,6 +284,7 @@ const updateOrg = async (req, res, next) => {
         if (o.latePenalty !== undefined)        data.latePenalty        = parseInt(o.latePenalty, 10) || 0;
         if (o.completelyLatePenalty !== undefined) data.completelyLatePenalty = parseInt(o.completelyLatePenalty, 10) || 0;
         if (o.absentPenalty !== undefined) data.absentPenalty = parseInt(o.absentPenalty, 10) || 0;
+        if (o.overstayPenalty !== undefined) data.overstayPenalty = parseInt(o.overstayPenalty, 10) || 0;
         if (o.autoSessionMinutes !== undefined) data.autoSessionMinutes = parseInt(o.autoSessionMinutes, 10) || 60;
         if (o.breakStart !== undefined) data.breakStart = o.breakStart || null;
         if (o.breakEnd   !== undefined) data.breakEnd   = o.breakEnd   || null;
@@ -287,12 +294,43 @@ const updateOrg = async (req, res, next) => {
         }
         await tx.office.update({ where: { id: ownedOffice.id }, data });
 
-        // Keep department break limits in sync with the office break allowance
-        if (o.breakMinutes !== undefined) {
+        // Keep department break limits and overstay penalties in sync with the office
+        const bpData = {};
+        if (o.breakMinutes !== undefined) bpData.totalDailyBreakLimit = data.breakMinutes;
+        if (o.overstayPenalty !== undefined) bpData.overstayPenalty = data.overstayPenalty;
+        if (Object.keys(bpData).length > 0) {
           await tx.breakPolicy.updateMany({
             where: { department: { orgId: id } },
-            data: { totalDailyBreakLimit: data.breakMinutes },
+            data: bpData,
           });
+        }
+      }
+
+      // Update individual department break settings and penalties if provided
+      if (Array.isArray(departments) && departments.length > 0) {
+        for (const d of departments) {
+          if (!d.id) continue;
+          const dept = await tx.department.findFirst({ where: { id: d.id, orgId: id } });
+          if (!dept) continue;
+          if (d.name) await tx.department.update({ where: { id: d.id }, data: { name: d.name } });
+          const bpData = {};
+          if (d.breakStart !== undefined) bpData.breakStart = d.breakStart || null;
+          if (d.breakEnd !== undefined) bpData.breakEnd = d.breakEnd || null;
+          if (d.overstayPenalty !== undefined) bpData.overstayPenalty = parseInt(d.overstayPenalty, 10) || 0;
+          if (Object.keys(bpData).length > 0) {
+            await tx.breakPolicy.upsert({
+              where: { departmentId: d.id },
+              update: bpData,
+              create: {
+                id: uuidv4(),
+                departmentId: d.id,
+                policyName: `${d.name || dept.name} Break Policy`,
+                breakStart: d.breakStart || '13:00',
+                breakEnd: d.breakEnd || '14:00',
+                overstayPenalty: bpData.overstayPenalty ?? 0,
+              },
+            });
+          }
         }
       }
 
