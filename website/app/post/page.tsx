@@ -128,78 +128,67 @@ export default function PostPage() {
   ];
 
   return (
-    <div className="min-h-screen w-full bg-[#08090d] text-white flex flex-col justify-between">
+    <div className="min-h-screen w-full bg-white text-slate-900 flex flex-col justify-between">
       {/* Header */}
       <Header />
 
-      {/* Hero Header */}
-      <section className="pt-16 sm:pt-20 pb-16 border-b border-white/[0.08] bg-[#0b0d13]">
+      {/* ── SECTION 1: HERO HEADER (WHITE BG) ── */}
+      <section className="pt-16 sm:pt-20 pb-16 bg-white text-slate-900 border-b border-slate-200">
         <div className="max-w-4xl mx-auto px-6 sm:px-8 text-center space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-white/[0.05] border border-white/10 text-xs font-medium text-slate-300">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-xs font-semibold text-blue-700">
             Product Walkthrough & Tour
           </div>
 
-          <h1 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight">
+          <h1 className="text-3xl sm:text-5xl font-extrabold text-slate-950 tracking-tight leading-tight">
             Inside TimeLogic: All 8 Production System Screens
           </h1>
 
-          <p className="text-slate-400 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
+          <p className="text-slate-600 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
             Explore authentic captures of the TimeLogic platform. Review the user interfaces, administrative tools, and automated engines powering our enterprise attendance infrastructure.
           </p>
         </div>
       </section>
 
-      {/* Screens Showcase */}
-      <section className="py-16 sm:py-24">
-        <div className="max-w-6xl mx-auto px-6 sm:px-8 space-y-24">
-          {screens.map((screen, idx) => (
+      {/* ── SECTION 2: SCREENS 01 & 02 (BLUE BG) ── */}
+      <section className="py-20 sm:py-24 bg-[#0a1638] text-white border-y border-blue-900/60">
+        <div className="max-w-6xl mx-auto px-6 sm:px-8 space-y-20">
+          {screens.slice(0, 2).map((screen, idx) => (
             <article
               key={screen.id}
-              className="p-8 sm:p-10 rounded-xl bg-[#0d0f17] border border-white/[0.08] space-y-8"
+              className="p-8 sm:p-10 rounded-2xl bg-[#0f1f4e] border border-blue-400/20 shadow-xl space-y-8"
             >
-              {/* Meta & Heading */}
               <div className="space-y-3">
-                <div className="flex items-center gap-3 text-xs text-slate-400">
-                  <span className="font-mono font-bold text-blue-400">
-                    SCREEN 0{idx + 1}
-                  </span>
+                <div className="flex items-center gap-3 text-xs text-sky-400">
+                  <span className="font-mono font-bold">SCREEN 0{idx + 1}</span>
                   <span>•</span>
-                  <span className="font-semibold text-slate-300">{screen.module}</span>
+                  <span className="font-semibold text-blue-200">{screen.module}</span>
                 </div>
 
                 <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
                   {screen.heading}
                 </h2>
 
-                <p className="text-sm text-slate-300 leading-relaxed max-w-3xl">
+                <p className="text-sm text-blue-100/80 leading-relaxed max-w-3xl">
                   {screen.summary}
                 </p>
               </div>
 
-              {/* Screenshot Display in Frame */}
-              <div className="rounded-xl border border-white/[0.12] bg-[#0c0e14] shadow-xl overflow-hidden">
-                <div className="h-8 px-4 bg-[#11141c] border-b border-white/[0.08] flex items-center justify-between text-xs text-slate-500">
-                  <span className="font-mono text-[11px] text-slate-400">
-                    timelogic.app / {screen.id}
-                  </span>
+              <div className="rounded-xl border border-blue-400/30 bg-slate-900 shadow-2xl overflow-hidden ring-1 ring-white/10">
+                <div className="h-8 px-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between text-xs text-slate-400">
+                  <span className="font-mono text-[11px]">timelogic.app / {screen.id}</span>
                   <span className="text-[11px] text-emerald-400 font-medium">Production Capture</span>
                 </div>
-                <img
-                  src={screen.image}
-                  alt={screen.heading}
-                  className="w-full h-auto object-cover"
-                />
+                <img src={screen.image} alt={screen.heading} className="w-full h-auto object-cover" />
               </div>
 
-              {/* Capabilities Grid */}
-              <div className="pt-4 border-t border-white/[0.08]">
-                <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">
+              <div className="pt-4 border-t border-blue-400/20">
+                <div className="text-xs font-bold text-blue-200 uppercase tracking-wider mb-4">
                   Operational Capabilities:
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {screen.keyCapabilities.map((cap, cIdx) => (
-                    <div key={cIdx} className="flex items-start gap-2.5 text-xs text-slate-300">
-                      <CheckCircle2 size={14} className="text-blue-400 flex-shrink-0 mt-0.5" />
+                    <div key={cIdx} className="flex items-start gap-2.5 text-xs text-blue-100/90">
+                      <CheckCircle2 size={15} className="text-sky-400 flex-shrink-0 mt-0.5" />
                       <span>{cap}</span>
                     </div>
                   ))}
@@ -210,13 +199,163 @@ export default function PostPage() {
         </div>
       </section>
 
-      {/* Bottom CTA */}
-      <section className="py-20 border-t border-white/[0.08] bg-[#0b0d13]">
+      {/* ── SECTION 3: SCREENS 03 & 04 (WHITE BG) ── */}
+      <section className="py-20 sm:py-24 bg-white text-slate-900 border-b border-slate-200">
+        <div className="max-w-6xl mx-auto px-6 sm:px-8 space-y-20">
+          {screens.slice(2, 4).map((screen, idx) => (
+            <article
+              key={screen.id}
+              className="p-8 sm:p-10 rounded-2xl bg-slate-50 border border-slate-200/80 shadow-md space-y-8"
+            >
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 text-xs text-blue-600">
+                  <span className="font-mono font-bold">SCREEN 0{idx + 3}</span>
+                  <span>•</span>
+                  <span className="font-semibold text-slate-600">{screen.module}</span>
+                </div>
+
+                <h2 className="text-2xl sm:text-3xl font-bold text-slate-950 tracking-tight">
+                  {screen.heading}
+                </h2>
+
+                <p className="text-sm text-slate-600 leading-relaxed max-w-3xl">
+                  {screen.summary}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-slate-300 bg-slate-900 shadow-xl overflow-hidden">
+                <div className="h-8 px-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between text-xs text-slate-400">
+                  <span className="font-mono text-[11px]">timelogic.app / {screen.id}</span>
+                  <span className="text-[11px] text-emerald-400 font-medium">Production Capture</span>
+                </div>
+                <img src={screen.image} alt={screen.heading} className="w-full h-auto object-cover" />
+              </div>
+
+              <div className="pt-4 border-t border-slate-200">
+                <div className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-4">
+                  Operational Capabilities:
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {screen.keyCapabilities.map((cap, cIdx) => (
+                    <div key={cIdx} className="flex items-start gap-2.5 text-xs text-slate-700">
+                      <CheckCircle2 size={15} className="text-blue-600 flex-shrink-0 mt-0.5" />
+                      <span>{cap}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {/* ── SECTION 4: SCREENS 05 & 06 (BLUE BG) ── */}
+      <section className="py-20 sm:py-24 bg-[#0a1638] text-white border-y border-blue-900/60">
+        <div className="max-w-6xl mx-auto px-6 sm:px-8 space-y-20">
+          {screens.slice(4, 6).map((screen, idx) => (
+            <article
+              key={screen.id}
+              className="p-8 sm:p-10 rounded-2xl bg-[#0f1f4e] border border-blue-400/20 shadow-xl space-y-8"
+            >
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 text-xs text-sky-400">
+                  <span className="font-mono font-bold">SCREEN 0{idx + 5}</span>
+                  <span>•</span>
+                  <span className="font-semibold text-blue-200">{screen.module}</span>
+                </div>
+
+                <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+                  {screen.heading}
+                </h2>
+
+                <p className="text-sm text-blue-100/80 leading-relaxed max-w-3xl">
+                  {screen.summary}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-blue-400/30 bg-slate-900 shadow-2xl overflow-hidden ring-1 ring-white/10">
+                <div className="h-8 px-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between text-xs text-slate-400">
+                  <span className="font-mono text-[11px]">timelogic.app / {screen.id}</span>
+                  <span className="text-[11px] text-emerald-400 font-medium">Production Capture</span>
+                </div>
+                <img src={screen.image} alt={screen.heading} className="w-full h-auto object-cover" />
+              </div>
+
+              <div className="pt-4 border-t border-blue-400/20">
+                <div className="text-xs font-bold text-blue-200 uppercase tracking-wider mb-4">
+                  Operational Capabilities:
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {screen.keyCapabilities.map((cap, cIdx) => (
+                    <div key={cIdx} className="flex items-start gap-2.5 text-xs text-blue-100/90">
+                      <CheckCircle2 size={15} className="text-sky-400 flex-shrink-0 mt-0.5" />
+                      <span>{cap}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {/* ── SECTION 5: SCREENS 07 & 08 (WHITE BG) ── */}
+      <section className="py-20 sm:py-24 bg-white text-slate-900 border-b border-slate-200">
+        <div className="max-w-6xl mx-auto px-6 sm:px-8 space-y-20">
+          {screens.slice(6, 8).map((screen, idx) => (
+            <article
+              key={screen.id}
+              className="p-8 sm:p-10 rounded-2xl bg-slate-50 border border-slate-200/80 shadow-md space-y-8"
+            >
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 text-xs text-blue-600">
+                  <span className="font-mono font-bold">SCREEN 0{idx + 7}</span>
+                  <span>•</span>
+                  <span className="font-semibold text-slate-600">{screen.module}</span>
+                </div>
+
+                <h2 className="text-2xl sm:text-3xl font-bold text-slate-950 tracking-tight">
+                  {screen.heading}
+                </h2>
+
+                <p className="text-sm text-slate-600 leading-relaxed max-w-3xl">
+                  {screen.summary}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-slate-300 bg-slate-900 shadow-xl overflow-hidden">
+                <div className="h-8 px-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between text-xs text-slate-400">
+                  <span className="font-mono text-[11px]">timelogic.app / {screen.id}</span>
+                  <span className="text-[11px] text-emerald-400 font-medium">Production Capture</span>
+                </div>
+                <img src={screen.image} alt={screen.heading} className="w-full h-auto object-cover" />
+              </div>
+
+              <div className="pt-4 border-t border-slate-200">
+                <div className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-4">
+                  Operational Capabilities:
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {screen.keyCapabilities.map((cap, cIdx) => (
+                    <div key={cIdx} className="flex items-start gap-2.5 text-xs text-slate-700">
+                      <CheckCircle2 size={15} className="text-blue-600 flex-shrink-0 mt-0.5" />
+                      <span>{cap}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {/* ── SECTION 6: BOTTOM CTA (BLUE BG) ── */}
+      <section className="py-22 bg-[#091534] text-white">
         <div className="max-w-4xl mx-auto px-6 sm:px-8 text-center space-y-6">
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-white">
+          <h2 className="text-2xl sm:text-4xl font-extrabold text-white">
             Schedule a Live On-Premise Demonstration
           </h2>
-          <p className="text-slate-400 text-sm sm:text-base max-w-lg mx-auto">
+          <p className="text-blue-100/80 text-base max-w-lg mx-auto leading-relaxed">
             Speak directly with our technical deployment team to see these screens functioning on your company network.
           </p>
           <div className="pt-2 flex items-center justify-center gap-4 flex-wrap">
@@ -224,7 +363,8 @@ export default function PostPage() {
               variant="primary"
               size="lg"
               href="tel:09036627043"
-              icon={<PhoneCall size={15} />}
+              icon={<PhoneCall size={16} />}
+              className="shadow-md hover:shadow-lg"
             >
               Call Deployment Lead: 09036627043
             </Button>

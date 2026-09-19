@@ -2,7 +2,6 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/Button";
 import {
-  TrendingUp,
   Mail,
   PhoneCall,
   Lock,
@@ -55,22 +54,22 @@ export default function InvestorsPage() {
   ];
 
   return (
-    <div className="min-h-screen w-full bg-[#08090d] text-white flex flex-col justify-between">
+    <div className="min-h-screen w-full bg-white text-slate-900 flex flex-col justify-between">
       {/* Header */}
       <Header />
 
-      {/* Hero Header */}
-      <section className="pt-16 sm:pt-20 pb-16 border-b border-white/[0.08] bg-[#0b0d13]">
+      {/* ── SECTION 1: HERO HEADER (WHITE BG) ── */}
+      <section className="pt-16 sm:pt-20 pb-16 bg-white text-slate-900 border-b border-slate-200">
         <div className="max-w-4xl mx-auto px-6 sm:px-8 text-center space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-white/[0.05] border border-white/10 text-xs font-medium text-slate-300">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-xs font-semibold text-blue-700">
             Capital & Strategic Partnerships
           </div>
 
-          <h1 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight">
+          <h1 className="text-3xl sm:text-5xl font-extrabold text-slate-950 tracking-tight leading-tight">
             Invest in TimeLogic
           </h1>
 
-          <p className="text-slate-400 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
+          <p className="text-slate-600 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
             Building the foundational infrastructure for verified workplace presence and tamper-proof payroll data across emerging and established commercial markets.
           </p>
 
@@ -79,15 +78,17 @@ export default function InvestorsPage() {
               variant="primary"
               size="md"
               href="mailto:invest@timelogic.app?subject=Investment%20Inquiry%20-%20TimeLogic"
-              icon={<Mail size={14} />}
+              icon={<Mail size={15} />}
+              className="shadow-md hover:shadow-lg"
             >
               Email Us: invest@timelogic.app
             </Button>
             <Button
-              variant="secondary"
+              variant="outline"
               size="md"
               href="tel:09036627043"
-              icon={<PhoneCall size={14} />}
+              icon={<PhoneCall size={15} />}
+              className="text-slate-800 border-slate-300 hover:bg-slate-100 hover:text-slate-950"
             >
               Direct Line: 09036627043
             </Button>
@@ -95,20 +96,20 @@ export default function InvestorsPage() {
         </div>
       </section>
 
-      {/* Investment Quotes */}
-      <section className="py-16 border-b border-white/[0.08]">
+      {/* ── SECTION 2: INVESTMENT QUOTES (BLUE BG) ── */}
+      <section className="py-20 sm:py-24 bg-[#0a1638] text-white border-y border-blue-900/60">
         <div className="max-w-6xl mx-auto px-6 sm:px-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {investmentQuotes.map((item, idx) => (
               <div
                 key={idx}
-                className="p-7 rounded-xl bg-[#0f1118] border border-white/[0.08] flex flex-col justify-between space-y-5"
+                className="p-8 rounded-2xl bg-[#0f1f4e] border border-blue-400/20 shadow-lg flex flex-col justify-between space-y-5"
               >
-                <Quote className="text-blue-400/50 w-6 h-6" />
-                <p className="text-sm text-slate-300 italic leading-relaxed">
+                <Quote className="text-sky-400/70 w-7 h-7" />
+                <p className="text-sm text-blue-100/90 italic leading-relaxed">
                   "{item.quote}"
                 </p>
-                <div className="text-xs font-semibold text-slate-400 border-t border-white/[0.08] pt-3">
+                <div className="text-xs font-semibold text-sky-400 border-t border-blue-400/20 pt-4">
                   — {item.attribution}
                 </div>
               </div>
@@ -117,66 +118,66 @@ export default function InvestorsPage() {
         </div>
       </section>
 
-      {/* The Core Investment Thesis */}
-      <section className="py-20 sm:py-24">
+      {/* ── SECTION 3: CORE THESIS & METRICS (WHITE BG) ── */}
+      <section className="py-20 sm:py-28 bg-white text-slate-900 border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-6 sm:px-8 space-y-16">
           <div className="max-w-3xl space-y-3">
-            <div className="text-xs font-semibold uppercase tracking-wider text-blue-400">
+            <div className="text-xs font-bold uppercase tracking-wider text-blue-600">
               The Investment Thesis
             </div>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-950 tracking-tight">
               Why TimeLogic Represents A High-Conviction Market Opportunity
             </h2>
-            <p className="text-slate-400 text-sm sm:text-base leading-relaxed">
-              Attendance management in commercial enterprises is broken. TimeLogic captures this high-margin vertical through three structural moats.
+            <p className="text-slate-600 text-base leading-relaxed">
+              Attendance management in commercial enterprises is broken. TimeLogic captures this high-margin vertical through structural moats.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="p-8 rounded-xl bg-[#0e1118] border border-white/[0.08] space-y-3">
-              <div className="w-9 h-9 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
-                <Lock size={18} />
+            <div className="p-8 rounded-2xl bg-slate-50 border border-slate-200 shadow-xs space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-100/80 text-blue-700 flex items-center justify-center font-bold">
+                <Lock size={20} />
               </div>
-              <h3 className="text-lg font-bold text-white">
+              <h3 className="text-lg font-bold text-slate-950">
                 Defensible Hardware-Bound Verification Moat
               </h3>
-              <p className="text-sm text-slate-400 leading-relaxed">
+              <p className="text-sm text-slate-600 leading-relaxed">
                 Mobile-only attendance apps experience severe customer churn because workers easily bypass GPS restrictions with mock location tools. TimeLogic binds check-in to physical on-premise kiosks, server-locked clocks, and facial biometrics. This creates immutable data integrity that organizations rely on daily.
               </p>
             </div>
 
-            <div className="p-8 rounded-xl bg-[#0e1118] border border-white/[0.08] space-y-3">
-              <div className="w-9 h-9 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
-                <Globe2 size={18} />
+            <div className="p-8 rounded-2xl bg-slate-50 border border-slate-200 shadow-xs space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-100/80 text-blue-700 flex items-center justify-center font-bold">
+                <Globe2 size={20} />
               </div>
-              <h3 className="text-lg font-bold text-white">
+              <h3 className="text-lg font-bold text-slate-950">
                 Massive Emerging & Greenfield Market Opportunity
               </h3>
-              <p className="text-sm text-slate-400 leading-relaxed">
+              <p className="text-sm text-slate-600 leading-relaxed">
                 Across sub-Saharan Africa, Latin America, and Southeast Asia, millions of growing businesses, hospitals, schools, and factories still record attendance with paper books. TimeLogic offers frictionless 24-hour setup using existing office hardware, unlocking vast greenfield ARR.
               </p>
             </div>
 
-            <div className="p-8 rounded-xl bg-[#0e1118] border border-white/[0.08] space-y-3">
-              <div className="w-9 h-9 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
-                <DollarSign size={18} />
+            <div className="p-8 rounded-2xl bg-slate-50 border border-slate-200 shadow-xs space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-100/80 text-blue-700 flex items-center justify-center font-bold">
+                <DollarSign size={20} />
               </div>
-              <h3 className="text-lg font-bold text-white">
+              <h3 className="text-lg font-bold text-slate-950">
                 High-Margin Predictable B2B SaaS Economics
               </h3>
-              <p className="text-sm text-slate-400 leading-relaxed">
+              <p className="text-sm text-slate-600 leading-relaxed">
                 Customers subscribe on transparent monthly terms per employee headcount. As businesses hire additional workers or open new branch locations, net retention naturally expands with near-zero marginal cost to serve.
               </p>
             </div>
 
-            <div className="p-8 rounded-xl bg-[#0e1118] border border-white/[0.08] space-y-3">
-              <div className="w-9 h-9 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
-                <ShieldCheck size={18} />
+            <div className="p-8 rounded-2xl bg-slate-50 border border-slate-200 shadow-xs space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-100/80 text-blue-700 flex items-center justify-center font-bold">
+                <ShieldCheck size={20} />
               </div>
-              <h3 className="text-lg font-bold text-white">
+              <h3 className="text-lg font-bold text-slate-950">
                 Immediate Operational ROI For Clients
               </h3>
-              <p className="text-sm text-slate-400 leading-relaxed">
+              <p className="text-sm text-slate-600 leading-relaxed">
                 By eliminating buddy-punching, ghost workers, and overstayed breaks, TimeLogic routinely recovers thousands of dollars in payroll leakage in the first 30 days of deployment. The software pays for itself immediately, insulating it from budget cuts.
               </p>
             </div>
@@ -185,14 +186,14 @@ export default function InvestorsPage() {
           {/* Key Metrics Grid */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 pt-4">
             {marketMetrics.map((m) => (
-              <div key={m.label} className="p-5 rounded-xl bg-[#0b0d13] border border-white/[0.08]">
-                <div className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+              <div key={m.label} className="p-6 rounded-2xl bg-slate-50 border border-slate-200">
+                <div className="text-3xl font-black text-slate-950 tracking-tight">
                   {m.value}
                 </div>
-                <div className="text-xs font-semibold text-blue-400 mt-1">
+                <div className="text-xs font-bold text-blue-600 mt-1">
                   {m.label}
                 </div>
-                <div className="text-xs text-slate-400 mt-1.5 leading-relaxed">
+                <div className="text-xs text-slate-600 mt-2 leading-relaxed">
                   {m.description}
                 </div>
               </div>
@@ -201,13 +202,13 @@ export default function InvestorsPage() {
         </div>
       </section>
 
-      {/* Investor Inquiry Box */}
-      <section className="py-20 border-t border-white/[0.08] bg-[#0b0d13]">
+      {/* ── SECTION 4: INQUIRY CTA BOX (BLUE BG) ── */}
+      <section className="py-22 bg-[#0a1638] text-white">
         <div className="max-w-4xl mx-auto px-6 sm:px-8 text-center space-y-6">
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-white">
+          <h2 className="text-2xl sm:text-4xl font-extrabold text-white">
             Request Our Investor Memorandum & Metrics
           </h2>
-          <p className="text-slate-400 text-sm sm:text-base max-w-lg mx-auto">
+          <p className="text-blue-100/80 text-base max-w-lg mx-auto leading-relaxed">
             We welcome conversations with qualified angel investors, venture capital funds, and strategic partners interested in workforce infrastructure.
           </p>
           <div className="pt-2 flex items-center justify-center gap-4 flex-wrap">
@@ -216,19 +217,21 @@ export default function InvestorsPage() {
               size="lg"
               href="mailto:invest@timelogic.app?subject=Investment%20Inquiry%20-%20TimeLogic"
               icon={<Mail size={16} />}
+              className="shadow-md hover:shadow-lg"
             >
               Email Us: invest@timelogic.app
             </Button>
             <Button
-              variant="secondary"
+              variant="outline"
               size="lg"
               href="tel:09036627043"
               icon={<PhoneCall size={16} />}
+              className="text-white border-white/30 hover:bg-white/10"
             >
               Direct Line: 09036627043
             </Button>
           </div>
-          <div className="text-xs text-slate-500">
+          <div className="text-xs text-blue-200/60">
             Confidential deck and financial model available upon request.
           </div>
         </div>

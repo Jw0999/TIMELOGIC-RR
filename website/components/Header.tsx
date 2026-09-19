@@ -29,13 +29,13 @@ export function Header({ onCallClick }: HeaderProps) {
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-white/[0.08] bg-[#08090d]/90 backdrop-blur-md">
+    <header className="sticky top-0 z-50 w-full border-b border-slate-200/80 bg-white/95 backdrop-blur-md shadow-xs transition-colors">
       <div className="max-w-7xl mx-auto px-6 sm:px-8 h-16 flex items-center justify-between">
         {/* Left: Brand Logo + Primary Nav */}
         <div className="flex items-center gap-10">
           <Link href="/" className="flex items-center gap-3 group select-none">
             <Logo size={32} />
-            <Wordmark className="text-lg font-bold tracking-tight text-white" />
+            <Wordmark className="text-lg font-bold tracking-tight text-slate-950" />
           </Link>
 
           {/* Desktop Navigation Links */}
@@ -48,8 +48,8 @@ export function Header({ onCallClick }: HeaderProps) {
                   href={item.href}
                   className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                     isActive
-                      ? "text-white bg-white/[0.06]"
-                      : "text-slate-400 hover:text-white hover:bg-white/[0.03]"
+                      ? "text-blue-600 bg-blue-50 font-semibold"
+                      : "text-slate-600 hover:text-slate-950 hover:bg-slate-100/60"
                   }`}
                 >
                   {item.label}
@@ -72,21 +72,27 @@ export function Header({ onCallClick }: HeaderProps) {
           </Button>
         </div>
 
-        {/* Mobile Hamburger Toggle */}
+        {/* Mobile Hamburger Toggle Button */}
         <div className="flex sm:hidden">
           <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 text-slate-300 hover:text-white rounded-lg focus:outline-none"
-            aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+            type="button"
+            onClick={() => setMobileMenuOpen((prev) => !prev)}
+            className="p-2 text-slate-700 hover:text-slate-950 hover:bg-slate-100 rounded-lg focus:outline-none transition-colors"
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-navigation-menu"
+            aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
           >
-            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
         </div>
       </div>
 
       {/* Mobile Dropdown Menu */}
       {mobileMenuOpen && (
-        <div className="border-b border-white/[0.08] bg-[#08090d] px-6 py-5 sm:hidden space-y-4 animate-in fade-in slide-in-from-top-1">
+        <div
+          id="mobile-navigation-menu"
+          className="border-b border-slate-200 bg-white px-6 py-5 sm:hidden space-y-4 shadow-xl relative z-50 animate-in fade-in duration-150"
+        >
           <nav className="flex flex-col gap-1">
             {navLinks.map((item) => {
               const isActive = pathname === item.href;
@@ -94,10 +100,11 @@ export function Header({ onCallClick }: HeaderProps) {
                 <Link
                   key={item.label}
                   href={item.href}
-                  className={`px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`px-3 py-2.5 rounded-lg text-base font-medium transition-colors ${
                     isActive
-                      ? "text-white bg-white/[0.08]"
-                      : "text-slate-300 hover:text-white hover:bg-white/[0.04]"
+                      ? "text-blue-600 bg-blue-50 font-semibold"
+                      : "text-slate-700 hover:text-slate-950 hover:bg-slate-100"
                   }`}
                 >
                   {item.label}
@@ -106,15 +113,20 @@ export function Header({ onCallClick }: HeaderProps) {
             })}
           </nav>
 
-          <div className="pt-4 border-t border-white/[0.08] flex flex-col gap-3">
-            <div className="text-xs text-slate-400">Direct Deployment Line:</div>
+          <div className="pt-4 border-t border-slate-200 flex flex-col gap-3">
+            <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Direct Deployment Line:
+            </div>
             <Button
               variant="primary"
               size="md"
               href="tel:09036627043"
-              onClick={onCallClick}
-              icon={<PhoneCall size={14} />}
-              className="w-full"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                if (onCallClick) onCallClick();
+              }}
+              icon={<PhoneCall size={15} />}
+              className="w-full justify-center py-3 text-base shadow-sm"
             >
               Call 09036627043
             </Button>

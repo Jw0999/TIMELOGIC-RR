@@ -1,11 +1,11 @@
 import React from "react";
 import Link from "next/link";
-import { PhoneCall, Mail, MapPin, ArrowUpRight } from "lucide-react";
+import { PhoneCall, Mail, MapPin } from "lucide-react";
 import { Logo, Wordmark } from "./ui/Logo";
 
 export function Footer() {
   return (
-    <footer className="w-full border-t border-white/[0.08] bg-[#07080c] text-slate-400 text-sm">
+    <footer className="w-full border-t border-blue-900/50 bg-[#060e22] text-slate-400 text-sm">
       <div className="max-w-7xl mx-auto px-6 sm:px-8 py-14 sm:py-16">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-10 lg:gap-16">
           {/* Brand Column */}
@@ -14,10 +14,10 @@ export function Footer() {
               <Logo size={32} />
               <Wordmark className="text-lg font-bold text-white tracking-tight" />
             </Link>
-            <p className="text-slate-400 text-sm leading-relaxed max-w-sm">
+            <p className="text-blue-100/70 text-sm leading-relaxed max-w-sm">
               Cryptographically verified workforce attendance infrastructure. Built for enterprise teams, factories, clinics, and schools that require uncompromised operational truth.
             </p>
-            <div className="pt-2 flex items-center gap-2 text-xs text-slate-300">
+            <div className="pt-2 flex items-center gap-2 text-xs text-blue-200">
               <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block animate-pulse" />
               <span>TimeLogic Kiosk Cloud Services: All Systems Operational</span>
             </div>
@@ -75,7 +75,7 @@ export function Footer() {
               <li>
                 <a
                   href="tel:09036627043"
-                  className="inline-flex items-center gap-1.5 text-blue-400 hover:text-blue-300 font-medium transition-colors"
+                  className="inline-flex items-center gap-1.5 text-sky-400 hover:text-sky-300 font-medium transition-colors"
                 >
                   <PhoneCall size={13} />
                   <span>09036627043</span>
@@ -99,7 +99,7 @@ export function Footer() {
         </div>
 
         {/* Bottom Bar */}
-        <div className="mt-12 pt-8 border-t border-white/[0.06] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+        <div className="mt-12 pt-8 border-t border-blue-900/30 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <div>
             © {new Date().getFullYear()} TimeLogic Systems Inc. All rights reserved.
           </div>

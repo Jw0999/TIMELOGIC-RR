@@ -92,49 +92,49 @@ export default function PricingPage() {
   ];
 
   return (
-    <div className="min-h-screen w-full bg-[#08090d] text-white flex flex-col justify-between">
+    <div className="min-h-screen w-full bg-white text-slate-900 flex flex-col justify-between">
       {/* Header */}
       <Header />
 
-      {/* Hero Header */}
-      <section className="pt-16 sm:pt-20 pb-16 border-b border-white/[0.08] bg-[#0b0d13]">
+      {/* ── SECTION 1: HEADER & INTRO (WHITE BG) ── */}
+      <section className="pt-16 sm:pt-20 pb-16 bg-white text-slate-900 border-b border-slate-200">
         <div className="max-w-4xl mx-auto px-6 sm:px-8 text-center space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-white/[0.05] border border-white/10 text-xs font-medium text-slate-300">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-xs font-semibold text-blue-700">
             Deployment & Licensing
           </div>
 
-          <h1 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight">
+          <h1 className="text-3xl sm:text-5xl font-extrabold text-slate-950 tracking-tight leading-tight">
             Transparent Monthly Deployment Plans
           </h1>
 
-          <p className="text-slate-400 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
+          <p className="text-slate-600 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
             Predictable monthly billing based on your verified employee headcount. No hidden hardware lock-in or per-check-in surcharges.
           </p>
         </div>
       </section>
 
-      {/* Pricing Cards */}
-      <section className="py-20 sm:py-24">
+      {/* ── SECTION 2: 3 PRICING CARDS (BLUE BG) ── */}
+      <section className="py-20 sm:py-28 bg-[#0a1638] text-white border-y border-blue-900/60">
         <div className="max-w-7xl mx-auto px-6 sm:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
             {plans.map((plan) => (
               <div
                 key={plan.name}
-                className={`rounded-xl p-8 sm:p-9 flex flex-col justify-between transition-colors ${
+                className={`rounded-2xl p-8 sm:p-9 flex flex-col justify-between transition-all ${
                   plan.highlighted
-                    ? "bg-[#10141f] border-2 border-blue-500/70 shadow-xl"
-                    : "bg-[#0d0f17] border border-white/[0.08]"
+                    ? "bg-[#102356] border-2 border-blue-400 shadow-2xl ring-1 ring-blue-300/30"
+                    : "bg-[#0c1b40] border border-blue-400/20 shadow-lg"
                 }`}
               >
                 <div>
                   {/* Header */}
                   <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-bold text-white tracking-tight">
+                    <h3 className="text-xl font-bold text-white tracking-tight">
                       {plan.name}
                     </h3>
                     {plan.highlighted && (
-                      <span className="text-[11px] font-semibold uppercase tracking-wider px-2.5 py-0.5 rounded bg-blue-600 text-white">
-                        Recommended
+                      <span className="text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-blue-500 text-white shadow-xs">
+                        Most Popular
                       </span>
                     )}
                   </div>
@@ -144,19 +144,19 @@ export default function PricingPage() {
                     <div className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
                       {plan.capacity}
                     </div>
-                    <div className="text-xs font-semibold uppercase tracking-wider text-blue-400 mt-1">
+                    <div className="text-xs font-bold uppercase tracking-wider text-sky-400 mt-1">
                       {plan.billing}
                     </div>
                   </div>
 
-                  <p className="text-xs text-slate-400 leading-relaxed mt-3">
+                  <p className="text-xs text-blue-100/75 leading-relaxed mt-3">
                     {plan.description}
                   </p>
 
                   {/* 3 Brief Sentences */}
-                  <div className="my-6 py-5 border-y border-white/[0.08] space-y-2.5">
+                  <div className="my-6 py-5 border-y border-blue-400/20 space-y-2.5">
                     {plan.sentences.map((sent, sIdx) => (
-                      <p key={sIdx} className="text-xs text-slate-300 leading-relaxed">
+                      <p key={sIdx} className="text-xs text-blue-100/90 leading-relaxed font-medium">
                         • {sent}
                       </p>
                     ))}
@@ -164,12 +164,12 @@ export default function PricingPage() {
 
                   {/* Features */}
                   <div className="space-y-3 mb-8">
-                    <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    <div className="text-xs font-bold text-blue-200 uppercase tracking-wider">
                       Included Capabilities:
                     </div>
                     {plan.features.map((feat) => (
-                      <div key={feat} className="flex items-start gap-2.5 text-xs text-slate-300">
-                        <Check size={14} className="text-blue-400 flex-shrink-0 mt-0.5" />
+                      <div key={feat} className="flex items-start gap-2.5 text-xs text-blue-100/90">
+                        <Check size={15} className="text-sky-400 flex-shrink-0 mt-0.5" />
                         <span>{feat}</span>
                       </div>
                     ))}
@@ -177,13 +177,17 @@ export default function PricingPage() {
                 </div>
 
                 {/* Call Button */}
-                <div className="pt-4 border-t border-white/[0.08]">
+                <div className="pt-4 border-t border-blue-400/20">
                   <Button
-                    variant={plan.highlighted ? "primary" : "secondary"}
+                    variant={plan.highlighted ? "primary" : "outline"}
                     size="md"
                     href="tel:09036627043"
                     icon={<PhoneCall size={14} />}
-                    className="w-full"
+                    className={`w-full justify-center ${
+                      plan.highlighted
+                        ? "shadow-md hover:shadow-lg"
+                        : "text-white border-white/30 hover:bg-white/10"
+                    }`}
                   >
                     Call To Deploy: 09036627043
                   </Button>
@@ -194,14 +198,14 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* Operational FAQs */}
-      <section className="py-20 border-t border-white/[0.08] bg-[#0b0d13]">
+      {/* ── SECTION 3: OPERATIONAL FAQS (WHITE BG) ── */}
+      <section className="py-20 sm:py-28 bg-white text-slate-900 border-b border-slate-200">
         <div className="max-w-4xl mx-auto px-6 sm:px-8 space-y-12">
           <div className="text-center space-y-2">
-            <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-950 tracking-tight">
               Frequently Asked Operational Questions
             </h2>
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-slate-600">
               Technical and logistical details regarding TimeLogic on-premise deployments.
             </p>
           </div>
@@ -210,13 +214,13 @@ export default function PricingPage() {
             {faqs.map((faq, fIdx) => (
               <div
                 key={fIdx}
-                className="p-6 rounded-xl bg-[#0f1118] border border-white/[0.08] space-y-2"
+                className="p-7 rounded-2xl bg-slate-50 border border-slate-200/80 shadow-xs space-y-2"
               >
-                <div className="text-base font-bold text-white flex items-center gap-2">
-                  <HelpCircle size={16} className="text-blue-400 flex-shrink-0" />
+                <div className="text-base font-bold text-slate-950 flex items-center gap-2.5">
+                  <HelpCircle size={18} className="text-blue-600 flex-shrink-0" />
                   <span>{faq.q}</span>
                 </div>
-                <p className="text-sm text-slate-400 leading-relaxed pl-6">
+                <p className="text-sm text-slate-600 leading-relaxed pl-7">
                   {faq.a}
                 </p>
               </div>
