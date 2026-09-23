@@ -5,7 +5,7 @@ const { redis, PREFIXES } = require('../config/redis');
 const env = require('../config/env');
 const logger = require('../config/logger');
 const EmployeePolicy = require('./EmployeePolicyService');
-const { dateOnly, evaluateAttendance, attendanceDate, isSunday, openingOccurrence, atZonedTime, officeHoursFor } = require('../utils/attendanceClock');
+const { dateOnly, dateKey, zonedParts, evaluateAttendance, attendanceDate, isSunday, openingOccurrence, atZonedTime, officeHoursFor } = require('../utils/attendanceClock');
 const { getCurrentServerTime } = require('../utils/networkTime');
 const { performFaceVerification, hasValidEnrolledFace } = require('../utils/faceVerify');
 
@@ -882,20 +882,244 @@ class AttendanceService {
   async syncEmployeeAbsencesForSession(sessionId) {
     const session = await prisma.attendanceSession.findUnique({
       where: { id: sessionId },
-      select: { id: true, startTime: true, office: { select: { orgId: true, timezone: true, openTime: true, closeTime: true, weeklySchedule: true, absentPenalty: true } } },
+      select: {
+        id: true,
+        startTime: true,
+        office: {
+          select: {
+            id: true,
+            orgId: true,
+            timezone: true,
+            openTime: true,
+            closeTime: true,
+            weeklySchedule: true,
+            absentPenalty: true,
+          },
+        },
+      },
     });
     if (!session?.office) return;
+    const tz = session.office.timezone || 'Africa/Lagos';
     const date = attendanceDate(session.startTime, { ...session.office, openingReference: session.startTime });
     if (!officeHoursFor(session.startTime, session.office)) return;
-    const employees = await prisma.user.findMany({ where: { orgId: session.office.orgId, role: 'EMPLOYEE', status: 'ACTIVE' }, select: { id: true } });
+
+    const employees = await prisma.user.findMany({
+      where: { orgId: session.office.orgId, role: 'EMPLOYEE', status: 'ACTIVE' },
+      select: { id: true, createdAt: true },
+    });
+
     for (const employee of employees) {
-      const leave = await prisma.leaveRequest.findFirst({ where: { employeeId: employee.id, status: 'APPROVED', startDate: { lte: date }, endDate: { gte: date } }, select: { id: true } });
-      const existing = await prisma.attendanceRecord.findUnique({ where: { employeeId_sessionId_date: { employeeId: employee.id, sessionId, date } }, select: { clockInTime: true } });
-      if (existing?.clockInTime) continue;
+      const empCreatedDate = dateOnly(employee.createdAt || new Date(), tz);
+      if (date < empCreatedDate) continue;
+
+      const leave = await prisma.leaveRequest.findFirst({
+        where: { employeeId: employee.id, status: 'APPROVED', startDate: { lte: date }, endDate: { gte: date } },
+        select: { id: true },
+      });
+
+      const existingClockIn = await prisma.attendanceRecord.findFirst({
+        where: { employeeId: employee.id, date, clockInTime: { not: null } },
+        select: { id: true },
+      });
+      if (existingClockIn) continue;
+
+      const existing = await prisma.attendanceRecord.findUnique({
+        where: { employeeId_sessionId_date: { employeeId: employee.id, sessionId, date } },
+        select: { id: true, reviewNotes: true, penalty: true },
+      });
+      if (existing?.reviewNotes === 'WAIVED_BY_ADMIN') continue;
+
+      const status = leave ? 'ON_LEAVE' : 'ABSENT';
+      const penalty = leave ? 0 : (session.office.absentPenalty || 0);
+
       await prisma.attendanceRecord.upsert({
         where: { employeeId_sessionId_date: { employeeId: employee.id, sessionId, date } },
-        create: { id: uuidv4(), employeeId: employee.id, sessionId, date, status: leave ? 'ON_LEAVE' : 'ABSENT', penalty: leave ? 0 : (session.office.absentPenalty || 0), checkInSource: 'PHONE' },
-        update: { status: leave ? 'ON_LEAVE' : 'ABSENT', penalty: leave ? 0 : (session.office.absentPenalty || 0) },
+        create: { id: uuidv4(), employeeId: employee.id, sessionId, date, status, penalty, checkInSource: 'PHONE' },
+        update: { status, penalty },
+      });
+    }
+  }
+
+  async reconcilePastAbsencesForOrg(orgId, monthStr = null) {
+    if (!orgId || orgId === 'platform-org') return;
+    const now = await getCurrentServerTime();
+    const org = await prisma.organization.findUnique({
+      where: { id: orgId },
+      include: {
+        offices: { where: { isActive: true } },
+      },
+    });
+    if (!org || !org.offices || org.offices.length === 0) return;
+
+    const admin = await prisma.user.findFirst({
+      where: { orgId, role: 'ADMIN', status: 'ACTIVE' },
+      select: { id: true },
+    });
+
+    const activeEmployees = await prisma.user.findMany({
+      where: { orgId, role: 'EMPLOYEE', status: 'ACTIVE' },
+      select: { id: true, firstName: true, lastName: true, createdAt: true },
+    });
+    if (activeEmployees.length === 0) return;
+
+    for (const office of org.offices) {
+      const tz = office.timezone || org.timezone || 'Africa/Lagos';
+      const nowParts = zonedParts(now, tz);
+      const todayDate = dateOnly(now, tz);
+      const todayKey = dateKey(now, tz);
+
+      let startDate;
+      let endDate;
+      if (monthStr && /^(\d{4})-(0[1-9]|1[0-2])$/.test(monthStr)) {
+        const [y, m] = monthStr.split('-').map(Number);
+        startDate = new Date(Date.UTC(y, m - 1, 1));
+        const lastDayOfMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+        const monthEnd = new Date(Date.UTC(y, m - 1, lastDayOfMonth));
+        endDate = monthEnd > todayDate ? todayDate : monthEnd;
+      } else {
+        // Default to current month from 1st of month up to today
+        startDate = new Date(Date.UTC(nowParts.year, nowParts.month - 1, 1));
+        endDate = todayDate;
+      }
+
+      const curr = new Date(startDate.getTime());
+      while (curr <= endDate) {
+        const targetDate = dateOnly(curr, tz);
+        const targetKey = dateKey(curr, tz);
+
+        const hours = officeHoursFor(curr, {
+          ...office,
+          organizationOpeningTime: org.openingTime,
+        });
+
+        if (hours && hours.openTime && hours.closeTime) {
+          let shouldReconcile = true;
+          const closeAt = atZonedTime(curr, hours.closeTime, tz);
+          const openAt = atZonedTime(curr, hours.openTime, tz);
+
+          if (targetKey === todayKey) {
+            // For TODAY: only reconcile if office closing time has passed
+            if (closeAt && now < closeAt) {
+              shouldReconcile = false;
+            }
+          }
+
+          if (shouldReconcile) {
+            let session = await prisma.attendanceSession.findFirst({
+              where: {
+                officeId: office.id,
+                startTime: {
+                  gte: new Date(openAt.getTime() - 90 * 60_000),
+                  lte: new Date(closeAt.getTime() + 90 * 60_000),
+                },
+              },
+              orderBy: { startTime: 'desc' },
+            });
+
+            if (!session) {
+              session = await prisma.attendanceSession.create({
+                data: {
+                  id: uuidv4(),
+                  sessionName: `${office.name} – ${targetKey}`,
+                  officeId: office.id,
+                  officeName: office.name,
+                  orgName: org.name,
+                  startTime: openAt,
+                  endTime: closeAt,
+                  status: 'ENDED',
+                  createdBy: admin?.id ?? null,
+                },
+              });
+            } else if (session.status === 'ACTIVE' || session.status === 'PAUSED') {
+              if (targetKey !== todayKey || now >= closeAt) {
+                await prisma.attendanceSession.update({
+                  where: { id: session.id },
+                  data: { status: 'ENDED' },
+                }).catch(() => {});
+              }
+            }
+
+            for (const emp of activeEmployees) {
+              const empCreatedDate = dateOnly(emp.createdAt || new Date(), tz);
+              if (targetDate < empCreatedDate) continue;
+
+              const clockedIn = await prisma.attendanceRecord.findFirst({
+                where: {
+                  employeeId: emp.id,
+                  date: targetDate,
+                  clockInTime: { not: null },
+                },
+                select: { id: true },
+              });
+              if (clockedIn) continue;
+
+              const leave = await prisma.leaveRequest.findFirst({
+                where: {
+                  employeeId: emp.id,
+                  status: 'APPROVED',
+                  startDate: { lte: targetDate },
+                  endDate: { gte: targetDate },
+                },
+                select: { id: true },
+              });
+
+              const existingRecord = await prisma.attendanceRecord.findUnique({
+                where: {
+                  employeeId_sessionId_date: {
+                    employeeId: emp.id,
+                    sessionId: session.id,
+                    date: targetDate,
+                  },
+                },
+                select: { id: true, reviewNotes: true, penalty: true },
+              });
+
+              if (existingRecord?.reviewNotes === 'WAIVED_BY_ADMIN') {
+                continue;
+              }
+
+              const penaltyAmount = leave ? 0 : (office.absentPenalty || 0);
+              const status = leave ? 'ON_LEAVE' : 'ABSENT';
+
+              await prisma.attendanceRecord.upsert({
+                where: {
+                  employeeId_sessionId_date: {
+                    employeeId: emp.id,
+                    sessionId: session.id,
+                    date: targetDate,
+                  },
+                },
+                create: {
+                  id: uuidv4(),
+                  employeeId: emp.id,
+                  sessionId: session.id,
+                  date: targetDate,
+                  status,
+                  penalty: penaltyAmount,
+                  checkInSource: 'PHONE',
+                },
+                update: {
+                  status,
+                  penalty: penaltyAmount,
+                },
+              });
+            }
+          }
+        }
+
+        curr.setUTCDate(curr.getUTCDate() + 1);
+      }
+    }
+  }
+
+  async reconcileAllPastAbsences(now) {
+    const orgs = await prisma.organization.findMany({
+      where: { id: { not: 'platform-org' } },
+      select: { id: true },
+    });
+    for (const org of orgs) {
+      await this.reconcilePastAbsencesForOrg(org.id).catch((err) => {
+        logger.warn(`reconcileAllPastAbsences error for org ${org.id}:`, err.message);
       });
     }
   }

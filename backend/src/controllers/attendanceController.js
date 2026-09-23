@@ -3,6 +3,7 @@ const { prisma } = require('../config/database');
 const EmployeePolicy = require('../services/EmployeePolicyService');
 const { dateKey } = require('../utils/attendanceClock');
 const { getCurrentServerTime } = require('../utils/networkTime');
+const logger = require('../config/logger');
 
 // GET /api/attendance/current-session
 // Returns the active session for the employee's org (used by mobile check-in button)
@@ -165,6 +166,11 @@ const getHistory = async (req, res, next) => {
     if (req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN') {
       const skip = (page - 1) * limit;
       const targetOrgId = req.headers['x-organization-id'] || req.query.orgId || (req.user.orgId !== 'platform-org' ? req.user.orgId : null);
+      if (targetOrgId && targetOrgId !== 'platform-org') {
+        await AttendanceService.reconcilePastAbsencesForOrg(targetOrgId).catch((err) => {
+          logger.warn(`reconcilePastAbsencesForOrg in getHistory error: ${err.message}`);
+        });
+      }
       const employeeFilter = targetOrgId ? { employee: { orgId: targetOrgId } } : {};
 
       const dateFilter = req.query.endDate
@@ -221,6 +227,11 @@ const getMonthlyPenalties = async (req, res, next) => {
     const end = new Date(Date.UTC(year, monthNumber, 1));
     const daysInMonth = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
     const targetOrgId = await resolveAdminOrgId(req);
+    if (targetOrgId && targetOrgId !== 'platform-org') {
+      await AttendanceService.reconcilePastAbsencesForOrg(targetOrgId, month).catch((err) => {
+        logger.warn(`reconcilePastAbsencesForOrg in getMonthlyPenalties error: ${err.message}`);
+      });
+    }
     const orgWhere = targetOrgId && targetOrgId !== 'platform-org' ? { orgId: targetOrgId } : {};
     const orgFilter = targetOrgId && targetOrgId !== 'platform-org' ? { employee: { orgId: targetOrgId } } : {};
     const manualOrgFilter = targetOrgId && targetOrgId !== 'platform-org' ? { orgId: targetOrgId } : {};
@@ -328,6 +339,11 @@ const getLiveAttendance = async (req, res, next) => {
   try {
     const now = await getCurrentServerTime();
     const targetOrgId = req.headers['x-organization-id'] || req.query.orgId || (req.user.orgId !== 'platform-org' ? req.user.orgId : null);
+    if (targetOrgId && targetOrgId !== 'platform-org') {
+      await AttendanceService.reconcilePastAbsencesForOrg(targetOrgId).catch((err) => {
+        logger.warn(`reconcilePastAbsencesForOrg in getLiveAttendance error: ${err.message}`);
+      });
+    }
     const organization = await prisma.organization.findUnique({ where: { id: targetOrgId || req.user.orgId }, select: { timezone: true } });
     const today = new Date(`${dateKey(now, organization?.timezone || 'Africa/Lagos')}T00:00:00.000Z`);
     const records = await prisma.attendanceRecord.findMany({

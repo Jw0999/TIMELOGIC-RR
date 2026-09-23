@@ -148,6 +148,7 @@ export default function Penalties() {
     let totalOverBreak = 0;
     let totalLate = 0;
     let totalCompletelyLate = 0;
+    let totalAbsent = 0;
     let employeesWithPenalties = 0;
 
     for (const emp of employees) {
@@ -163,6 +164,7 @@ export default function Penalties() {
       totalOverBreak += autoObj?.overBreakPenalty ?? autoObj?.breakPenalty ?? 0;
       totalLate += autoObj?.latenessPenalty ?? 0;
       totalCompletelyLate += autoObj?.completelyLatePenalty ?? 0;
+      totalAbsent += autoObj?.absentPenalty ?? 0;
 
       if (manual + auto > 0) employeesWithPenalties++;
     }
@@ -173,6 +175,7 @@ export default function Penalties() {
       totalOverBreak,
       totalLate,
       totalCompletelyLate,
+      totalAbsent,
       grandTotal: totalManual + totalAuto,
       employeesWithPenalties,
     };
@@ -208,7 +211,7 @@ export default function Penalties() {
   };
 
   const handleWaiveAutoPenalties = async (employee: Employee, autoAmount: number) => {
-    const confirmMsg = `Remove all auto penalties (${money(autoAmount)}) for ${employee.firstName} ${employee.lastName} for ${monthLabel}?\n\nThis will clear Over Break, Lateness, and Completely Late penalties for this month.`;
+    const confirmMsg = `Remove all auto penalties (${money(autoAmount)}) for ${employee.firstName} ${employee.lastName} for ${monthLabel}?\n\nThis will clear Over Break, Lateness, Completely Late, and Absence penalties for this month.`;
     if (!window.confirm(confirmMsg)) return;
 
     setWaivingEmployeeId(employee.id);
@@ -230,7 +233,7 @@ export default function Penalties() {
     <div className="flex flex-col h-full overflow-hidden">
       <Header
         title="Penalties"
-        subtitle={`Showing penalties for ${monthLabel} — Manual alongside automatic Over Break, Lateness, and Completely Late penalties`}
+        subtitle={`Showing penalties for ${monthLabel} — Manual alongside automatic Over Break, Lateness, Completely Late, and Absence penalties`}
         action={
           <div className="flex items-center gap-2">
             <div className="flex items-center rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] overflow-hidden">
@@ -313,7 +316,7 @@ export default function Penalties() {
             <p className="text-xl font-bold text-amber-600 dark:text-amber-400 mt-2">
               {money(overallStats.totalAuto)}
             </p>
-            <p className="text-[11px] text-[var(--text-muted)] mt-1">Break, Late & Completely Late</p>
+            <p className="text-[11px] text-[var(--text-muted)] mt-1">Break, Late & Absence</p>
           </div>
 
           <div className="bg-[var(--card-bg)] p-4 rounded-2xl border border-[var(--border)]">
@@ -345,7 +348,7 @@ export default function Penalties() {
             <div>
               <h2 className="font-bold text-[var(--text-main)]">Employee Penalties Overview ({monthLabel})</h2>
               <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                Monthly auto penalties (Over Break, Lateness, Completely Late) alongside manual adjustments
+                Monthly auto penalties (Over Break, Lateness, Completely Late, Absence) alongside manual adjustments
               </p>
             </div>
             <div className="relative max-w-xs w-full">

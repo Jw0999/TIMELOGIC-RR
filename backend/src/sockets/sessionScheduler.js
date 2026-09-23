@@ -46,6 +46,11 @@ async function tick() {
     await endSessionsOutsideOfficeHours(now);
     await autoCheckoutExpired(now);
 
+    // Periodic sweep for past absences across all organizations (runs every 10 minutes)
+    if (minuteKey % 10 === 0) {
+      await AttendanceService.reconcileAllPastAbsences(now).catch((e) => logger.warn('reconcileAllPastAbsences sweep:', e.message));
+    }
+
     const orgs = await prisma.organization.findMany({
       where: { id: { not: 'platform-org' } },
       include: { offices: { where: { isActive: true }, orderBy: { createdAt: 'asc' } } },
@@ -193,6 +198,7 @@ async function endSessionsOutsideOfficeHours(now) {
 
     const autoCreateAt = new Date(openAt.getTime() - sessionLeadMinutes() * 60_000);
     if (now < autoCreateAt || now >= closeAt) {
+      await AttendanceService.syncEmployeeAbsencesForSession(session.id).catch((e) => logger.warn('absence sweep:', e.message));
       await prisma.attendanceSession.updateMany({
         where: { id: session.id, status: { in: ['ACTIVE', 'PAUSED'] } },
         data: { status: 'ENDED' },

@@ -593,7 +593,7 @@ const waiveEmployeeAutoPenalties = async (req, res, next) => {
           ...(monthMatch ? { date: dateFilter } : {}),
           penalty: { gt: 0 },
         },
-        data: { penalty: 0 },
+        data: { penalty: 0, reviewNotes: 'WAIVED_BY_ADMIN' },
       }),
       prisma.breakRecord.updateMany({
         where: {

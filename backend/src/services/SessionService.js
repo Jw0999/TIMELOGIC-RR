@@ -144,6 +144,12 @@ class SessionService {
   }
 
   async endSession(sessionId, orgId) {
+    try {
+      const AttendanceService = require('./AttendanceService');
+      await AttendanceService.syncEmployeeAbsencesForSession(sessionId);
+    } catch (e) {
+      logger.warn(`endSession absence sweep error: ${e.message}`);
+    }
     const session = await this._transition(sessionId, 'ENDED', orgId);
     await QRTokenService.invalidatePrevious(sessionId);
     await redis.del(`${PREFIXES.SESSION}${sessionId}`);
