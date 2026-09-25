@@ -55,10 +55,17 @@ const formatTime = (value?: string | null, timezone?: string | null) =>
       })
     : '—';
 
-const formatOfficeName = (session: Dashboard['activeSessions'][number]) =>
-  typeof session.office === 'string'
+const formatOfficeName = (session?: Dashboard['activeSessions'][number] | null) => {
+  if (!session) return 'Main Office';
+  return typeof session.office === 'string'
     ? session.office
-    : session.office?.name || 'Main Office';
+    : session.office?.name || session.sessionName || 'Main Office';
+};
+
+const getOfficeObj = (session?: Dashboard['activeSessions'][number] | null) => {
+  if (!session || !session.office) return null;
+  return typeof session.office === 'object' ? session.office : null;
+};
 
 const formatDepartment = (employee: Employee) =>
   typeof employee.department === 'string'
@@ -183,7 +190,22 @@ function App() {
   const [user, setUser] = useState<AdminUser | null>(null);
   const [booting, setBooting] = useState(true);
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
-  const [sessionId, setSessionId] = useState('');
+  const [sessionId, setSessionId] = useState<string>(() => {
+    try {
+      return localStorage.getItem('timelogic_station_session_id') || '';
+    } catch {
+      return '';
+    }
+  });
+
+  const handleSelectSession = (id: string) => {
+    setSessionId(id);
+    try {
+      localStorage.setItem('timelogic_station_session_id', id);
+    } catch {
+      // ignore
+    }
+  };
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'unclocked' | 'clocked_in' | 'enrolled' | 'needs_face'>('all');
   const [activeTab, setActiveTab] = useState<'attendance' | 'breaks' | 'students'>('attendance');
@@ -304,7 +326,10 @@ function App() {
 
       setDashboard(next);
 
-      if (next.selectedSession?.id) {
+      const matched = sessionId ? next.activeSessions?.find((s) => s.id === sessionId) : null;
+      if (matched) {
+        setSessionId(matched.id);
+      } else if (next.selectedSession?.id) {
         setSessionId(next.selectedSession.id);
       } else if (sessionId && !next.activeSessions?.some((s) => s.id === sessionId)) {
         setSessionId('');
@@ -503,6 +528,8 @@ function App() {
         setError('Face not registered. Please enroll face first.');
       } else if (err.code === 'FACE_REQUIRED') {
         setError('Face verification is required for this employee. Please capture photo.');
+      } else if (err.code === 'OFFICE_MISMATCH' || err.message?.includes('assigned to')) {
+        setError(`⚠️ Office Mismatch: ${err.message}`);
       } else {
         setError(err.message || 'Attendance confirmation failed. Verify password.');
       }
@@ -762,6 +789,73 @@ function App() {
           </div>
         </div>
 
+        {/* ── OPTION B: DEDICATED STATION OFFICE SWITCHER BAR ── */}
+        <section className="station-office-bar">
+          <div className="station-office-bar-header">
+            <div className="station-office-tag">
+              <span className="office-pulse-dot" />
+              <strong>STATION LOCATION:</strong>
+            </div>
+
+            {dashboard?.activeSessions && dashboard.activeSessions.length > 1 ? (
+              <div className="office-switcher-pills">
+                {dashboard.activeSessions.map((s) => {
+                  const isActive = s.id === selectedSession?.id;
+                  const offName = formatOfficeName(s);
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      className={`office-pill ${isActive ? 'active' : ''}`}
+                      onClick={() => handleSelectSession(s.id)}
+                    >
+                      <span className="office-pill-icon">🏢</span>
+                      <span className="office-pill-name">{offName}</span>
+                      {isActive && <span className="active-check">✓ Active</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="single-office-display">
+                <span className="office-pill-icon">🏢</span>
+                <span className="office-pill-name font-bold">
+                  {selectedSession ? formatOfficeName(selectedSession) : 'Main Office Station'}
+                </span>
+                <span className="active-check">✓ Active</span>
+              </div>
+            )}
+          </div>
+
+          {/* Active Office Policy & Work Hours Banner */}
+          {selectedSession && (() => {
+            const officeObj = getOfficeObj(selectedSession);
+            const openTime = officeObj?.openTime || formatTime(selectedSession.startTime, dashboard?.organization?.timezone);
+            const closeTime = officeObj?.closeTime || formatTime(selectedSession.endTime, dashboard?.organization?.timezone);
+            const breakStart = officeObj?.breakStart || '13:00';
+            const breakEnd = officeObj?.breakEnd || '14:00';
+            const breakMins = officeObj?.breakMinutes || 60;
+            const grace = officeObj?.graceMinutes ?? 30;
+
+            return (
+              <div className="station-office-meta">
+                <div className="meta-item">
+                  <Clock size={13} style={{ color: '#38bdf8' }} />
+                  <span>Work Hours: <strong>{openTime} – {closeTime}</strong></span>
+                </div>
+                <div className="meta-item">
+                  <Coffee size={13} style={{ color: '#fbbf24' }} />
+                  <span>Daily Break: <strong>{breakStart} – {breakEnd}</strong> ({breakMins}m limit)</span>
+                </div>
+                <div className="meta-item">
+                  <ShieldCheck size={13} style={{ color: '#34d399' }} />
+                  <span>Grace Period: <strong>{grace} mins</strong></span>
+                </div>
+              </div>
+            );
+          })()}
+        </section>
+
         {/* Stats & Session Control Bar */}
         <section className="stats-grid">
           {/* Active Session Selector Card */}
@@ -784,7 +878,7 @@ function App() {
               </div>
 
               {hasActiveSession ? (
-                <select value={sessionId} onChange={(e) => setSessionId(e.target.value)}>
+                <select value={sessionId} onChange={(e) => handleSelectSession(e.target.value)}>
                   {dashboard?.activeSessions.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.sessionName || 'Standard Session'} · {formatOfficeName(s)}
@@ -974,9 +1068,64 @@ function App() {
                               <span>Code: {emp.employeeCode || '—'}</span>
                               <span>•</span>
                               <span>{formatDepartment(emp)}</span>
+                              {emp.office && (
+                                <>
+                                  <span>•</span>
+                                  <span>🏢 {typeof emp.office === 'object' ? emp.office.name : emp.office}</span>
+                                </>
+                              )}
+                              {emp.shiftType && (
+                                <>
+                                  <span>•</span>
+                                  <span>{emp.shiftType.replace('_', ' ')}</span>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
+
+                        {/* Office Mismatch Warning (Option B Protection) */}
+                        {(() => {
+                          const empOfficeId = emp.officeId || (typeof emp.office === 'object' ? emp.office?.id : null);
+                          const selectedOfficeId = getOfficeObj(selectedSession)?.id;
+                          const isOfficeMismatch = Boolean(empOfficeId && selectedOfficeId && empOfficeId !== selectedOfficeId);
+                          const empOfficeName = (typeof emp.office === 'object' ? emp.office?.name : null) || 'another office';
+                          const currentOfficeName = formatOfficeName(selectedSession);
+
+                          if (!isOfficeMismatch) return null;
+
+                          const targetSession = dashboard?.activeSessions?.find((s) => getOfficeObj(s)?.id === empOfficeId);
+
+                          return (
+                            <div className="alert error" style={{ margin: '1rem 0', textAlign: 'left', borderRadius: '12px' }}>
+                              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem' }}>
+                                <AlertTriangle size={20} style={{ color: '#ef4444', flexShrink: 0, marginTop: '2px' }} />
+                                <div style={{ flex: 1 }}>
+                                  <strong style={{ fontSize: '0.88rem', color: '#b91c1c' }}>
+                                    Office Location Mismatch Detected
+                                  </strong>
+                                  <p style={{ margin: '0.35rem 0 0.65rem', fontSize: '0.8rem', color: '#7f1d1d', lineHeight: 1.4 }}>
+                                    You are assigned to <strong>{empOfficeName}</strong>. This station is currently operating for <strong>{currentOfficeName}</strong>.
+                                  </p>
+                                  {targetSession && (
+                                    <button
+                                      type="button"
+                                      className="btn primary"
+                                      style={{
+                                        fontSize: '0.78rem',
+                                        padding: '0.4rem 0.85rem',
+                                        fontWeight: 700,
+                                      }}
+                                      onClick={() => handleSelectSession(targetSession.id)}
+                                    >
+                                      🏢 Switch Station to {empOfficeName}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         {/* Status Details */}
                         <div className="identified-status-box">
@@ -1037,17 +1186,23 @@ function App() {
 
                         {/* Action Buttons */}
                         <div className="identified-actions-grid">
-                          {!isCheckedIn ? (
-                            <button
-                              className="btn primary"
-                              style={{ padding: '0.95rem', fontSize: '1.05rem', justifyContent: 'center' }}
-                              disabled={!hasActiveSession}
-                              onClick={() => setPendingAction({ type: 'check_in', employee: emp })}
-                            >
-                              <LogIn size={18} />
-                              <span>Check In for Today</span>
-                            </button>
-                          ) : !isCheckedOut ? (
+                          {!isCheckedIn ? (() => {
+                            const empOfficeId = emp.officeId || (typeof emp.office === 'object' ? emp.office?.id : null);
+                            const selectedOfficeId = getOfficeObj(selectedSession)?.id;
+                            const isOfficeMismatch = Boolean(empOfficeId && selectedOfficeId && empOfficeId !== selectedOfficeId);
+
+                            return (
+                              <button
+                                className="btn primary"
+                                style={{ padding: '0.95rem', fontSize: '1.05rem', justifyContent: 'center' }}
+                                disabled={!hasActiveSession || isOfficeMismatch}
+                                onClick={() => setPendingAction({ type: 'check_in', employee: emp })}
+                              >
+                                <LogIn size={18} />
+                                <span>{isOfficeMismatch ? 'Office Mismatch (Switch Station Above)' : 'Check In for Today'}</span>
+                              </button>
+                            );
+                          })() : !isCheckedOut ? (
                             <>
                               <button
                                 className="btn danger"

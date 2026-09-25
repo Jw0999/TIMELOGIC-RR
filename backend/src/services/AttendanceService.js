@@ -499,6 +499,25 @@ class AttendanceService {
   async getManualDashboard(adminOrgId, { sessionId, search = '', page = 1, limit = 100 } = {}) {
     const organization = await EmployeePolicy.getOrganizationPolicy(adminOrgId);
     const now = await getCurrentServerTime();
+
+    // Query all active offices for this organization
+    const offices = await prisma.office.findMany({
+      where: { orgId: adminOrgId, isActive: true },
+      select: {
+        id: true,
+        name: true,
+        timezone: true,
+        openTime: true,
+        closeTime: true,
+        breakStart: true,
+        breakEnd: true,
+        breakMinutes: true,
+        graceMinutes: true,
+        lateAfterMinutes: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
     const activeSessions = await prisma.attendanceSession.findMany({
       where: {
         office: { orgId: adminOrgId, isActive: true },
@@ -512,11 +531,55 @@ class AttendanceService {
           select: {
             id: true, name: true, timezone: true, openTime: true, closeTime: true,
             graceMinutes: true, lateAfterMinutes: true, gracePenalty: true, latePenalty: true, completelyLatePenalty: true,
+            breakStart: true, breakEnd: true, breakMinutes: true,
           },
         },
       },
       orderBy: { startTime: 'desc' },
     });
+
+    // Auto-ensure daily active session for any active office that has no active session today
+    for (const office of offices) {
+      const alreadyHas = activeSessions.some((s) => s.office?.id === office.id);
+      if (!alreadyHas) {
+        const hours = officeHoursFor(now, { ...office, organizationOpeningTime: organization?.openingTime });
+        if (hours) {
+          const openAt = atZonedTime(now, hours.openTime, office.timezone);
+          const closeAt = atZonedTime(now, hours.closeTime, office.timezone);
+          if (!closeAt || now < closeAt) {
+            try {
+              const autoSession = await prisma.attendanceSession.create({
+                data: {
+                  id: uuidv4(),
+                  sessionName: `${office.name} Standard Session`,
+                  officeId: office.id,
+                  officeName: office.name,
+                  orgName: organization?.name ?? null,
+                  startTime: openAt || now,
+                  endTime: closeAt || new Date(now.getTime() + 10 * 3600 * 1000),
+                  status: 'ACTIVE',
+                  qrRefreshInterval: 120,
+                },
+                select: {
+                  id: true, sessionName: true, startTime: true, endTime: true,
+                  office: {
+                    select: {
+                      id: true, name: true, timezone: true, openTime: true, closeTime: true,
+                      graceMinutes: true, lateAfterMinutes: true, gracePenalty: true, latePenalty: true, completelyLatePenalty: true,
+                      breakStart: true, breakEnd: true, breakMinutes: true,
+                    },
+                  },
+                },
+              });
+              activeSessions.push(autoSession);
+            } catch {
+              // Ignore session creation clash if created concurrently
+            }
+          }
+        }
+      }
+    }
+
     let selectedSession = null;
     if (sessionId) {
       selectedSession = activeSessions.find((session) => session.id === sessionId) || null;
@@ -532,6 +595,7 @@ class AttendanceService {
               select: {
                 id: true, name: true, timezone: true, openTime: true, closeTime: true,
                 graceMinutes: true, lateAfterMinutes: true, gracePenalty: true, latePenalty: true, completelyLatePenalty: true,
+                breakStart: true, breakEnd: true, breakMinutes: true,
               },
             },
           },
@@ -545,6 +609,7 @@ class AttendanceService {
     if (!organization.allowManualCheckIn) {
       return {
         enabled: false, serverTime: now, organization,
+        offices,
         activeSessions, selectedSession: selectedSession ?? null,
         employees: [], total: 0, page: 1, totalPages: 0,
       };
@@ -653,6 +718,7 @@ class AttendanceService {
     }
     return {
       enabled: true, serverTime: now, organization,
+      offices,
       activeSessions, selectedSession: selectedSession ?? null,
       employees: employees.map((employee) => {
         const hasFace = Boolean(hasValidEnrolledFace(employee));
@@ -685,6 +751,9 @@ class AttendanceService {
         employeeCode: true,
         profileImageUrl: true,
         faceEncodingData: true,
+        shiftType: true,
+        officeId: true,
+        office: { select: { id: true, name: true, openTime: true, closeTime: true, breakStart: true, breakEnd: true, breakMinutes: true } },
         department: { select: { name: true } },
       },
     });
