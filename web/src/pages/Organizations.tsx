@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, X, ChevronRight, ChevronsUpDown, Pencil, CalendarDays } from 'lucide-react';
+import { Plus, Trash2, X, ChevronRight, ChevronsUpDown, Pencil, CalendarDays, KeyRound } from 'lucide-react';
 import PageShell from '../components/PageShell';
-import { fetchAllOrgs, createOrg, updateOrg, deleteOrg, fetchOrgUsers, fetchLeavePolicy, saveLeavePolicy } from '../services';
+import { fetchAllOrgs, createOrg, updateOrg, deleteOrg, fetchOrgUsers, fetchLeavePolicy, saveLeavePolicy, resetAdminPassword, reassignUserOffice } from '../services';
 import { downloadCSV } from '../utils/csv';
 
 const INDUSTRIES = ['Technology','Finance','Healthcare','Education','Logistics','Retail','Manufacturing','Non-profit','Government','Other'];
@@ -14,10 +14,29 @@ const weeklySchedule = (openTime = '08:00', closeTime = '17:00'): WeeklySchedule
   DAYS.map((day) => [day, day === 'sunday' ? { openTime: '', closeTime: '' } : { openTime, closeTime }]),
 ) as WeeklySchedule;
 
+interface ShiftScheduleItem {
+  label: string;
+  openTime: string;
+  closeTime: string;
+}
+
+interface ShiftSchedules {
+  FULL_TIME: ShiftScheduleItem;
+  MORNING: ShiftScheduleItem;
+  EVENING: ShiftScheduleItem;
+}
+
+const defaultShiftSchedules = (): ShiftSchedules => ({
+  FULL_TIME: { label: 'Full Time', openTime: '08:00', closeTime: '17:00' },
+  MORNING:   { label: 'Morning Shift', openTime: '08:00', closeTime: '13:00' },
+  EVENING:   { label: 'Evening Shift', openTime: '13:00', closeTime: '18:00' },
+});
+
 interface OrgFormData {
   name: string; industry: string;
   allowDeviceCheckIn: boolean; allowManualCheckIn: boolean; hasStudents: boolean;
   timezone: string;
+  shiftSchedules: ShiftSchedules;
   offices: {
     name: string; address: string; timezone: string; wifiSSID: string; publicIp: string;
     breakMinutes: number;
@@ -41,6 +60,7 @@ const defaultForm = (): OrgFormData => ({
   name: '', industry: 'Technology',
   allowDeviceCheckIn: true, allowManualCheckIn: false, hasStudents: false,
   timezone: 'Africa/Lagos',
+  shiftSchedules: defaultShiftSchedules(),
   offices: [{ ...newOffice(), name: 'Main Office' }],
   departments: [{ name: 'Engineering', breakStart: '13:00', breakEnd: '14:00', overstayPenalty: 0 }],
   admin: { firstName: '', lastName: '', email: '', password: '', confirmPassword: '' },
@@ -98,6 +118,7 @@ function OrgModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
         allowManualCheckIn: form.allowManualCheckIn,
         hasStudents: form.hasStudents,
         timezone: form.timezone,
+        shiftSchedules: form.shiftSchedules,
         offices: form.offices,
         departments: form.departments,
         admin: {
@@ -137,6 +158,53 @@ function OrgModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
                 <p className="text-[11px] text-[var(--text-muted)] mt-0.5">Used to evaluate the company admin's first login of the day. Office hours continue to control employee attendance sessions.</p>
               </div>
               <div><label className={lbl}>Company Timezone *</label><select className={inp} value={form.timezone} onChange={(e) => setForm((p) => ({...p, timezone: e.target.value}))}>{TIMEZONES.map((t) => <option key={t}>{t}</option>)}</select></div>
+            </div>
+            <div className="p-4 bg-[var(--hover-bg)] rounded-xl border border-[var(--border)] space-y-3">
+              <div>
+                <p className="text-sm font-bold text-[var(--text-main)]">Shift schedules</p>
+                <p className="text-[11px] text-[var(--text-muted)] mt-0.5">Configure working hours for Full Time, Morning, and Evening shifts. Lateness and absence calculations respect these shift windows.</p>
+              </div>
+              <div className="space-y-2">
+                {(['FULL_TIME', 'MORNING', 'EVENING'] as const).map((key) => {
+                  const item = form.shiftSchedules[key] || defaultShiftSchedules()[key];
+                  const title = key === 'FULL_TIME' ? 'Full Time' : key === 'MORNING' ? 'Morning Shift' : 'Evening Shift';
+                  return (
+                    <div key={key} className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-center bg-[var(--card-bg)] p-2.5 rounded-xl border border-[var(--border)]">
+                      <span className="text-xs font-semibold text-[var(--text-main)]">{title}</span>
+                      <div className="flex items-center gap-1.5">
+                        <label className="text-[11px] text-[var(--text-muted)] font-medium">Start:</label>
+                        <input
+                          type="time"
+                          className={inp}
+                          value={item.openTime || '08:00'}
+                          onChange={(e) => setForm((p) => ({
+                            ...p,
+                            shiftSchedules: {
+                              ...p.shiftSchedules,
+                              [key]: { ...p.shiftSchedules[key], openTime: e.target.value }
+                            }
+                          }))}
+                        />
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <label className="text-[11px] text-[var(--text-muted)] font-medium">End:</label>
+                        <input
+                          type="time"
+                          className={inp}
+                          value={item.closeTime || '17:00'}
+                          onChange={(e) => setForm((p) => ({
+                            ...p,
+                            shiftSchedules: {
+                              ...p.shiftSchedules,
+                              [key]: { ...p.shiftSchedules[key], closeTime: e.target.value }
+                            }
+                          }))}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
             <div className="p-4 bg-[var(--hover-bg)] rounded-xl border border-[var(--border)] space-y-3">
               <div>
@@ -239,27 +307,188 @@ function OrgModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
 function UsersModal({ org, onClose }: { org: any; onClose: () => void }) {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  useEffect(() => { fetchOrgUsers(org.id).then(setUsers).finally(() => setLoading(false)); }, [org.id]);
+  const [resettingUser, setResettingUser] = useState<any>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [resetError, setResetError] = useState('');
+  const [resetSuccess, setResetSuccess] = useState('');
+  const [submittingReset, setSubmittingReset] = useState(false);
+  const [reassigningId, setReassigningId] = useState<string | null>(null);
+
+  const load = () => {
+    setLoading(true);
+    fetchOrgUsers(org.id).then(setUsers).finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, [org.id]);
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resettingUser) return;
+    if (newPassword.length < 8) {
+      setResetError('Password must be at least 8 characters long.');
+      return;
+    }
+    setSubmittingReset(true);
+    setResetError('');
+    setResetSuccess('');
+    try {
+      await resetAdminPassword(resettingUser.id, newPassword);
+      setResetSuccess(`Password for ${resettingUser.firstName} ${resettingUser.lastName} reset successfully!`);
+      setTimeout(() => {
+        setResettingUser(null);
+        setNewPassword('');
+        setResetSuccess('');
+      }, 1500);
+    } catch (err: any) {
+      setResetError(err?.message ?? 'Failed to reset password.');
+    } finally {
+      setSubmittingReset(false);
+    }
+  };
+
+  const handleReassignOffice = async (userId: string, officeId: string) => {
+    setReassigningId(userId);
+    try {
+      await reassignUserOffice(userId, officeId);
+      load();
+    } catch (err: any) {
+      alert(err?.message ?? 'Failed to reassign office');
+    } finally {
+      setReassigningId(null);
+    }
+  };
+
+  const offices = org.offices || [];
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--card-bg)] rounded-3xl w-full max-w-2xl shadow-2xl max-h-[80vh] overflow-hidden flex flex-col border border-[var(--border)]">
+      <div className="bg-[var(--card-bg)] rounded-3xl w-full max-w-3xl shadow-2xl max-h-[85vh] overflow-hidden flex flex-col border border-[var(--border)]">
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
-          <div><h2 className="font-bold text-[var(--text-main)]">{org.name}</h2><p className="text-xs text-[var(--text-muted)]">All users</p></div>
+          <div>
+            <h2 className="font-bold text-[var(--text-main)]">{org.name}</h2>
+            <p className="text-xs text-[var(--text-muted)]">Organization Users & Office Assignments</p>
+          </div>
           <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-main)]"><X size={18}/></button>
         </div>
         <div className="flex-1 overflow-y-auto divide-y divide-[var(--border)]">
-          {loading ? <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-6 w-6 border-2 border-primary-600 border-t-transparent"/></div>
-            : users.length === 0 ? <p className="text-center py-10 text-sm text-[var(--text-muted)]">No users</p>
-            : users.map((u: any) => (
-              <div key={u.id} className="px-5 py-3 flex items-center gap-3 hover:bg-[var(--hover-bg)] transition-colors">
-                <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0"><span className="text-xs font-bold text-primary-700">{u.firstName?.[0]}{u.lastName?.[0]}</span></div>
-                <div className="flex-1 min-w-0"><p className="text-sm font-semibold text-[var(--text-main)]">{u.firstName} {u.lastName}</p><p className="text-xs text-[var(--text-muted)] truncate">{u.email}</p></div>
-                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${u.role === 'ADMIN' ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-600'}`}>{u.role}</span>
-              </div>
-            ))}
+          {loading ? (
+            <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-6 w-6 border-2 border-primary-600 border-t-transparent"/></div>
+          ) : users.length === 0 ? (
+            <p className="text-center py-10 text-sm text-[var(--text-muted)]">No users</p>
+          ) : (
+            users.map((u: any) => {
+              const shiftLabel = u.shiftType === 'MORNING' ? 'Morning Shift' : u.shiftType === 'EVENING' ? 'Evening Shift' : 'Full Time';
+              const methodLabel = u.checkInMethod === 'MANUAL' ? 'Kiosk Station' : u.checkInMethod === 'PHONE' ? 'Phone' : 'Station + Phone';
+              return (
+                <div key={u.id} className="px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-[var(--hover-bg)] transition-colors">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
+                      <span className="text-xs font-bold text-primary-700">{u.firstName?.[0]}{u.lastName?.[0]}</span>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-[var(--text-main)] truncate">{u.firstName} {u.lastName}</p>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${u.role === 'ADMIN' ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-600'}`}>{u.role}</span>
+                      </div>
+                      <p className="text-xs text-[var(--text-muted)] truncate">{u.email}</p>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-[var(--hover-bg)] text-[var(--text-muted)] border border-[var(--border)]">{shiftLabel}</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-[var(--hover-bg)] text-[var(--text-muted)] border border-[var(--border)]">{methodLabel}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-end sm:self-center">
+                    {/* Office selector / display */}
+                    {offices.length > 0 && u.role !== 'SUPER_ADMIN' ? (
+                      <div className="flex items-center gap-1 text-xs">
+                        <span className="text-[11px] text-[var(--text-muted)]">Office:</span>
+                        <select
+                          value={u.officeId || u.office?.id || ''}
+                          disabled={reassigningId === u.id}
+                          onChange={(e) => handleReassignOffice(u.id, e.target.value)}
+                          className="border border-[var(--input-border)] bg-[var(--input-bg)] text-[var(--text-main)] text-xs rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                        >
+                          <option value="">Default / Unassigned</option>
+                          {offices.map((o: any) => (
+                            <option key={o.id} value={o.id}>{o.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : (
+                      u.office && <span className="text-xs text-[var(--text-muted)]">{u.office.name}</span>
+                    )}
+
+                    {/* Reset Admin Password */}
+                    {u.role === 'ADMIN' && (
+                      <button
+                        onClick={() => { setResettingUser(u); setNewPassword(''); setResetError(''); setResetSuccess(''); }}
+                        className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition"
+                      >
+                        <KeyRound size={12}/> Reset Password
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
-        <div className="px-5 py-3 border-t border-[var(--border)]"><p className="text-xs text-[var(--text-muted)]">{users.length} users total</p></div>
+        <div className="px-5 py-3 border-t border-[var(--border)] flex justify-between items-center">
+          <p className="text-xs text-[var(--text-muted)]">{users.length} users total</p>
+          <button onClick={onClose} className="px-4 py-1.5 border border-[var(--border)] text-xs font-semibold rounded-xl hover:bg-[var(--hover-bg)] transition text-[var(--text-main)]">Close</button>
+        </div>
       </div>
+
+      {/* Reset Admin Password Modal */}
+      {resettingUser && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-60 p-4">
+          <div className="bg-[var(--card-bg)] rounded-2xl w-full max-w-md shadow-2xl p-6 border border-[var(--border)] space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-amber-700">
+                <KeyRound size={20}/>
+                <h3 className="font-bold text-base text-[var(--text-main)]">Reset Admin Password</h3>
+              </div>
+              <button onClick={() => setResettingUser(null)} className="text-[var(--text-muted)] hover:text-[var(--text-main)]"><X size={18}/></button>
+            </div>
+            <p className="text-xs text-[var(--text-muted)]">
+              Set a new password for <strong className="text-[var(--text-main)]">{resettingUser.firstName} {resettingUser.lastName}</strong> ({resettingUser.email}).
+              They will use this password to sign into the Desktop Admin App.
+            </p>
+            {resetError && <div className="p-2.5 bg-red-50 border border-red-100 rounded-lg text-xs text-red-700">{resetError}</div>}
+            {resetSuccess && <div className="p-2.5 bg-emerald-50 border border-emerald-100 rounded-lg text-xs text-emerald-700">{resetSuccess}</div>}
+            <form onSubmit={handleResetPassword} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1">New Password (min 8 chars) *</label>
+                <input
+                  type="password"
+                  className="w-full border border-[var(--input-border)] bg-[var(--input-bg)] text-[var(--text-main)] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Enter new admin password"
+                  autoFocus
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setResettingUser(null)}
+                  className="px-4 py-2 border border-[var(--border)] text-xs font-semibold rounded-xl hover:bg-[var(--hover-bg)] text-[var(--text-main)]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingReset || !newPassword}
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition disabled:opacity-50"
+                >
+                  {submittingReset ? 'Updating…' : 'Update Password'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -271,6 +500,7 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
   const [allowManualCheckIn, setAllowManualCheckIn] = useState(org.allowManualCheckIn ?? false);
   const [hasStudents, setHasStudents] = useState(org.hasStudents ?? false);
   const [timezone, setTimezone] = useState(org.timezone ?? 'Africa/Lagos');
+  const [shiftSchedules, setShiftSchedules] = useState<ShiftSchedules>(() => org.shiftSchedules ?? defaultShiftSchedules());
   const [offices, setOffices] = useState<any[]>(() => (org.offices ?? []).map((o: any) => ({
     id: o.id, name: o.name ?? '', address: o.address ?? '', timezone: o.timezone ?? 'Africa/Lagos',
     wifiSSID: o.wifiSSID ?? '', publicIp: o.publicIp ?? '',
@@ -308,6 +538,7 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
         allowManualCheckIn,
         hasStudents,
         timezone,
+        shiftSchedules,
         offices,
         departments,
       });
@@ -334,6 +565,48 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
               <p className="text-[11px] text-[var(--text-muted)] mt-0.5">Used to evaluate the company admin's first login of the day. Office hours below continue to control employee attendance sessions.</p>
             </div>
             <div><label className={lbl}>Company Timezone *</label><select className={inp} value={timezone} onChange={(e) => setTimezone(e.target.value)}>{TIMEZONES.map((t) => <option key={t}>{t}</option>)}</select></div>
+          </div>
+
+          <div className="p-4 bg-[var(--hover-bg)] rounded-xl border border-[var(--border)] space-y-3">
+            <div>
+              <p className="text-sm font-bold text-[var(--text-main)]">Shift schedules</p>
+              <p className="text-[11px] text-[var(--text-muted)] mt-0.5">Configure working hours for Full Time, Morning, and Evening shifts. Lateness and absence calculations respect these shift windows.</p>
+            </div>
+            <div className="space-y-2">
+              {(['FULL_TIME', 'MORNING', 'EVENING'] as const).map((key) => {
+                const item = shiftSchedules[key] || defaultShiftSchedules()[key];
+                const title = key === 'FULL_TIME' ? 'Full Time' : key === 'MORNING' ? 'Morning Shift' : 'Evening Shift';
+                return (
+                  <div key={key} className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-center bg-[var(--card-bg)] p-2.5 rounded-xl border border-[var(--border)]">
+                    <span className="text-xs font-semibold text-[var(--text-main)]">{title}</span>
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-[11px] text-[var(--text-muted)] font-medium">Start:</label>
+                      <input
+                        type="time"
+                        className={inp}
+                        value={item.openTime || '08:00'}
+                        onChange={(e) => setShiftSchedules((p) => ({
+                          ...p,
+                          [key]: { ...(p[key] || defaultShiftSchedules()[key]), openTime: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-[11px] text-[var(--text-muted)] font-medium">End:</label>
+                      <input
+                        type="time"
+                        className={inp}
+                        value={item.closeTime || '17:00'}
+                        onChange={(e) => setShiftSchedules((p) => ({
+                          ...p,
+                          [key]: { ...(p[key] || defaultShiftSchedules()[key]), closeTime: e.target.value }
+                        }))}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           <div className="p-4 bg-[var(--hover-bg)] rounded-xl border border-[var(--border)] space-y-3">

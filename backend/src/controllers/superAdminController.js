@@ -15,6 +15,12 @@ const defaultWeeklySchedule = (openTime = '08:00', closeTime = '17:00') => ({
   sunday: null,
 });
 
+const defaultShiftSchedules = () => ({
+  FULL_TIME: { openTime: '08:00', closeTime: '17:00', label: 'Full Time (8:00 AM - 5:00 PM)' },
+  MORNING:   { openTime: '08:00', closeTime: '13:00', label: 'Morning Shift (8:00 AM - 1:00 PM)' },
+  EVENING:   { openTime: '13:00', closeTime: '18:00', label: 'Evening Shift (1:00 PM - 6:00 PM)' },
+});
+
 // GET /api/super/organizations — all orgs with full detail
 const listOrgs = async (req, res, next) => {
   try {
@@ -58,6 +64,7 @@ const createOrg = async (req, res, next) => {
       hasStudents = false,
       openingTime = '08:00',
       timezone = 'Africa/Lagos',
+      shiftSchedules,
       offices = [],       // [{ name, address, timezone }]
       departments = [],   // [{ name }]
       admin,              // { firstName, lastName, email, password, employeeCode? }
@@ -92,6 +99,7 @@ const createOrg = async (req, res, next) => {
           hasStudents: Boolean(hasStudents),
           openingTime,
           timezone,
+          shiftSchedules: shiftSchedules || defaultShiftSchedules(),
         },
       });
 
@@ -161,8 +169,9 @@ const createOrg = async (req, res, next) => {
           passwordHash,
           role: 'ADMIN',
           status: 'ACTIVE',
+          officeId: defaultOffice.id,
         },
-        select: { id: true, firstName: true, lastName: true, email: true, role: true },
+        select: { id: true, firstName: true, lastName: true, email: true, role: true, officeId: true },
       });
 
       // 6. Break policy for each department (each carries its OWN break window & overstay penalty)
@@ -202,7 +211,7 @@ const updateOrg = async (req, res, next) => {
     const { id } = req.params;
     const {
       name, industry, offices = [], departments = [],
-      allowDeviceCheckIn, allowManualCheckIn, hasStudents, openingTime, timezone,
+      allowDeviceCheckIn, allowManualCheckIn, hasStudents, openingTime, timezone, shiftSchedules,
     } = req.body;
 
     const current = await prisma.organization.findUnique({
@@ -251,6 +260,7 @@ const updateOrg = async (req, res, next) => {
           ...(hasStudents !== undefined ? { hasStudents } : {}),
           ...(openingTime !== undefined ? { openingTime } : {}),
           ...(timezone !== undefined ? { timezone } : {}),
+          ...(shiftSchedules !== undefined ? { shiftSchedules } : {}),
         },
       });
 
@@ -376,6 +386,8 @@ const orgUsers = async (req, res, next) => {
       select: {
         id: true, firstName: true, lastName: true, email: true,
         role: true, status: true, employeeCode: true, shiftType: true,
+        checkInMethod: true, officeId: true,
+        office: { select: { id: true, name: true } },
         profileImageUrl: true, lastLoginAt: true, createdAt: true,
         department: { select: { name: true } },
         _count: { select: { devices: true, attendanceRecords: true } },
@@ -821,4 +833,65 @@ const setLeavePolicy = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { listOrgs, createOrg, updateOrg, deleteOrg, orgUsers, renameAdmin, systemStats, getNotifications, officeSecurityDetail, updateOfficeSecurity, systemReport, addDepartment, getDepartmentBreakPolicy, updateDepartmentBreakPolicy, employeeFullRecord, reemployEmployee, suspendAdmin, activateAdmin, reassignEmployee, updateProfile, resetSystem, getLeavePolicy, setLeavePolicy };
+// PUT /api/super/users/:userId/password — change an Organization Admin's password
+const resetAdminPassword = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 8 characters long.' });
+    }
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true, orgId: true, firstName: true, lastName: true },
+    });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+    if (user.role !== 'ADMIN') {
+      return res.status(400).json({ success: false, message: 'Only Organization Admin passwords can be updated here.' });
+    }
+    const passwordHash = await bcrypt.hash(newPassword, +env.BCRYPT_ROUNDS || 12);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+    await prisma.refreshToken.deleteMany({ where: { userId } });
+    res.json({ success: true, message: `Password for ${user.firstName} ${user.lastName} has been updated successfully.` });
+  } catch (err) { next(err); }
+};
+
+// PUT /api/super/users/:userId/office — change an employee's assigned office
+const reassignUserOffice = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const { officeId } = req.body;
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, orgId: true, role: true },
+    });
+    if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
+    if (officeId) {
+      const office = await prisma.office.findFirst({
+        where: { id: officeId, orgId: user.orgId },
+        select: { id: true, name: true },
+      });
+      if (!office) return res.status(400).json({ success: false, message: 'Office does not belong to user organization.' });
+    }
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: { officeId: officeId || null },
+      select: { id: true, firstName: true, lastName: true, officeId: true, office: { select: { id: true, name: true } } },
+    });
+    res.json({ success: true, data: updated, message: 'Employee office updated successfully.' });
+  } catch (err) { next(err); }
+};
+
+module.exports = {
+  listOrgs, createOrg, updateOrg, deleteOrg, orgUsers, renameAdmin,
+  resetAdminPassword, reassignUserOffice,
+  systemStats, getNotifications, officeSecurityDetail, updateOfficeSecurity,
+  systemReport, addDepartment, getDepartmentBreakPolicy, updateDepartmentBreakPolicy,
+  employeeFullRecord, reemployEmployee, suspendAdmin, activateAdmin, reassignEmployee,
+  updateProfile, resetSystem, getLeavePolicy, setLeavePolicy,
+};

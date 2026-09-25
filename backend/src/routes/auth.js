@@ -22,4 +22,8 @@ router.put('/change-password',  authenticate, [
   body('newPassword').isLength({ min: 8 }),
 ], validate, ctrl.changePassword);
 
+router.post('/station-login', authLimiter, [
+  body('password').notEmpty().withMessage('Password is required'),
+], validate, ctrl.stationLogin);
+
 module.exports = router;

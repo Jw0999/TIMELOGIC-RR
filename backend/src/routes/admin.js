@@ -78,6 +78,8 @@ router.post('/departments', authenticate, isAdmin, [
 router.get('/users', authenticate, isAdmin, ctrl.listUsers);
 router.put('/users/:userId', authenticate, isAdmin, [
   body('checkInMethod').optional().isIn(['PHONE', 'MANUAL', 'BOTH']),
+  body('officeId').optional({ nullable: true }).isUUID(),
+  body('shiftType').optional().isIn(['FULL_TIME', 'MORNING', 'EVENING', 'AFTERNOON', 'NIGHT', 'FLEXIBLE']),
   body('phone').optional({ nullable: true }).isString(),
 ], validate, ctrl.updateUser);
 router.get('/users/:userId/summary', authenticate, isAdmin, ctrl.employeeSummary);
@@ -170,6 +172,12 @@ router.post('/emergency/:controlId/revert', authenticate, isAdmin, ctrl.emergenc
 // Notifications
 router.get('/notifications', authenticate, isAdmin, ctrl.getNotifications);
 
+// Station Password for PWA 2.0 (configured by Desktop Admin)
+router.get('/station-password', authenticate, isAdmin, ctrl.getStationPasswordStatus);
+router.put('/station-password', authenticate, isAdmin, [
+  body('stationPassword').isLength({ min: 6 }).withMessage('Station password must be at least 6 characters'),
+], validate, ctrl.setStationPassword);
+
 // Create an employee user
 router.post('/employees', authenticate, isAdmin, [
   body('firstName').notEmpty(),
@@ -177,6 +185,8 @@ router.post('/employees', authenticate, isAdmin, [
   body('email').isEmail().normalizeEmail(),
   body('password').isLength({ min: 8 }),
   body('checkInMethod').optional().isIn(['PHONE', 'MANUAL', 'BOTH']),
+  body('officeId').optional({ nullable: true }).isUUID(),
+  body('shiftType').optional().isIn(['FULL_TIME', 'MORNING', 'EVENING', 'AFTERNOON', 'NIGHT', 'FLEXIBLE']),
   body('phone').optional({ nullable: true }).isString(),
 ], validate, ctrl.createEmployee);
 

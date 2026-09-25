@@ -33,7 +33,15 @@ const getOrg = async (req, res, next) => {
         _count: { select: { users: true } },
       },
     });
-    res.json({ success: true, data: org });
+    if (!org) return res.status(404).json({ success: false, message: 'Organization not found' });
+    const { kioskPasswordHash, ...safeOrg } = org;
+    res.json({
+      success: true,
+      data: {
+        ...safeOrg,
+        hasStationPassword: Boolean(kioskPasswordHash),
+      },
+    });
   } catch (err) { next(err); }
 };
 
@@ -88,7 +96,7 @@ const createDepartment = async (req, res, next) => {
 
 const listUsers = async (req, res, next) => {
   try {
-    const { role, status, departmentId, page = 1, limit = 20, search } = req.query;
+    const { role, status, departmentId, officeId, page = 1, limit = 20, search } = req.query;
     const skip = (+page - 1) * +limit;
     const targetOrgId = await resolveAdminOrgId(req);
     const where = {
@@ -98,6 +106,7 @@ const listUsers = async (req, res, next) => {
       ...(role && { role }),
       ...(status && status !== 'TERMINATED' && { status }),
       ...(departmentId && { departmentId }),
+      ...(officeId && { officeId }),
       ...(search && {
         OR: [
           { firstName: { contains: search, mode: 'insensitive' } },
@@ -115,6 +124,8 @@ const listUsers = async (req, res, next) => {
           profileImageUrl: true, employeeCode: true,
           phone: true, checkInMethod: true,
           faceEncodingData: true,
+          officeId: true,
+          office: { select: { id: true, name: true } },
           department: {
             select: {
               id: true,
@@ -156,12 +167,18 @@ const updateUser = async (req, res, next) => {
       return res.status(403).json({ success: false, message: 'Only employee accounts can be modified here.' });
     }
 
-    const { firstName, lastName, status, departmentId, shiftType, checkInMethod, phone } = req.body;
+    const { firstName, lastName, status, departmentId, officeId, shiftType, checkInMethod, phone } = req.body;
     if (departmentId) {
       const department = await prisma.department.findFirst({
         where: { id: departmentId, orgId: req.user.orgId }, select: { id: true },
       });
       if (!department) return res.status(400).json({ success: false, message: 'Department does not belong to your organization.' });
+    }
+    if (officeId) {
+      const office = await prisma.office.findFirst({
+        where: { id: officeId, orgId: req.user.orgId }, select: { id: true },
+      });
+      if (!office) return res.status(400).json({ success: false, message: 'Office does not belong to your organization.' });
     }
     let allowedMethod;
     if (checkInMethod !== undefined) {
@@ -186,11 +203,16 @@ const updateUser = async (req, res, next) => {
         ...(lastName !== undefined ? { lastName } : {}),
         ...(status !== undefined ? { status } : {}),
         ...(departmentId !== undefined ? { departmentId: departmentId || null } : {}),
+        ...(officeId !== undefined ? { officeId: officeId || null } : {}),
         ...(shiftType !== undefined ? { shiftType } : {}),
         ...(allowedMethod !== undefined ? { checkInMethod: allowedMethod } : {}),
         ...(phone !== undefined ? { phone: phone || null } : {}),
       },
-      select: { id: true, firstName: true, lastName: true, email: true, role: true, status: true, checkInMethod: true, phone: true },
+      select: {
+        id: true, firstName: true, lastName: true, email: true, role: true, status: true,
+        checkInMethod: true, phone: true, shiftType: true, officeId: true,
+        office: { select: { id: true, name: true } },
+      },
     });
     res.json({ success: true, data: user });
   } catch (err) { next(err); }
@@ -346,7 +368,7 @@ const getNotifications = async (req, res, next) => {
 
 const createEmployee = async (req, res, next) => {
   try {
-    const { firstName, lastName, email, password, employeeCode, departmentId, shiftType, phone, checkInMethod = 'PHONE' } = req.body;
+    const { firstName, lastName, email, password, employeeCode, departmentId, officeId, shiftType, phone, checkInMethod = 'MANUAL' } = req.body;
     const targetOrgId = await resolveAdminOrgId(req);
 
     const org = await prisma.organization.findUnique({
@@ -370,6 +392,23 @@ const createEmployee = async (req, res, next) => {
       });
       if (!department) return res.status(400).json({ success: false, message: 'Department does not belong to your organization.' });
     }
+
+    let targetOfficeId = null;
+    if (officeId) {
+      const office = await prisma.office.findFirst({
+        where: { id: officeId, orgId: targetOrgId, isActive: true }, select: { id: true },
+      });
+      if (!office) return res.status(400).json({ success: false, message: 'Selected office does not belong to your organization.' });
+      targetOfficeId = office.id;
+    } else {
+      const defaultOffice = await prisma.office.findFirst({
+        where: { orgId: targetOrgId, isActive: true },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
+      targetOfficeId = defaultOffice?.id || null;
+    }
+
     const passwordHash = await bcrypt.hash(password, +(env.BCRYPT_ROUNDS || 12));
     const user = await prisma.user.create({
       data: {
@@ -381,12 +420,17 @@ const createEmployee = async (req, res, next) => {
         passwordHash,
         role: 'EMPLOYEE',
         status: 'ACTIVE',
-        shiftType: shiftType || 'MORNING',
+        shiftType: shiftType || 'FULL_TIME',
         departmentId: departmentId || null,
+        officeId: targetOfficeId,
         phone: phone || null,
         checkInMethod: allowedMethod,
       },
-      select: { id: true, firstName: true, lastName: true, email: true, employeeCode: true, role: true, status: true, shiftType: true, phone: true, checkInMethod: true },
+      select: {
+        id: true, firstName: true, lastName: true, email: true, employeeCode: true,
+        role: true, status: true, shiftType: true, phone: true, checkInMethod: true,
+        officeId: true, office: { select: { id: true, name: true } },
+      },
     });
     // Initialize leave balances
     const types = ['ANNUAL','SICK','CASUAL','MATERNITY','PATERNITY','UNPAID','COMPASSIONATE'];
@@ -396,6 +440,39 @@ const createEmployee = async (req, res, next) => {
       await prisma.leaveBalance.create({ data: { id: uuidv4(), employeeId: user.id, leaveType: lt, year, totalEntitled: defaults[lt], remaining: defaults[lt] } });
     }
     res.status(201).json({ success: true, data: user });
+  } catch (err) { next(err); }
+};
+
+const setStationPassword = async (req, res, next) => {
+  try {
+    const { stationPassword } = req.body;
+    if (!stationPassword || typeof stationPassword !== 'string' || stationPassword.length < 6) {
+      return res.status(400).json({ success: false, message: 'Station password must be at least 6 characters.' });
+    }
+    const targetOrgId = await resolveAdminOrgId(req);
+    const kioskPasswordHash = await bcrypt.hash(stationPassword, +(env.BCRYPT_ROUNDS || 12));
+    await prisma.organization.update({
+      where: { id: targetOrgId },
+      data: { kioskPasswordHash },
+    });
+    res.json({ success: true, message: 'PWA 2.0 Station Password updated successfully.' });
+  } catch (err) { next(err); }
+};
+
+const getStationPasswordStatus = async (req, res, next) => {
+  try {
+    const targetOrgId = await resolveAdminOrgId(req);
+    const org = await prisma.organization.findUnique({
+      where: { id: targetOrgId },
+      select: { kioskPasswordHash: true, shiftSchedules: true },
+    });
+    res.json({
+      success: true,
+      data: {
+        hasStationPassword: Boolean(org?.kioskPasswordHash),
+        shiftSchedules: org?.shiftSchedules || null,
+      },
+    });
   } catch (err) { next(err); }
 };
 
@@ -627,5 +704,6 @@ module.exports = {
   getNotifications, createEmployee,
   getManualAttendance, findManualEmployee, manualCheckIn, manualCheckOut,
   listPenalties, createPenalty, deletePenalty, waiveEmployeeAutoPenalties,
+  setStationPassword, getStationPasswordStatus,
   resolveAdminOrgId,
 };

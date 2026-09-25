@@ -8,6 +8,8 @@ export interface AdminOrganization {
   hasStudents: boolean;
   openingTime?: string | null;
   timezone?: string | null;
+  shiftSchedules?: Record<string, { openTime: string; closeTime: string; label?: string }> | null;
+  hasStationPassword?: boolean;
 }
 
 export interface AdminUser {
@@ -21,6 +23,9 @@ export interface AdminUser {
   status: string;
   lastLoginAt?: string | null;
   checkInMethod?: EmployeeCheckInMethod | null;
+  officeId?: string | null;
+  office?: { id: string; name: string } | null;
+  shiftType?: string;
   organization: AdminOrganization;
 }
 
@@ -44,6 +49,9 @@ export interface ManualAttendanceEmployee {
   lastName: string;
   employeeCode?: string | null;
   department?: { id?: string; name?: string | null } | string | null;
+  officeId?: string | null;
+  office?: { id: string; name: string } | null;
+  shiftType?: string;
   checkInMethod: EmployeeCheckInMethod;
   attendance?: AttendanceSummary | null;
 }

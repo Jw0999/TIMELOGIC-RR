@@ -87,6 +87,10 @@ router.post('/reset',                            ctrl.resetSystem);
 router.put('/users/:userId/suspend',             ctrl.suspendAdmin);
 router.put('/users/:userId/activate',            ctrl.activateAdmin);
 router.put('/users/:userId/name',                 ctrl.renameAdmin);
+router.put('/users/:userId/password', [
+  body('newPassword').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+], validate, ctrl.resetAdminPassword);
+router.put('/users/:userId/office',              ctrl.reassignUserOffice);
 router.put('/users/:userId/reassign',            ctrl.reassignEmployee);
 
 module.exports = router;

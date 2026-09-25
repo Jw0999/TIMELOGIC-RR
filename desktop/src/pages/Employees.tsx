@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Search, UserPlus, Smartphone, X, Eye, Camera, Pencil, Settings2 } from 'lucide-react';
 import Header from '../components/Header';
-import { fetchEmployees, createEmployee, updateEmployee, suspendUser, activateUser, deleteEmployee, resetDevice, fetchDepartments, fetchEmployeeSummary } from '../services';
+import { fetchEmployees, createEmployee, updateEmployee, suspendUser, activateUser, deleteEmployee, resetDevice, fetchDepartments, fetchEmployeeSummary, fetchAdminOrg } from '../services';
 import { API_URL, SOCKET_URL } from '../config';
 import { getToken, authenticatedFetch } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -17,47 +17,76 @@ const STATUS_STYLE: Record<string, string> = {
   TERMINATED: 'bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400',
 };
 
-const SHIFTS = ['MORNING', 'AFTERNOON', 'NIGHT', 'FLEXIBLE'];
+const SHIFTS = [
+  { value: 'FULL_TIME', label: 'Full Time' },
+  { value: 'MORNING', label: 'Morning Shift' },
+  { value: 'EVENING', label: 'Evening Shift' },
+];
+
+const SHIFT_LABEL: Record<string, string> = {
+  FULL_TIME: 'Full Time',
+  MORNING: 'Morning',
+  EVENING: 'Evening',
+  AFTERNOON: 'Afternoon',
+  NIGHT: 'Night',
+  FLEXIBLE: 'Flexible',
+};
 
 const METHOD_LABEL: Record<EmployeeCheckInMethod, string> = {
-  PHONE: 'Phone / Device',
-  MANUAL: 'Manual by Admin',
-  BOTH: 'Phone + Manual',
+  PHONE: 'Phone / Device (Coming Soon)',
+  MANUAL: 'Attendance Station / Kiosk (PWA 2.0)',
+  BOTH: 'Phone + Station (Coming Soon)',
 };
 
 function availableMethods(organization: AdminOrganization | null): EmployeeCheckInMethod[] {
   if (!organization) return [];
   const methods: EmployeeCheckInMethod[] = [];
-  if (organization.allowDeviceCheckIn) methods.push('PHONE');
   if (organization.allowManualCheckIn) methods.push('MANUAL');
+  if (organization.allowDeviceCheckIn) methods.push('PHONE');
   if (organization.allowDeviceCheckIn && organization.allowManualCheckIn) methods.push('BOTH');
-  return methods;
+  return methods.length > 0 ? methods : ['MANUAL'];
 }
 
 function defaultMethod(organization: AdminOrganization | null): EmployeeCheckInMethod {
-  return availableMethods(organization)[0] ?? 'PHONE';
+  return 'MANUAL';
 }
 
 interface AddForm {
   firstName: string; lastName: string; email: string; password: string;
-  employeeCode: string; shiftType: string; departmentId: string; phone: string;
+  employeeCode: string; shiftType: string; departmentId: string; officeId: string; phone: string;
   checkInMethod: EmployeeCheckInMethod;
 }
-const defaultForm = (organization: AdminOrganization | null): AddForm => ({ firstName: '', lastName: '', email: '', password: '', employeeCode: '', shiftType: 'MORNING', departmentId: '', phone: '', checkInMethod: defaultMethod(organization) });
+const defaultForm = (organization: AdminOrganization | null, offices: any[]): AddForm => ({
+  firstName: '', lastName: '', email: '', password: '', employeeCode: '',
+  shiftType: 'FULL_TIME', departmentId: '', officeId: offices[0]?.id || '', phone: '',
+  checkInMethod: 'MANUAL',
+});
 
-function AddEmployeeModal({ depts, organization, onClose, onSaved }: { depts: any[]; organization: AdminOrganization; onClose: () => void; onSaved: () => void }) {
-  const [form, setForm] = useState<AddForm>(() => defaultForm(organization));
+function AddEmployeeModal({ depts, offices, organization, onClose, onSaved }: { depts: any[]; offices: any[]; organization: AdminOrganization; onClose: () => void; onSaved: () => void }) {
+  const [form, setForm] = useState<AddForm>(() => defaultForm(organization, offices));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const methods = availableMethods(organization);
   const up = <K extends keyof AddForm,>(k: K, v: AddForm[K]) => setForm((p) => ({ ...p, [k]: v }));
 
+  const handleMethodSelect = (selectedMethod: EmployeeCheckInMethod) => {
+    if (selectedMethod === 'PHONE' || selectedMethod === 'BOTH') {
+      alert('This feature is coming soon!\n\nEmployee check-in is currently performed using the Attendance Station / Kiosk (PWA 2.0).');
+      up('checkInMethod', 'MANUAL');
+      return;
+    }
+    up('checkInMethod', selectedMethod);
+  };
+
   const submit = async () => {
     if (!form.firstName || !form.lastName || !form.email || !form.password) { setError('First name, last name, email and password are required.'); return; }
-    if (!methods.includes(form.checkInMethod)) { setError('Choose a check-in method enabled for this organization.'); return; }
     setLoading(true); setError('');
     try {
-      await createEmployee({ ...form, departmentId: form.departmentId || undefined });
+      await createEmployee({
+        ...form,
+        departmentId: form.departmentId || undefined,
+        officeId: form.officeId || undefined,
+      });
       onSaved(); onClose();
     } catch (err: any) { setError(err?.message ?? 'Failed to add employee'); }
     finally { setLoading(false); }
@@ -68,7 +97,7 @@ function AddEmployeeModal({ depts, organization, onClose, onSaved }: { depts: an
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--card-bg)] rounded-3xl w-full max-w-lg shadow-2xl">
+      <div className="bg-[var(--card-bg)] rounded-3xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border)]">
           <h2 className="text-lg font-bold text-[var(--text-main)]">Add New Employee</h2>
           <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-main)]"><X size={20} /></button>
@@ -87,26 +116,32 @@ function AddEmployeeModal({ depts, organization, onClose, onSaved }: { depts: an
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={labelCls}>Shift Type</label>
-              <select className={inputCls} value={form.shiftType} onChange={(e) => up('shiftType', e.target.value)}>
-                {SHIFTS.map((s) => <option key={s} value={s}>{s}</option>)}
+              <label className={labelCls}>Assigned Office *</label>
+              <select className={inputCls} value={form.officeId} onChange={(e) => up('officeId', e.target.value)}>
+                {offices.map((o: any) => <option key={o.id} value={o.id}>{o.name}</option>)}
               </select>
             </div>
             <div>
-              <label className={labelCls}>Department</label>
-              <select className={inputCls} value={form.departmentId} onChange={(e) => up('departmentId', e.target.value)}>
-                <option value="">None</option>
-                {depts.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              <label className={labelCls}>Shift Type *</label>
+              <select className={inputCls} value={form.shiftType} onChange={(e) => up('shiftType', e.target.value)}>
+                {SHIFTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
             </div>
           </div>
           <div>
+            <label className={labelCls}>Department</label>
+            <select className={inputCls} value={form.departmentId} onChange={(e) => up('departmentId', e.target.value)}>
+              <option value="">None</option>
+              {depts.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          </div>
+          <div>
             <label className={labelCls}>Employee Check-In Method *</label>
-            <select className={inputCls} value={form.checkInMethod} onChange={(e) => up('checkInMethod', e.target.value as EmployeeCheckInMethod)} disabled={methods.length === 0}>
+            <select className={inputCls} value={form.checkInMethod} onChange={(e) => handleMethodSelect(e.target.value as EmployeeCheckInMethod)}>
               {methods.map((method) => <option key={method} value={method}>{METHOD_LABEL[method]}</option>)}
             </select>
             <p className="text-[11px] text-[var(--text-muted)] mt-1">
-              Only methods enabled by the Super Admin are available. At the Admin station, the employee confirms each manual action with their own password.
+              At the PWA 2.0 Attendance Station, the employee verifies their attendance with their own password and face scan.
             </p>
           </div>
         </div>
@@ -125,33 +160,47 @@ function EditCheckInMethodModal({
   employee,
   organization,
   departments,
+  offices,
   onClose,
   onSaved,
 }: {
   employee: any;
   organization: AdminOrganization;
   departments: any[];
+  offices: any[];
   onClose: () => void;
   onSaved: () => void;
 }) {
   const methods = availableMethods(organization);
   const current = employee.checkInMethod as EmployeeCheckInMethod | undefined;
   const [departmentId, setDepartmentId] = useState(employee.departmentId ?? '');
+  const [officeId, setOfficeId] = useState(employee.officeId ?? employee.office?.id ?? (offices[0]?.id || ''));
+  const [shiftType, setShiftType] = useState(employee.shiftType ?? 'FULL_TIME');
   const [method, setMethod] = useState<EmployeeCheckInMethod>(() => (
     current && methods.includes(current) ? current : defaultMethod(organization)
   ));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const save = async () => {
-    if (!methods.includes(method)) {
-      setError('No enabled check-in method is available for this organization.');
+  const handleMethodSelect = (selectedMethod: EmployeeCheckInMethod) => {
+    if (selectedMethod === 'PHONE' || selectedMethod === 'BOTH') {
+      alert('This feature is coming soon!\n\nEmployee check-in is currently performed using the Attendance Station / Kiosk (PWA 2.0).');
+      setMethod('MANUAL');
       return;
     }
+    setMethod(selectedMethod);
+  };
+
+  const save = async () => {
     setLoading(true);
     setError('');
     try {
-      await updateEmployee(employee.id, { checkInMethod: method, departmentId });
+      await updateEmployee(employee.id, {
+        checkInMethod: method,
+        departmentId: departmentId || undefined,
+        officeId: officeId || undefined,
+        shiftType,
+      });
       onSaved();
       onClose();
     } catch (err) {
@@ -161,45 +210,62 @@ function EditCheckInMethodModal({
     }
   };
 
+  const inputCls = 'w-full border border-[var(--input-border)] bg-[var(--input-bg)] text-[var(--text-main)] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
+  const labelCls = 'block text-xs font-semibold text-[var(--text-muted)] mb-1.5';
+
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl w-full max-w-md shadow-2xl">
+      <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border)]">
           <div>
-            <h2 className="text-lg font-bold text-[var(--text-main)]">Edit Check-In Method</h2>
+            <h2 className="text-lg font-bold text-[var(--text-main)]">Edit Employee Settings</h2>
             <p className="text-xs text-[var(--text-muted)] mt-0.5">{employee.firstName} {employee.lastName}</p>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">Department</label>
-            <select value={departmentId} onChange={(event) => setDepartmentId(event.target.value)} className="w-full border border-[var(--input-border)] bg-[var(--input-bg)] text-[var(--text-main)] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
-              <option value="">No department</option>
-              {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
-            </select>
-            <p className="text-[11px] text-[var(--text-muted)] mt-1">The employee will follow this department's break window immediately.</p>
           </div>
           <button onClick={onClose} className="text-[var(--text-muted)]"><X size={20} /></button>
         </div>
         <div className="p-6 space-y-4">
           {error && <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm text-red-700 dark:text-red-400">{error}</div>}
+          
           <div>
-            <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">Allowed method</label>
-            <select value={method} onChange={(event) => setMethod(event.target.value as EmployeeCheckInMethod)} disabled={methods.length === 0}
-              className="w-full border border-[var(--input-border)] bg-[var(--input-bg)] text-[var(--text-main)] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50">
+            <label className={labelCls}>Assigned Office *</label>
+            <select value={officeId} onChange={(e) => setOfficeId(e.target.value)} className={inputCls}>
+              {offices.map((office) => <option key={office.id} value={office.id}>{office.name}</option>)}
+            </select>
+            <p className="text-[11px] text-[var(--text-muted)] mt-1">Isolates check-in sessions and absence reconciliation to this office.</p>
+          </div>
+
+          <div>
+            <label className={labelCls}>Shift Type *</label>
+            <select value={shiftType} onChange={(e) => setShiftType(e.target.value)} className={inputCls}>
+              {SHIFTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className={labelCls}>Department</label>
+            <select value={departmentId} onChange={(event) => setDepartmentId(event.target.value)} className={inputCls}>
+              <option value="">No department</option>
+              {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
+            </select>
+            <p className="text-[11px] text-[var(--text-muted)] mt-1">The employee will follow this department's break window immediately.</p>
+          </div>
+
+          <div>
+            <label className={labelCls}>Allowed Check-In Method</label>
+            <select value={method} onChange={(event) => handleMethodSelect(event.target.value as EmployeeCheckInMethod)} className={inputCls}>
               {methods.map((option) => <option key={option} value={option}>{METHOD_LABEL[option]}</option>)}
             </select>
           </div>
-          {current && !methods.includes(current) && (
-            <p className="text-xs text-amber-700 dark:text-amber-400">The current {METHOD_LABEL[current]} method is no longer enabled organization-wide. Saving will move this employee to an available method.</p>
-          )}
+
           <div className="rounded-xl bg-[var(--hover-bg)] p-3 text-xs text-[var(--text-muted)]">
-            Effective channels are always the intersection of this employee setting and the organization-wide permissions.
+            Employee attendance is recorded at the designated PWA 2.0 station for their assigned office.
           </div>
         </div>
         <div className="flex justify-end gap-3 px-6 pb-6">
           <button onClick={onClose} className="px-4 py-2 border border-[var(--border)] text-[var(--text-main)] rounded-xl text-sm font-semibold">Cancel</button>
-          <button onClick={() => void save()} disabled={loading || methods.length === 0}
+          <button onClick={() => void save()} disabled={loading}
             className="px-5 py-2 bg-primary-700 hover:bg-primary-800 text-white rounded-xl text-sm font-bold disabled:opacity-50">
-            {loading ? 'Saving...' : 'Save Method'}
+            {loading ? 'Saving...' : 'Save Settings'}
           </button>
         </div>
       </div>
@@ -414,9 +480,11 @@ export default function Employees() {
   const { organization } = useAuth();
   const [employees, setEmployees] = useState<any[]>([]);
   const [depts, setDepts] = useState<any[]>([]);
+  const [offices, setOffices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [shift, setShift] = useState('All');
+  const [selectedOffice, setSelectedOffice] = useState('All');
   const [showAdd, setShowAdd] = useState(false);
   const [viewEmp, setViewEmp] = useState<any>(null);
   const [editEmp, setEditEmp] = useState<any>(null);
@@ -424,24 +492,28 @@ export default function Employees() {
 
   const load = () => {
     setLoadError('');
-    Promise.all([fetchEmployees(), fetchDepartments()])
-      .then(([e, d]) => {
+    Promise.all([fetchEmployees(), fetchDepartments(), fetchAdminOrg()])
+      .then(([e, d, org]) => {
         const emps = e.filter((u: any) => u.role === 'EMPLOYEE');
         setEmployees(emps);
         setDepts(d);
+        if (org?.offices) setOffices(org.offices);
         if (viewEmp) {
           const fresh = emps.find((u: any) => u.id === viewEmp.id);
           if (fresh) setViewEmp(fresh);
         }
       })
-        .catch((err: any) => setLoadError(err?.message ?? 'Could not load employees.'))
+      .catch((err: any) => setLoadError(err?.message ?? 'Could not load employees.'))
       .finally(() => setLoading(false));
   };
-      useEffect(() => { load(); const timer = setInterval(load, 10000); return () => clearInterval(timer); }, []);
+  useEffect(() => { load(); const timer = setInterval(load, 10000); return () => clearInterval(timer); }, []);
 
   const filtered = employees.filter((e) => {
     const name = `${e.firstName} ${e.lastName} ${e.email} ${e.employeeCode ?? ''}`.toLowerCase();
-    return name.includes(search.toLowerCase()) && (shift === 'All' || e.shiftType === shift);
+    const matchesSearch = name.includes(search.toLowerCase());
+    const matchesShift = shift === 'All' || e.shiftType === shift;
+    const matchesOffice = selectedOffice === 'All' || (e.officeId ? e.officeId === selectedOffice : e.office?.id === selectedOffice);
+    return matchesSearch && matchesShift && matchesOffice;
   });
 
   return (
@@ -463,25 +535,41 @@ export default function Employees() {
       />
       <div className="flex-1 overflow-y-auto p-6">
         {loadError && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{loadError}</div>}
-        <div className="flex items-center gap-3 mb-5">
-          <div className="relative flex-1 max-w-sm">
+        <div className="flex flex-wrap items-center gap-3 mb-5">
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search employees..."
               className="w-full pl-9 pr-4 py-2.5 border border-[var(--input-border)] bg-[var(--input-bg)] text-[var(--text-main)] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
           </div>
-          {['All', ...SHIFTS].map((s) => (
-            <button key={s} onClick={() => setShift(s)}
-              className={`text-xs font-semibold px-3 py-2 rounded-xl transition ${shift === s ? 'bg-primary-700 text-white' : 'bg-[var(--card-bg)] border border-[var(--border)] text-[var(--text-main)] hover:bg-[var(--hover-bg)]'}`}>
-              {s}
-            </button>
-          ))}
+
+          {offices.length > 1 && (
+            <select
+              value={selectedOffice}
+              onChange={(e) => setSelectedOffice(e.target.value)}
+              className="border border-[var(--border)] bg-[var(--card-bg)] text-[var(--text-main)] text-xs font-semibold px-3 py-2.5 rounded-xl"
+            >
+              <option value="All">All Offices</option>
+              {offices.map((o) => (
+                <option key={o.id} value={o.id}>{o.name}</option>
+              ))}
+            </select>
+          )}
+
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {['All', ...SHIFTS.map((s) => s.value)].map((s) => (
+              <button key={s} onClick={() => setShift(s)}
+                className={`text-xs font-semibold px-3 py-2 rounded-xl transition ${shift === s ? 'bg-primary-700 text-white' : 'bg-[var(--card-bg)] border border-[var(--border)] text-[var(--text-main)] hover:bg-[var(--hover-bg)]'}`}>
+                {s === 'All' ? 'All Shifts' : (SHIFT_LABEL[s] || s)}
+              </button>
+            ))}
+          </div>
         </div>
         {loading ? <Spinner /> : (
           <div className="bg-[var(--card-bg)] rounded-2xl border border-[var(--border)] shadow-sm overflow-hidden transition-colors">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[var(--border)] bg-[var(--hover-bg)]">
-                  {['Employee','Code','Department','Shift','Method','Face','Status','Actions'].map((h) => (
+                  {['Employee','Code','Office','Department','Shift','Method','Face','Status','Actions'].map((h) => (
                     <th key={h} className="text-left text-xs font-semibold text-[var(--text-muted)] px-4 py-3">{h}</th>
                   ))}
                 </tr>
@@ -505,11 +593,16 @@ export default function Employees() {
                       </div>
                     </td>
                     <td className="px-4 py-3 font-mono text-sm text-primary-600">{e.employeeCode ?? '—'}</td>
+                    <td className="px-4 py-3 font-medium text-[var(--text-main)]">
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-800">
+                        {e.office?.name ?? 'Main Office'}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-[var(--text-muted)]">{e.department?.name ?? '—'}</td>
-                    <td className="px-4 py-3"><span className="text-xs font-medium text-[var(--text-muted)] bg-[var(--hover-bg)] px-2 py-0.5 rounded-full border border-[var(--border)]">{e.shiftType}</span></td>
+                    <td className="px-4 py-3"><span className="text-xs font-medium text-[var(--text-muted)] bg-[var(--hover-bg)] px-2 py-0.5 rounded-full border border-[var(--border)]">{SHIFT_LABEL[e.shiftType] ?? e.shiftType}</span></td>
                     <td className="px-4 py-3">
                       <span className="text-[11px] font-bold text-primary-700 bg-primary-100 dark:bg-primary-900/30 px-2 py-1 rounded-full whitespace-nowrap">
-                        {METHOD_LABEL[(e.checkInMethod as EmployeeCheckInMethod) ?? 'PHONE'] ?? e.checkInMethod ?? '—'}
+                        {METHOD_LABEL[(e.checkInMethod as EmployeeCheckInMethod) ?? 'MANUAL'] ?? e.checkInMethod ?? '—'}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -528,7 +621,7 @@ export default function Employees() {
                         <button onClick={() => setViewEmp(e)} className="p-1.5 rounded-lg hover:bg-[var(--hover-bg)] text-[var(--text-muted)] transition" title="View profile"><Eye size={14} /></button>
                         {e.status !== 'TERMINATED' && (
                           <>
-                            <button onClick={() => setEditEmp(e)} className="p-1.5 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/20 text-primary-600 transition" title="Edit check-in method"><Pencil size={14} /></button>
+                            <button onClick={() => setEditEmp(e)} className="p-1.5 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/20 text-primary-600 transition" title="Edit employee settings"><Pencil size={14} /></button>
                             <button onClick={async () => { e.status === 'ACTIVE' ? await suspendUser(e.id) : await activateUser(e.id); load(); }}
                               className={`text-xs font-semibold px-2 py-1 rounded-lg transition ${e.status === 'ACTIVE' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 hover:bg-amber-100' : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 hover:bg-emerald-100'}`}>
                               {e.status === 'ACTIVE' ? 'Suspend' : 'Activate'}
@@ -561,8 +654,8 @@ export default function Employees() {
           </div>
         )}
       </div>
-      {showAdd && organization && <AddEmployeeModal depts={depts} organization={organization} onClose={() => setShowAdd(false)} onSaved={load} />}
-      {editEmp && organization && <EditCheckInMethodModal employee={editEmp} organization={organization} departments={depts} onClose={() => setEditEmp(null)} onSaved={load} />}
+      {showAdd && organization && <AddEmployeeModal depts={depts} offices={offices} organization={organization} onClose={() => setShowAdd(false)} onSaved={load} />}
+      {editEmp && organization && <EditCheckInMethodModal employee={editEmp} organization={organization} departments={depts} offices={offices} onClose={() => setEditEmp(null)} onSaved={load} />}
       {viewEmp && <EmployeeDetailModal emp={viewEmp} onClose={() => setViewEmp(null)} onRefresh={load} />}
     </div>
   );

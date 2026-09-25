@@ -98,8 +98,12 @@ export const fetchEmployees = async () => {
 export const fetchEmployeeSummary = (id: string) => api.get<any>(`/admin/users/${id}/summary`).then((r) => r.data);
 export const fetchPlanInfo    = () => api.get<any>('/admin/plan').then((r) => r.data);
 export const createEmployee   = (body: any) => api.post<any>('/admin/employees', body).then((r) => r.data);
-export const updateEmployee   = (id: string, body: { checkInMethod: EmployeeCheckInMethod; departmentId?: string }) =>
+export const updateEmployee   = (id: string, body: { checkInMethod?: EmployeeCheckInMethod; departmentId?: string; officeId?: string; shiftType?: string }) =>
   api.put<any>(`/admin/users/${id}`, body).then((r) => r.data);
+export const setStationPassword = (stationPassword: string) =>
+  api.put<any>('/admin/station-password', { stationPassword }).then((r) => r.data);
+export const fetchStationPasswordStatus = () =>
+  api.get<any>('/admin/station-password').then((r) => r.data);
 export const suspendUser      = (id: string) => api.put<any>(`/admin/users/${id}/suspend`, {});
 export const activateUser     = (id: string) => api.put<any>(`/admin/users/${id}`, { status: 'ACTIVE' });
 export const deleteEmployee   = (id: string) => api.delete<any>(`/admin/users/${id}`);

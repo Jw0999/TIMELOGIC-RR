@@ -37,12 +37,14 @@ const me = async (req, res, next) => {
         role: true, status: true, shiftType: true,
         checkInMethod: true, phone: true,
         profileImageUrl: true, employeeCode: true,
-        departmentId: true, orgId: true, lastLoginAt: true, createdAt: true,
+        departmentId: true, officeId: true, orgId: true, lastLoginAt: true, createdAt: true,
         department: { select: { name: true } },
+        office: { select: { id: true, name: true } },
         organization: {
           select: {
             id: true, name: true, allowDeviceCheckIn: true, allowManualCheckIn: true,
             hasStudents: true, openingTime: true, timezone: true,
+            shiftSchedules: true,
           },
         },
       },
@@ -56,10 +58,29 @@ const me = async (req, res, next) => {
 
 const changePassword = async (req, res, next) => {
   try {
+    if (req.user.role === 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'Organization Admin passwords can only be changed by the Super Administrator.',
+      });
+    }
     const { currentPassword, newPassword } = req.body;
     await AuthService.changePassword(req.user.id, currentPassword, newPassword);
     res.json({ success: true, message: 'Password changed' });
   } catch (err) { next(err); }
 };
 
-module.exports = { login, logout, refresh, me, changePassword };
+const stationLogin = async (req, res, next) => {
+  try {
+    const { identifier, email, password } = req.body;
+    const cleanId = identifier || email;
+    const result = await AuthService.stationLogin(cleanId, password, {
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+    res.json({ success: true, data: result });
+  } catch (err) { next(err); }
+};
+
+module.exports = { login, logout, refresh, me, changePassword, stationLogin };
+

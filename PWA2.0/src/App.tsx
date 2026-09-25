@@ -153,13 +153,13 @@ function LoginScreen({ onLogin }: { onLogin: (user: AdminUser) => void }) {
           </div>
 
           <div className="form-group">
-            <label>Password</label>
+            <label>Station Password</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
-              placeholder="••••••••••••"
+              placeholder="Enter PWA 2.0 Station Password"
             />
           </div>
 
@@ -168,7 +168,7 @@ function LoginScreen({ onLogin }: { onLogin: (user: AdminUser) => void }) {
           </button>
 
           <p className="login-note">
-            Only Administrator accounts can initialize and monitor this kiosk.
+            Use your organization email and the Station Password configured in the Desktop App Settings.
           </p>
         </form>
       </section>

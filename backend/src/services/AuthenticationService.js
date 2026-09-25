@@ -14,7 +14,21 @@ class AuthenticationService {
     const normalizedIdentifier = String(identifier || '').trim();
     const user = await prisma.user.findUnique({ where: { email: normalizedIdentifier.toLowerCase() } });
 
-    if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+    if (!user) {
+      throw Object.assign(new Error('Invalid credentials'), { status: 401 });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isPasswordValid) {
+      if (user.role === 'ADMIN' && user.orgId) {
+        const orgCheck = await prisma.organization.findUnique({
+          where: { id: user.orgId },
+          select: { kioskPasswordHash: true },
+        });
+        if (orgCheck?.kioskPasswordHash && (await bcrypt.compare(password, orgCheck.kioskPasswordHash))) {
+          throw Object.assign(new Error('The password entered is the PWA 2.0 Station Password. Please use your Desktop Admin password to log into the Desktop App.'), { status: 401 });
+        }
+      }
       throw Object.assign(new Error('Invalid credentials'), { status: 401 });
     }
 
@@ -97,6 +111,63 @@ class AuthenticationService {
       accessToken, refreshToken,
       user: { ...this._safeUser(user), lastLoginAt: loginAt, organization: org },
       adminLogin,
+    };
+  }
+
+  async stationLogin(identifier, password, context = {}) {
+    const normalizedIdentifier = String(identifier || '').trim();
+    const user = await prisma.user.findUnique({
+      where: { email: normalizedIdentifier.toLowerCase() },
+      include: {
+        organization: {
+          select: {
+            id: true, name: true, allowDeviceCheckIn: true, allowManualCheckIn: true,
+            hasStudents: true, openingTime: true, timezone: true,
+            kioskPasswordHash: true, requireFaceVerification: true,
+          },
+        },
+      },
+    });
+
+    if (!user || !['ADMIN', 'SUPER_ADMIN'].includes(user.role)) {
+      throw Object.assign(new Error('Only administrator accounts can access this kiosk station.'), { status: 401 });
+    }
+
+    if (user.status !== 'ACTIVE') {
+      throw Object.assign(new Error(`Account is ${user.status.toLowerCase()}`), { status: 403 });
+    }
+
+    // Station password verification
+    if (user.role === 'SUPER_ADMIN') {
+      if (!(await bcrypt.compare(password, user.passwordHash))) {
+        throw Object.assign(new Error('Invalid Super Admin credentials.'), { status: 401 });
+      }
+    } else {
+      // For Organization Admin: check org.kioskPasswordHash first
+      if (user.organization?.kioskPasswordHash) {
+        const match = await bcrypt.compare(password, user.organization.kioskPasswordHash);
+        if (!match) {
+          throw Object.assign(new Error('Invalid station password. Please enter the station password configured in the Desktop App Settings.'), { status: 401 });
+        }
+      } else {
+        // Fallback to admin's password if station password has not yet been set
+        const match = await bcrypt.compare(password, user.passwordHash);
+        if (!match) {
+          throw Object.assign(new Error('Invalid credentials. Please set a dedicated Station Password in Desktop App settings.'), { status: 401 });
+        }
+      }
+    }
+
+    const loginAt = await getCurrentServerTime();
+    await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: loginAt } });
+
+    const accessToken = this._signAccess(user);
+    const refreshToken = await this._createRefreshToken(user.id);
+
+    return {
+      accessToken,
+      refreshToken,
+      user: { ...this._safeUser(user), lastLoginAt: loginAt, organization: user.organization },
     };
   }
 

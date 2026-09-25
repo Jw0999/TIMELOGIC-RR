@@ -165,8 +165,10 @@ func main() {
 	showMessage(
 		"TimeLogic Admin — Update Complete",
 		"✓ TimeLogic Admin has been successfully updated!\n\n"+
-			"• Live biometric verification & check-in integration\n"+
-			"• Manual & absent penalties management\n"+
+			"• Multi-office employee isolation & office routing\n"+
+			"• Full Time, Morning, and Evening shift schedules\n"+
+			"• Dedicated PWA 2.0 Station kiosk password configuration\n"+
+			"• Absence & lateness penalties automation\n"+
 			"• Strict department break windows & leave approvals\n\n"+
 			"Connected to production backend:\n"+
 			"https://timelogic-backend.onrender.com\n\n"+

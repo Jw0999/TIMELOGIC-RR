@@ -21,6 +21,8 @@ model Organization {
   requireFaceVerification  Boolean           @default(false)
   openingTime              String            @default("08:00")
   timezone           String            @default("Africa/Lagos")
+  kioskPasswordHash  String?
+  shiftSchedules     Json?
   adminLoginEvents   AdminLoginEvent[]
   departments        Department[]
   offices            Office[]
@@ -58,6 +60,7 @@ model Office {
   overstayPenalty       Int                 @default(0)
   sessions              AttendanceSession[]
   organization          Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  employees             User[]              @relation("OfficeEmployees")
   securitySettings      SecuritySettings?
   wifiFingerprints      WiFiFingerprint[]
 
@@ -83,6 +86,7 @@ model User {
   id                 String                @id @default(uuid())
   orgId              String
   departmentId       String?
+  officeId           String?
   firstName          String
   lastName           String
   email              String                @unique
@@ -127,6 +131,7 @@ model User {
   manualPenalties    ManualPenalty[]       @relation("EmployeeManualPenalties")
   createdPenalties   ManualPenalty[]       @relation("CreatedManualPenalties")
   department         Department?           @relation("DepartmentEmployees", fields: [departmentId], references: [id])
+  office             Office?               @relation("OfficeEmployees", fields: [officeId], references: [id])
   organization       Organization          @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@unique([orgId, employeeCode])
@@ -585,7 +590,9 @@ enum BreakType {
 }
 
 enum ShiftType {
+  FULL_TIME
   MORNING
+  EVENING
   AFTERNOON
   NIGHT
   FLEXIBLE

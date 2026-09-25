@@ -37,6 +37,9 @@ class AttendanceService {
     if (session.office.orgId !== employee.orgId) {
       return { success: false, reason: 'SESSION_CLOSED', message: 'This attendance session does not belong to your organization.' };
     }
+    if (employee.officeId && session.office?.id && employee.officeId !== session.office.id) {
+      return { success: false, reason: 'OFFICE_MISMATCH', message: `This employee belongs to ${employee.office?.name || 'another office'} and cannot check in at this office session.` };
+    }
 
     // Gate: must be on the company Wi-Fi BEFORE we reveal a code
     const wifi = this._checkWifi(session.office, ctx, employeeId);
@@ -361,6 +364,9 @@ class AttendanceService {
     if (session.office.orgId !== employee.orgId) {
       return { success: false, reason: 'SESSION_CLOSED', message: 'This attendance session does not belong to your organization.' };
     }
+    if (employee.officeId && session.office?.id && employee.officeId !== session.office.id) {
+      return { success: false, reason: 'OFFICE_MISMATCH', message: `This employee belongs to ${employee.office?.name || 'another office'} and cannot check in at ${session.office?.name || 'this office'}.` };
+    }
     await this._assertEmployeeMayCheckIn(employeeId, clockInTime, session.office.timezone);
 
     // The session starts AUTO_SESSION_LEAD_MIN before official opening. Keep
@@ -390,7 +396,7 @@ class AttendanceService {
     // can be verified by IP. Self-healing: tracks dynamic IP changes daily.
     await this._learnOfficeIp(session.office, ctx);
     // ── Attendance rules: status + penalty ──
-    const { status, penalty } = this._computeStatusAndPenalty(clockInTime, session);
+    const { status, penalty } = this._computeStatusAndPenalty(clockInTime, session, employee);
     const today = attendanceDate(clockInTime, {
       ...session.office,
       openingReference: session.startTime,
@@ -551,6 +557,12 @@ class AttendanceService {
       role: 'EMPLOYEE',
       status: 'ACTIVE',
       checkInMethod: { in: ['MANUAL', 'BOTH'] },
+      ...(selectedSession?.office?.id ? {
+        OR: [
+          { officeId: selectedSession.office.id },
+          { officeId: null },
+        ],
+      } : {}),
       ...(search ? {
         OR: [
           { firstName: { contains: search, mode: 'insensitive' } },
@@ -575,7 +587,8 @@ class AttendanceService {
         select: {
           id: true, firstName: true, lastName: true, employeeCode: true,
           email: true, checkInMethod: true, phone: true, profileImageUrl: true,
-          faceEncodingData: true,
+          faceEncodingData: true, shiftType: true, officeId: true,
+          office: { select: { id: true, name: true } },
           department: { select: { name: true } },
           attendanceRecords: selectedSession ? {
             where: { sessionId: selectedSession.id, date: recordDate },
@@ -742,9 +755,12 @@ class AttendanceService {
 
     const session = await this._loadManualSession(sessionId, employee.orgId, clockInTime);
     if (!officeHoursFor(clockInTime, session.office)) throw Object.assign(new Error('This office is closed today.'), { status: 400 });
+    if (employee.officeId && session.officeId && employee.officeId !== session.officeId) {
+      throw Object.assign(new Error(`This employee is assigned to ${employee.office?.name || 'another office'} and cannot check in at ${session.office?.name || 'this office'}.`), { status: 403, code: 'OFFICE_MISMATCH' });
+    }
     await this._assertEmployeeMayCheckIn(employeeId, clockInTime, session.office.timezone);
 
-    const { status, penalty } = this._computeStatusAndPenalty(clockInTime, session);
+    const { status, penalty } = this._computeStatusAndPenalty(clockInTime, session, employee);
     const record = await this._persistCheckIn({
       employeeId, sessionId, date: attendanceDate(clockInTime, {
         ...session.office,
@@ -851,6 +867,9 @@ class AttendanceService {
         faceBlockedUntil: true,
         faceMismatchCount: true,
         faceLastMismatchAt: true,
+        officeId: true,
+        office: { select: { id: true, name: true } },
+        shiftType: true,
         ...(
           includePassword ? { passwordHash: true } : {}
         ),
@@ -858,7 +877,7 @@ class AttendanceService {
           select: {
             id: true, allowDeviceCheckIn: true, allowManualCheckIn: true,
             hasStudents: true, openingTime: true, timezone: true,
-            requireFaceVerification: true,
+            requireFaceVerification: true, shiftSchedules: true,
           },
         },
       },
@@ -894,6 +913,7 @@ class AttendanceService {
             closeTime: true,
             weeklySchedule: true,
             absentPenalty: true,
+            organization: { select: { shiftSchedules: true } },
           },
         },
       },
@@ -904,13 +924,28 @@ class AttendanceService {
     if (!officeHoursFor(session.startTime, session.office)) return;
 
     const employees = await prisma.user.findMany({
-      where: { orgId: session.office.orgId, role: 'EMPLOYEE', status: 'ACTIVE' },
-      select: { id: true, createdAt: true },
+      where: {
+        orgId: session.office.orgId,
+        officeId: session.office.id,
+        role: 'EMPLOYEE',
+        status: 'ACTIVE',
+      },
+      select: { id: true, createdAt: true, shiftType: true },
     });
 
+    const nowServer = await getCurrentServerTime();
     for (const employee of employees) {
       const empCreatedDate = dateOnly(employee.createdAt || new Date(), tz);
       if (date < empCreatedDate) continue;
+
+      // Shift check: an evening worker should not be marked absent during morning hours
+      if (employee.shiftType === 'EVENING') {
+        const eveningClose = session.office.organization?.shiftSchedules?.EVENING?.closeTime || '18:00';
+        const eveningCloseAt = atZonedTime(nowServer, eveningClose, tz);
+        if (eveningCloseAt && nowServer < eveningCloseAt) {
+          continue;
+        }
+      }
 
       const leave = await prisma.leaveRequest.findFirst({
         where: { employeeId: employee.id, status: 'APPROVED', startDate: { lte: date }, endDate: { gte: date } },
@@ -956,17 +991,23 @@ class AttendanceService {
       select: { id: true },
     });
 
-    const activeEmployees = await prisma.user.findMany({
-      where: { orgId, role: 'EMPLOYEE', status: 'ACTIVE' },
-      select: { id: true, firstName: true, lastName: true, createdAt: true },
-    });
-    if (activeEmployees.length === 0) return;
-
     for (const office of org.offices) {
       const tz = office.timezone || org.timezone || 'Africa/Lagos';
       const nowParts = zonedParts(now, tz);
       const todayDate = dateOnly(now, tz);
       const todayKey = dateKey(now, tz);
+
+      // Multi-office isolation: only reconcile employees assigned to this specific office
+      const activeEmployees = await prisma.user.findMany({
+        where: {
+          orgId,
+          officeId: office.id,
+          role: 'EMPLOYEE',
+          status: 'ACTIVE',
+        },
+        select: { id: true, firstName: true, lastName: true, createdAt: true, shiftType: true },
+      });
+      if (activeEmployees.length === 0) continue;
 
       let startDate;
       let endDate;
@@ -1042,6 +1083,16 @@ class AttendanceService {
             for (const emp of activeEmployees) {
               const empCreatedDate = dateOnly(emp.createdAt || new Date(), tz);
               if (targetDate < empCreatedDate) continue;
+
+              // Shift check for today: an evening worker should not be marked absent during morning hours
+              if (targetKey === todayKey && emp.shiftType === 'EVENING') {
+                const shiftSchedule = org.shiftSchedules?.EVENING;
+                const eveningCloseTime = shiftSchedule?.closeTime || '18:00';
+                const eveningCloseAt = atZonedTime(now, eveningCloseTime, tz);
+                if (eveningCloseAt && now < eveningCloseAt) {
+                  continue;
+                }
+              }
 
               const clockedIn = await prisma.attendanceRecord.findFirst({
                 where: {
@@ -1263,9 +1314,23 @@ class AttendanceService {
   //  ≤ graceMinutes after open      → PRESENT, no penalty
   //  ≤ lateAfterMinutes after open  → PRESENT, gracePenalty (₦ off salary)
   //  > lateAfterMinutes after open  → COMPLETELY_LATE, latePenalty (₦ off salary)
-  _computeStatusAndPenalty(clockInTime, session) {
+  _computeStatusAndPenalty(clockInTime, session, employee = null) {
     const o = session.office ?? {};
-    const hours = officeHoursFor(clockInTime, o);
+    let hours = officeHoursFor(clockInTime, o);
+
+    // Shift awareness: if employee has a shiftType and organization has shift schedules,
+    // evaluate lateness against the employee's shift start time rather than office openTime.
+    const orgSchedules = employee?.organization?.shiftSchedules || o.organization?.shiftSchedules;
+    if (employee?.shiftType && orgSchedules && orgSchedules[employee.shiftType]) {
+      const shift = orgSchedules[employee.shiftType];
+      if (shift.openTime && shift.closeTime) {
+        hours = {
+          openTime: shift.openTime,
+          closeTime: shift.closeTime,
+        };
+      }
+    }
+
     if (!hours?.openTime) {
       const minutes = (clockInTime.getTime() - session.startTime.getTime()) / 60000;
       if (minutes <= (o.graceMinutes ?? 30)) return { status: 'PRESENT', penalty: 0, minutesLate: Math.max(0, Math.floor(minutes)) };

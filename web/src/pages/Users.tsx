@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { X, Crown, Shield, User, ChevronsUpDown, Calendar, Coffee, AlertTriangle, FileText, ArrowLeftRight, Smartphone } from 'lucide-react';
+import { X, Crown, Shield, User, ChevronsUpDown, Calendar, Coffee, AlertTriangle, FileText, ArrowLeftRight, Smartphone, KeyRound } from 'lucide-react';
 import PageShell from '../components/PageShell';
-import { fetchAllOrgs, fetchOrgUsers, fetchEmployeeRecords, reemployEmployee, suspendAdmin, activateAdmin, renameAdmin, reassignEmployee, resetUserDevice } from '../services';
+import { fetchAllOrgs, fetchOrgUsers, fetchEmployeeRecords, reemployEmployee, suspendAdmin, activateAdmin, renameAdmin, reassignEmployee, resetUserDevice, resetAdminPassword } from '../services';
 import { downloadCSV } from '../utils/csv';
 
 const AVATAR_COLORS = ['#15803d','#0891b2','#7c3aed','#b45309','#be185d','#0369a1','#dc2626','#d97706'];
@@ -163,6 +163,7 @@ export default function Users() {
         onExport={() => downloadCSV('users', filtered.map((u: any) => ({
           Name: `${u.firstName} ${u.lastName}`, Email: u.email, Code: u.employeeCode ?? '',
           Role: u.role, Organization: u.orgName ?? orgs.find((o: any) => o.id === u.orgId)?.name ?? '',
+          Office: u.office?.name ?? '', Shift: u.shiftType ?? '',
           Status: u.status,
         })))}
       >
@@ -175,17 +176,18 @@ export default function Users() {
                 <TH>Code</TH>
                 <TH>Role</TH>
                 <TH>Organization</TH>
+                <TH>Office</TH>
                 <TH>Status</TH>
                 <th className="text-left text-xs font-semibold text-[var(--text-muted)] px-4 py-3">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border)]">
               {(loading || orgsLoading) ? (
-                <tr><td colSpan={7} className="text-center py-14">
+                <tr><td colSpan={8} className="text-center py-14">
                   <div className="flex justify-center"><div className="animate-spin rounded-full h-6 w-6 border-2 border-primary-600 border-t-transparent"/></div>
                 </td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={7} className="text-center py-14 text-sm text-[var(--text-muted)]">No users found</td></tr>
+                <tr><td colSpan={8} className="text-center py-14 text-sm text-[var(--text-muted)]">No users found</td></tr>
               ) : filtered.map((u, idx) => {
                 const color = AVATAR_COLORS[idx % AVATAR_COLORS.length];
                 const badge = STATUS_BADGE[u.status] ?? STATUS_BADGE.ACTIVE;
@@ -214,6 +216,7 @@ export default function Users() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-[var(--text-muted)] text-sm">{u.orgName ?? orgs.find((o: any) => o.id === u.orgId)?.name ?? '—'}</td>
+                    <td className="px-4 py-3 text-[var(--text-muted)] text-sm">{u.office?.name ?? '—'}</td>
                     <td className="px-4 py-3">
                       <span className="flex items-center gap-1.5 text-xs font-bold" style={{ color: badge.text }}>
                         <span className="w-1.5 h-1.5 rounded-full" style={{ background: badge.dot }}/>
@@ -225,6 +228,26 @@ export default function Users() {
                       {u.role === 'ADMIN' && (
                         <div className="flex items-center gap-3">
                           <button onClick={async () => { const firstName = window.prompt('Admin first name', u.firstName); const lastName = firstName === null ? null : window.prompt('Admin last name', u.lastName); if (firstName?.trim() && lastName?.trim()) { try { await renameAdmin(u.id, firstName, lastName); loadUsers(); } catch (err: any) { alert(err?.message ?? 'Could not rename admin.'); } } }} className="text-sm font-semibold text-primary-700 hover:text-primary-900">Rename</button>
+                          <button
+                            onClick={async () => {
+                              const newPass = window.prompt(`Enter new password for Admin ${u.firstName} ${u.lastName} (minimum 8 characters):`);
+                              if (!newPass) return;
+                              if (newPass.length < 8) {
+                                alert('Password must be at least 8 characters long.');
+                                return;
+                              }
+                              try {
+                                await resetAdminPassword(u.id, newPass);
+                                alert(`Password for ${u.firstName} ${u.lastName} updated successfully.`);
+                                loadUsers();
+                              } catch (err: any) {
+                                alert(err?.message ?? 'Could not reset password.');
+                              }
+                            }}
+                            className="text-sm font-semibold text-amber-600 hover:text-amber-800"
+                          >
+                            Reset Password
+                          </button>
                           <button
                             onClick={async () => { u.status === 'ACTIVE' ? await suspendAdmin(u.id) : await activateAdmin(u.id); loadUsers(); }}
                             className={`text-sm font-semibold transition-colors ${u.status === 'ACTIVE' ? 'text-red-600 hover:text-red-800' : 'text-primary-700 hover:text-primary-900'}`}>

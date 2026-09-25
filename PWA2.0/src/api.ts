@@ -65,7 +65,7 @@ export const api = {
 
 export async function login(identifier: string, password: string) {
   const body = identifier.includes('@') ? { email: identifier, password } : { employeeCode: identifier, password };
-  const response = await api.post<{ data: { accessToken: string; refreshToken: string; user: AdminUser } }>('/auth/login', body);
+  const response = await api.post<{ data: { accessToken: string; refreshToken: string; user: AdminUser } }>('/auth/station-login', body);
   if (!['ADMIN', 'SUPER_ADMIN'].includes(response.data.user.role)) throw new Error('Only administrator accounts can use this station.');
   accessToken = response.data.accessToken;
   localStorage.setItem('timelogic_admin_access', response.data.accessToken);
@@ -76,7 +76,7 @@ export async function login(identifier: string, password: string) {
 export interface AdminUser { id: string; firstName: string; lastName: string; role: string; orgId: string; organization?: Organization }
 export interface Organization { id: string; name: string; allowManualCheckIn: boolean; hasStudents?: boolean; requireFaceVerification?: boolean; timezone?: string | null }
 export interface Attendance { sessionId?: string; clockInTime?: string | null; clockOutTime?: string | null; status?: string | null; penalty?: number | null; session?: { office?: { timezone?: string | null } | null } | null }
-export interface Employee { id: string; firstName: string; lastName: string; email?: string | null; employeeCode?: string | null; profileImageUrl?: string | null; hasFaceEnrolled?: boolean; department?: { name?: string | null } | string | null; checkInMethod: string; attendance?: Attendance | null }
+export interface Employee { id: string; firstName: string; lastName: string; email?: string | null; employeeCode?: string | null; profileImageUrl?: string | null; hasFaceEnrolled?: boolean; department?: { name?: string | null } | string | null; officeId?: string | null; office?: { id: string; name: string } | null; shiftType?: string | null; checkInMethod: string; attendance?: Attendance | null }
 export interface Session { id: string; sessionName?: string | null; office?: { name?: string | null; timezone?: string | null } | string | null; startTime?: string | null; endTime?: string | null }
 export interface Dashboard { enabled: boolean; serverTime: string; organization: Organization; activeSessions: Session[]; selectedSession: Session | null; employees: Employee[]; total?: number; totalPages?: number }
 export interface LiveAttendance { employeeId: string; clockInTime?: string | null; clockOutTime?: string | null; employee?: Employee }
