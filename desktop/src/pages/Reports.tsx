@@ -87,7 +87,7 @@ export default function Reports() {
         title="Reports & Analytics"
         subtitle={`Live data · Last updated ${displayRefreshedAt} WAT`}
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
             <button onClick={() => setAutoRefresh(!autoRefresh)}
               className={`text-xs font-semibold px-3 py-2 rounded-xl transition border ${autoRefresh ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 border-primary-200 dark:border-primary-700' : 'border-[var(--border)] text-[var(--text-muted)] bg-[var(--hover-bg)]'}`}>
               {autoRefresh ? '⬤ Live' : '○ Paused'}
@@ -112,7 +112,7 @@ export default function Reports() {
 
         {/* Live stats grid */}
         {loading ? <Spinner /> : (
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {statCards.map((s) => (
               <div key={s.label} className="bg-[var(--card-bg)] rounded-2xl border border-[var(--border)] shadow-sm p-4 transition-colors">
                 <div className={`w-9 h-9 rounded-xl ${s.bg} flex items-center justify-center mb-2`}>
@@ -135,7 +135,7 @@ export default function Reports() {
               </h3>
               {monthlyData.period && <span className="text-xs text-[var(--text-muted)]">{monthlyData.period}</span>}
             </div>
-            <div className="grid grid-cols-4 gap-4 mb-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
               {[
                 { label: 'Total Present', value: monthlyData.totalPresent ?? 0, color: 'text-emerald-600' },
                 { label: 'Total Late', value: monthlyData.totalLate ?? 0, color: 'text-amber-600' },
@@ -169,7 +169,7 @@ export default function Reports() {
         <div className="bg-[var(--card-bg)] rounded-2xl border border-[var(--border)] shadow-sm p-5 transition-colors">
           <h3 className="font-bold text-[var(--text-main)] mb-3">Full Database Export</h3>
           <p className="text-sm text-[var(--text-muted)] mb-4">Downloads include: <strong>all attendance records</strong> (check-in, check-out, status), <strong>all employees</strong>, <strong>leave requests</strong>, <strong>break records</strong>, and <strong>fraud alerts</strong>.</p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {[
               { type: 'excel' as const, label: 'Excel (Multi-Sheet)', sub: 'One sheet per data type', icon: FileSpreadsheet, color: 'text-emerald-600' },
               { type: 'csv'   as const, label: 'CSV (All Records)',   sub: 'Flat file — all attendance data', icon: FileText,       color: 'text-slate-600' },

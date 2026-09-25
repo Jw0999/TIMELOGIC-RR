@@ -37,12 +37,12 @@ export default function Header({ title, subtitle, action }: Props) {
   ];
 
   return (
-    <div className="flex items-center justify-between px-6 py-4 bg-[var(--card-bg)] border-b border-[var(--border)] transition-colors">
-      <div>
-        <h1 className="text-xl font-bold text-[var(--text-main)]">{title}</h1>
-        {subtitle && <p className="text-sm text-[var(--text-muted)] mt-0.5">{subtitle}</p>}
+    <div className="flex items-center justify-between px-6 py-4 bg-[var(--card-bg)] border-b border-[var(--border)] transition-colors gap-4">
+      <div className="min-w-0">
+        <h1 className="text-xl font-bold text-[var(--text-main)] truncate">{title}</h1>
+        {subtitle && <p className="text-sm text-[var(--text-muted)] mt-0.5 truncate">{subtitle}</p>}
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 shrink-0 flex-wrap justify-end">
         {user?.role === 'SUPER_ADMIN' && organizations?.length > 0 && (
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[var(--border)] bg-[var(--card-bg)] shadow-sm">
             <Building2 size={15} className="text-primary-600 shrink-0" />

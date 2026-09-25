@@ -99,19 +99,19 @@ export default function Attendance() {
           {(['today', 'past', 'all'] as const).map((option) => <button key={option} onClick={() => setView(option)} className={`text-xs font-semibold px-3 py-2 rounded-xl transition ${view === option ? 'bg-primary-700 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}>{option === 'today' ? 'Today' : option === 'past' ? 'Past Date' : 'All History'}</button>)}
           {view === 'past' && <input type="date" value={pastDate} onChange={(e) => setPastDate(e.target.value)} className="border border-slate-200 rounded-xl px-3 py-2 text-sm" />}
         </div>
-        <div className="flex items-center gap-3 mb-5">
-          <div className="relative flex-1 max-w-sm">
+        <div className="flex flex-wrap items-center gap-3 mb-5">
+          <div className="relative flex-1 min-w-[220px] max-w-sm">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name or employee code..." className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
           </div>
-            {(['All', 'PRESENT', 'LATE', 'COMPLETELY_LATE', 'ABSENT', 'ON_LEAVE'] as const).map((s) => (
+          {(['All', 'PRESENT', 'LATE', 'COMPLETELY_LATE', 'ABSENT', 'ON_LEAVE'] as const).map((s) => (
             <button key={s} onClick={() => setFilter(s)} className={`text-xs font-semibold px-3 py-2 rounded-xl transition ${filter === s ? 'bg-primary-700 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{s.replace('_', ' ')}</button>
           ))}
         </div>
         {loading ? <Spinner /> : (
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm min-w-[950px]">
                 <thead><tr className="bg-slate-50 border-b border-slate-100">
                   <th className="text-left text-xs font-semibold text-slate-500 px-5 py-3">Employee</th>
                   <th className="text-left text-xs font-semibold text-slate-500 px-4 py-3">Date</th>
@@ -120,7 +120,7 @@ export default function Attendance() {
                   <th className="text-left text-xs font-semibold text-slate-500 px-4 py-3">Status</th>
                   <th className="text-left text-xs font-semibold text-slate-500 px-4 py-3">Penalty</th>
                   <th className="text-left text-xs font-semibold text-slate-500 px-4 py-3">Source / Verification</th>
-                  <th className="text-left text-xs font-semibold text-slate-500 px-4 py-3">Actions</th>
+                  <th className="sticky right-0 bg-slate-50 text-left text-xs font-semibold text-slate-500 px-4 py-3 shadow-[-4px_0_6px_rgba(0,0,0,0.06)] z-10">Actions</th>
                 </tr></thead>
                 <tbody className="divide-y divide-slate-50">
                   {filtered.map((r: any) => {
@@ -175,7 +175,7 @@ export default function Attendance() {
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="sticky right-0 bg-white px-4 py-3 shadow-[-4px_0_6px_rgba(0,0,0,0.06)] z-10">
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={async () => {
@@ -217,22 +217,24 @@ export default function Attendance() {
               <h2 className="font-bold text-slate-800">Month-end penalty summary</h2>
               <p className="text-xs text-slate-500 mt-1">{monthlyPenalties.month} has {monthlyPenalties.daysInMonth} days. Totals include the full calendar month.</p>
             </div>
-            <table className="w-full text-sm">
-              <thead><tr className="bg-slate-50 border-b border-slate-100">
-                <th className="text-left text-xs font-semibold text-slate-500 px-5 py-3">Employee</th>
-                <th className="text-left text-xs font-semibold text-slate-500 px-4 py-3">Department</th>
-                <th className="text-left text-xs font-semibold text-slate-500 px-4 py-3">Attendance days</th>
-                <th className="text-left text-xs font-semibold text-slate-500 px-4 py-3">Total penalty</th>
-              </tr></thead>
-              <tbody className="divide-y divide-slate-50">
-                {monthlyPenalties.employees.map((employee: any) => <tr key={employee.id}>
-                  <td className="px-5 py-3 font-semibold text-slate-800">{employee.firstName} {employee.lastName} <span className="text-xs font-normal text-slate-400">{employee.employeeCode || ''}</span></td>
-                  <td className="px-4 py-3 text-slate-500">{employee.department?.name ?? 'No department'}</td>
-                  <td className="px-4 py-3 text-slate-700">{employee.attendanceCount}</td>
-                  <td className="px-4 py-3 font-bold text-red-600">₦{Number(employee.totalPenalty).toLocaleString()}</td>
-                </tr>)}
-              </tbody>
-            </table>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[650px]">
+                <thead><tr className="bg-slate-50 border-b border-slate-100">
+                  <th className="text-left text-xs font-semibold text-slate-500 px-5 py-3">Employee</th>
+                  <th className="text-left text-xs font-semibold text-slate-500 px-4 py-3">Department</th>
+                  <th className="text-left text-xs font-semibold text-slate-500 px-4 py-3">Attendance days</th>
+                  <th className="text-left text-xs font-semibold text-slate-500 px-4 py-3">Total penalty</th>
+                </tr></thead>
+                <tbody className="divide-y divide-slate-50">
+                  {monthlyPenalties.employees.map((employee: any) => <tr key={employee.id}>
+                    <td className="px-5 py-3 font-semibold text-slate-800">{employee.firstName} {employee.lastName} <span className="text-xs font-normal text-slate-400">{employee.employeeCode || ''}</span></td>
+                    <td className="px-4 py-3 text-slate-500">{employee.department?.name ?? 'No department'}</td>
+                    <td className="px-4 py-3 text-slate-700">{employee.attendanceCount}</td>
+                    <td className="px-4 py-3 font-bold text-red-600">₦{Number(employee.totalPenalty).toLocaleString()}</td>
+                  </tr>)}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>

@@ -466,20 +466,22 @@ export default function Students() {
 
         {view === 'history' ? (historyLoading ? <Spinner /> : (
           <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card-bg)] shadow-sm">
-            <table className="w-full text-sm">
-              <thead><tr className="border-b border-[var(--border)] bg-[var(--hover-bg)]">
-                {['Date', 'Student', 'Code', 'Check In', 'Check Out'].map((heading) => <th key={heading} className="px-4 py-3 text-left text-xs font-semibold text-[var(--text-muted)]">{heading}</th>)}
-              </tr></thead>
-              <tbody className="divide-y divide-[var(--border)]">
-                {history.map((record) => <tr key={record.id} className="hover:bg-[var(--hover-bg)]">
-                  <td className="px-4 py-3 text-[var(--text-muted)]">{new Date(record.date).toLocaleDateString('en-NG', { timeZone: organization?.timezone || 'Africa/Lagos' })}</td>
-                  <td className="px-4 py-3 font-semibold text-[var(--text-main)]">{record.student.firstName} {record.student.lastName}</td>
-                  <td className="px-4 py-3 font-mono text-primary-600">{record.student.studentCode}</td>
-                  <td className="px-4 py-3 text-[var(--text-main)]">{formatServerTime(record.checkInTime, organization?.timezone)}</td>
-                  <td className="px-4 py-3 text-[var(--text-main)]">{formatServerTime(record.checkOutTime, organization?.timezone)}</td>
-                </tr>)}
-              </tbody>
-            </table>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[650px]">
+                <thead><tr className="border-b border-[var(--border)] bg-[var(--hover-bg)]">
+                  {['Date', 'Student', 'Code', 'Check In', 'Check Out'].map((heading) => <th key={heading} className="px-4 py-3 text-left text-xs font-semibold text-[var(--text-muted)]">{heading}</th>)}
+                </tr></thead>
+                <tbody className="divide-y divide-[var(--border)]">
+                  {history.map((record) => <tr key={record.id} className="hover:bg-[var(--hover-bg)]">
+                    <td className="px-4 py-3 text-[var(--text-muted)]">{new Date(record.date).toLocaleDateString('en-NG', { timeZone: organization?.timezone || 'Africa/Lagos' })}</td>
+                    <td className="px-4 py-3 font-semibold text-[var(--text-main)]">{record.student.firstName} {record.student.lastName}</td>
+                    <td className="px-4 py-3 font-mono text-primary-600">{record.student.studentCode}</td>
+                    <td className="px-4 py-3 text-[var(--text-main)]">{formatServerTime(record.checkInTime, organization?.timezone)}</td>
+                    <td className="px-4 py-3 text-[var(--text-main)]">{formatServerTime(record.checkOutTime, organization?.timezone)}</td>
+                  </tr>)}
+                </tbody>
+              </table>
+            </div>
             {!history.length && <div className="py-12 text-center text-sm text-[var(--text-muted)]">No student attendance records found.</div>}
           </div>
         )) : loading ? <Spinner /> : (
@@ -488,9 +490,10 @@ export default function Students() {
               <table className="w-full min-w-[900px] text-sm">
                 <thead>
                   <tr className="border-b border-[var(--border)] bg-[var(--hover-bg)]">
-                    {['Student', 'Code', 'Class / Group', 'Status', 'Today’s Attendance', 'Manual Attendance', 'Actions'].map((heading) => (
+                    {['Student', 'Code', 'Class / Group', 'Status', 'Today’s Attendance', 'Manual Attendance'].map((heading) => (
                       <th key={heading} className="px-4 py-3 text-left text-xs font-semibold text-[var(--text-muted)]">{heading}</th>
                     ))}
+                    <th className="sticky right-0 bg-[var(--hover-bg)] px-4 py-3 text-left text-xs font-semibold text-[var(--text-muted)] shadow-[-4px_0_6px_rgba(0,0,0,0.06)] z-10">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
@@ -555,7 +558,7 @@ export default function Students() {
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="sticky right-0 bg-[var(--card-bg)] px-4 py-3 shadow-[-4px_0_6px_rgba(0,0,0,0.06)] z-10">
                           <div className="flex items-center gap-1.5">
                             <button onClick={() => setEditing(student)} title="Edit student" aria-label={`Edit ${student.firstName} ${student.lastName}`}
                               className="rounded-lg p-1.5 text-[var(--text-muted)] transition hover:bg-primary-50 hover:text-primary-700 dark:hover:bg-primary-900/30">

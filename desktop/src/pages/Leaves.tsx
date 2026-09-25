@@ -36,8 +36,8 @@ export default function Leaves() {
     <div className="flex flex-col h-full overflow-hidden">
       <Header title="Leave Requests" subtitle={`${requests.filter((r) => r.status === 'PENDING').length} pending`} action={<button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-primary-700 text-white text-sm font-bold"><Plus size={15} />Add leave</button>} />
       <div className="flex-1 overflow-y-auto p-6">
-        <div className="flex items-center gap-3 mb-5">
-          <div className="relative flex-1 max-w-sm">
+        <div className="flex flex-wrap items-center gap-3 mb-5">
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search employee..." className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
           </div>
@@ -49,14 +49,14 @@ export default function Leaves() {
           <div className="space-y-3">
             {filtered.map((r: any) => (
               <div key={r.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-                <div className="flex items-start justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
                       <span className="text-sm font-bold text-primary-700">{r.employee?.firstName?.[0]}{r.employee?.lastName?.[0]}</span>
                     </div>
                     <div>
                       <p className="font-bold text-slate-800">{r.employee?.firstName} {r.employee?.lastName}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
+                      <div className="flex flex-wrap items-center gap-2 mt-0.5">
                         <span className="text-xs font-bold bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full">{r.leaveType}</span>
                         <span className="text-sm text-slate-600">{fmtDate(r.startDate)} → {fmtDate(r.endDate)}</span>
                         <span className="text-sm font-semibold text-slate-700">({r.totalDays}d)</span>
@@ -64,7 +64,7 @@ export default function Leaves() {
                       {r.reason && <p className="text-sm text-slate-500 mt-1 italic">"{r.reason}"</p>}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLE[r.status] ?? 'bg-slate-100 text-slate-500'}`}>{r.status}</span>
                     {r.status === 'APPROVED' && (
                       <button onClick={async () => { await stopLeave(r.id); load(); }} className="flex items-center gap-1 bg-slate-700 hover:bg-slate-800 text-white text-xs font-semibold px-3 py-2 rounded-xl">Stop leave</button>

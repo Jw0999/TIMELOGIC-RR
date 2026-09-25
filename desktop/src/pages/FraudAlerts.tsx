@@ -40,7 +40,7 @@ export default function FraudAlerts() {
     <div className="flex flex-col h-full overflow-hidden">
       <Header title="Fraud Alerts" subtitle={`${alerts.filter((a) => a.status === 'NEW').length} new · ${alerts.length} total`} />
       <div className="flex-1 overflow-y-auto p-6">
-        <div className="flex gap-2 mb-5">
+        <div className="flex flex-wrap gap-2 mb-5">
           {['All', 'NEW', 'INVESTIGATING', 'RESOLVED', 'DISMISSED'].map((s) => (
             <button key={s} onClick={() => setFilter(s)} className={`text-xs font-semibold px-3 py-2 rounded-xl transition ${filter === s ? 'bg-primary-700 text-white' : 'bg-[var(--card-bg)] border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--hover-bg)]'}`}>{s}</button>
           ))}
@@ -49,7 +49,7 @@ export default function FraudAlerts() {
           <div className="space-y-3">
             {filtered.map((a: any) => (
               <div key={a.id} className={`bg-[var(--card-bg)] rounded-2xl border shadow-sm p-5 ${a.status === 'NEW' ? 'border-red-300 dark:border-red-800' : 'border-[var(--border)]'}`}>
-                <div className="flex items-start justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                   <div className="flex items-start gap-3">
                     <div className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ${SEVERITY_DOT[a.severity?.toLowerCase()] ?? 'bg-slate-300'}`} />
                     <div>
@@ -71,7 +71,7 @@ export default function FraudAlerts() {
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLE[a.status] ?? 'bg-slate-100 text-slate-500'}`}>{a.status}</span>
                     {a.status === 'NEW' && <>
                       <button onClick={async () => { await escalateAlert(a.id); load(); }} className="flex items-center gap-1 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold px-3 py-2 rounded-xl"><Eye size={12} />Investigate</button>

@@ -103,7 +103,7 @@ export default function Sessions() {
         {showCreate && (
           <div className="mb-6 bg-[var(--card-bg)] rounded-2xl border border-[var(--border)] shadow-sm p-5">
             <h3 className="font-bold text-[var(--text-main)] mb-4">New Attendance Session</h3>
-            <div className="grid grid-cols-3 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
               <div>
                 <label className={labelCls}>Session Name</label>
                 <input value={newName} onChange={(e) => setNewName(e.target.value)} className={inputCls} />
@@ -140,14 +140,14 @@ export default function Sessions() {
           <div className="space-y-4">
             {sessions.map((s: any) => (
               <div key={s.id} className="bg-[var(--card-bg)] rounded-2xl border border-[var(--border)] shadow-sm p-5 transition-colors">
-                <div className="flex items-start justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-3 mb-1">
                       <h3 className="font-bold text-[var(--text-main)]">{s.sessionName}</h3>
                       <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${STATUS_STYLE[s.status] ?? 'bg-slate-100 text-slate-500'}`}>{s.status}</span>
                       {s.status === 'ACTIVE' && <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />}
                     </div>
-                    <div className="flex items-center gap-4 text-xs text-[var(--text-muted)]">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-[var(--text-muted)]">
                       <span>{s.office?.name ?? 'Office'}</span>
                       <span className="flex items-center gap-1"><Clock size={11} />QR every {s.qrRefreshInterval}s</span>
                       <span className="flex items-center gap-1"><Users size={11} />{s._count?.attendanceRecords ?? 0} checked in</span>
@@ -157,7 +157,7 @@ export default function Sessions() {
                       {s.office?.closeTime && <span>Checkout after {s.office.closeTime}</span>}
                     </div>
                   </div>
-                  <div className="flex gap-2 flex-wrap justify-end">
+                  <div className="flex gap-2 flex-wrap sm:justify-end">
                     {s.status === 'ACTIVE' && <>
                       <button onClick={() => act(() => pauseSession(s.id))} className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold px-3 py-2 rounded-xl transition"><Pause size={13} />Pause</button>
                       <button onClick={() => act(() => refreshQR(s.id))} className="flex items-center gap-1.5 bg-[var(--hover-bg)] hover:bg-[var(--border)] text-[var(--text-main)] text-xs font-semibold px-3 py-2 rounded-xl transition"><RefreshCw size={13} />Refresh QR</button>

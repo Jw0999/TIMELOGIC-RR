@@ -296,7 +296,7 @@ export default function Penalties() {
         )}
 
         {/* Top Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-[var(--card-bg)] p-4 rounded-2xl border border-[var(--border)]">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-[var(--text-muted)]">Total Penalties</span>
@@ -369,10 +369,10 @@ export default function Penalties() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm min-w-[850px]">
                 <thead>
                   <tr className="bg-[var(--hover-bg)] border-b border-[var(--border)]">
-                    {['Employee', 'Manual', 'Entries', 'Auto Penalties', 'Total', 'Action'].map((heading) => (
+                    {['Employee', 'Manual', 'Entries', 'Auto Penalties', 'Total'].map((heading) => (
                       <th
                         key={heading}
                         className="text-left text-xs font-semibold text-[var(--text-muted)] px-4 py-3"
@@ -380,6 +380,9 @@ export default function Penalties() {
                         {heading}
                       </th>
                     ))}
+                    <th className="sticky right-0 bg-[var(--hover-bg)] text-left text-xs font-semibold text-[var(--text-muted)] px-4 py-3 shadow-[-4px_0_6px_rgba(0,0,0,0.06)] z-10">
+                      Action
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
@@ -486,7 +489,7 @@ export default function Penalties() {
                         </td>
 
                         {/* Action column */}
-                        <td className="px-4 py-3">
+                        <td className="sticky right-0 bg-[var(--card-bg)] px-4 py-3 shadow-[-4px_0_6px_rgba(0,0,0,0.06)] z-10">
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => {

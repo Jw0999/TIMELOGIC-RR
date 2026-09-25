@@ -126,7 +126,7 @@ export default function Emergency() {
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
 
         {/* Live status banner */}
-        <div className="bg-[var(--card-bg)] rounded-2xl border border-[var(--border)] shadow-sm p-4 flex items-center gap-6 transition-colors">
+        <div className="bg-[var(--card-bg)] rounded-2xl border border-[var(--border)] shadow-sm p-4 flex flex-wrap items-center gap-6 transition-colors">
           <div className="flex items-center gap-2">
             <div className={`w-3 h-3 rounded-full animate-pulse ${(liveStats?.activeSessions ?? 0) > 0 ? 'bg-emerald-500' : 'bg-slate-300'}`} />
             <span className="text-sm font-semibold text-[var(--text-main)]">Live Status</span>
@@ -152,7 +152,7 @@ export default function Emergency() {
         </div>
 
         {/* Action buttons */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {visibleActions.map((a) => (
             <div key={a.key} className="bg-[var(--card-bg)] rounded-2xl border border-[var(--border)] shadow-sm p-5 transition-colors">
               <div className="flex items-start gap-3 mb-4">
@@ -183,7 +183,7 @@ export default function Emergency() {
           {log.length === 0 ? (
             <div className="text-center py-10 text-sm text-[var(--text-muted)]">No emergency actions taken in this session</div>
           ) : log.map((h) => (
-            <div key={h.id} className="px-5 py-4 flex items-center justify-between border-b border-[var(--border)]">
+            <div key={h.id} className="px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)]">
               <div className="flex items-center gap-3">
                 {h.status === 'pending' && <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary-600 border-t-transparent flex-shrink-0" />}
                 {h.status === 'success' && <CheckCircle size={16} className="text-emerald-500 flex-shrink-0" />}

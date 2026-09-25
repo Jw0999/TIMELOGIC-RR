@@ -267,50 +267,55 @@ export default function ManualCheckIn() {
               {loading && !dashboard ? (
                 <div className="h-64 flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-600 border-t-transparent" /></div>
               ) : (
-                <table className="w-full text-sm">
-                  <thead><tr className="bg-[var(--hover-bg)] border-b border-[var(--border)]">
-                    {['Employee', 'Department', 'Method', 'Clock In', 'Clock Out', 'Status', 'Action'].map((heading) => (
-                      <th key={heading} className="text-left text-xs font-semibold text-[var(--text-muted)] px-4 py-3">{heading}</th>
-                    ))}
-                  </tr></thead>
-                  <tbody className="divide-y divide-[var(--border)]">
-                    {(dashboard?.employees ?? []).map((employee) => {
-                      const attendance = employee.attendance;
-                      const hasCheckedIn = Boolean(attendance?.clockInTime);
-                      const hasCheckedOut = Boolean(attendance?.clockOutTime);
-                      return (
-                        <tr key={employee.id} className="hover:bg-[var(--hover-bg)] transition-colors">
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-9 h-9 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-xs font-bold text-primary-700">
-                                {employee.firstName?.[0]}{employee.lastName?.[0]}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm min-w-[850px]">
+                    <thead><tr className="bg-[var(--hover-bg)] border-b border-[var(--border)]">
+                      {['Employee', 'Department', 'Method', 'Clock In', 'Clock Out', 'Status'].map((heading) => (
+                        <th key={heading} className="text-left text-xs font-semibold text-[var(--text-muted)] px-4 py-3">{heading}</th>
+                      ))}
+                      <th className="sticky right-0 bg-[var(--hover-bg)] text-left text-xs font-semibold text-[var(--text-muted)] px-4 py-3 shadow-[-4px_0_6px_rgba(0,0,0,0.06)] z-10">
+                        Action
+                      </th>
+                    </tr></thead>
+                    <tbody className="divide-y divide-[var(--border)]">
+                      {(dashboard?.employees ?? []).map((employee) => {
+                        const attendance = employee.attendance;
+                        const hasCheckedIn = Boolean(attendance?.clockInTime);
+                        const hasCheckedOut = Boolean(attendance?.clockOutTime);
+                        return (
+                          <tr key={employee.id} className="hover:bg-[var(--hover-bg)] transition-colors">
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-9 h-9 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-xs font-bold text-primary-700">
+                                  {employee.firstName?.[0]}{employee.lastName?.[0]}
+                                </div>
+                                <div><p className="font-semibold text-[var(--text-main)]">{employee.firstName} {employee.lastName}</p><p className="text-xs text-[var(--text-muted)]">{employee.employeeCode ?? 'No code'}</p></div>
                               </div>
-                              <div><p className="font-semibold text-[var(--text-main)]">{employee.firstName} {employee.lastName}</p><p className="text-xs text-[var(--text-muted)]">{employee.employeeCode ?? 'No code'}</p></div>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-[var(--text-muted)]">{departmentName(employee)}</td>
-                          <td className="px-4 py-3"><span className="text-[11px] font-bold rounded-full px-2 py-1 bg-primary-100 text-primary-700 dark:bg-primary-900/30">{employee.checkInMethod}</span></td>
-                          <td className="px-4 py-3 font-medium text-[var(--text-main)]">{formatTime(attendance?.clockInTime, attendance?.session?.office?.timezone ?? dashboard?.organization?.timezone)}</td>
-                          <td className="px-4 py-3 font-medium text-[var(--text-main)]">{formatTime(attendance?.clockOutTime, attendance?.session?.office?.timezone ?? dashboard?.organization?.timezone)}</td>
-                          <td className="px-4 py-3"><span className="text-xs font-bold text-[var(--text-muted)]">{attendance?.status?.replace(/_/g, ' ') ?? 'NOT CHECKED IN'}</span></td>
-                          <td className="px-4 py-3">
-                            {!hasCheckedIn ? (
-                              <button disabled={!activeSessionId} onClick={() => setPending({ kind: 'check-in', employee })}
-                                className="inline-flex items-center gap-1.5 rounded-lg bg-primary-700 hover:bg-primary-800 text-white text-xs font-bold px-3 py-2 disabled:opacity-40">
-                                <LogIn size={13} />Check In
-                              </button>
-                            ) : !hasCheckedOut ? (
-                              <button onClick={() => setPending({ kind: 'check-out', employee })}
-                                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold px-3 py-2 disabled:opacity-40">
-                                <LogOut size={13} />Check Out
-                              </button>
-                            ) : <span className="text-xs font-semibold text-emerald-600">Completed</span>}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                            </td>
+                            <td className="px-4 py-3 text-[var(--text-muted)]">{departmentName(employee)}</td>
+                            <td className="px-4 py-3"><span className="text-[11px] font-bold rounded-full px-2 py-1 bg-primary-100 text-primary-700 dark:bg-primary-900/30">{employee.checkInMethod}</span></td>
+                            <td className="px-4 py-3 font-medium text-[var(--text-main)]">{formatTime(attendance?.clockInTime, attendance?.session?.office?.timezone ?? dashboard?.organization?.timezone)}</td>
+                            <td className="px-4 py-3 font-medium text-[var(--text-main)]">{formatTime(attendance?.clockOutTime, attendance?.session?.office?.timezone ?? dashboard?.organization?.timezone)}</td>
+                            <td className="px-4 py-3"><span className="text-xs font-bold text-[var(--text-muted)]">{attendance?.status?.replace(/_/g, ' ') ?? 'NOT CHECKED IN'}</span></td>
+                            <td className="sticky right-0 bg-[var(--card-bg)] px-4 py-3 shadow-[-4px_0_6px_rgba(0,0,0,0.06)] z-10">
+                              {!hasCheckedIn ? (
+                                <button disabled={!activeSessionId} onClick={() => setPending({ kind: 'check-in', employee })}
+                                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary-700 hover:bg-primary-800 text-white text-xs font-bold px-3 py-2 disabled:opacity-40">
+                                  <LogIn size={13} />Check In
+                                </button>
+                              ) : !hasCheckedOut ? (
+                                <button onClick={() => setPending({ kind: 'check-out', employee })}
+                                  className="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold px-3 py-2 disabled:opacity-40">
+                                  <LogOut size={13} />Check Out
+                                </button>
+                              ) : <span className="text-xs font-semibold text-emerald-600">Completed</span>}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               )}
               {!loading && (dashboard?.employees?.length ?? 0) === 0 && (
                 <div className="text-center py-14 text-sm text-[var(--text-muted)]">No manual-enabled employees match this search.</div>

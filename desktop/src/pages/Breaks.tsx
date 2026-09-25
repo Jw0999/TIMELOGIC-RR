@@ -289,7 +289,7 @@ export default function Breaks() {
         ) : (
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm min-w-[920px]">
                 <thead>
                   <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
                     <th className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 px-5 py-3">Employee</th>
@@ -301,7 +301,7 @@ export default function Breaks() {
                     <th className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3">Duration</th>
                     <th className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3">Status</th>
                     {view === 'today' && (
-                      <th className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3">Admin Action</th>
+                      <th className="sticky right-0 bg-slate-50 dark:bg-slate-800 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 px-4 py-3 shadow-[-4px_0_6px_rgba(0,0,0,0.06)] z-10">Admin Action</th>
                     )}
                   </tr>
                 </thead>
@@ -401,7 +401,7 @@ export default function Breaks() {
                           )}
                         </td>
                         {view === 'today' && (
-                          <td className="px-4 py-3">
+                          <td className="sticky right-0 bg-white dark:bg-slate-900 px-4 py-3 shadow-[-4px_0_6px_rgba(0,0,0,0.06)] z-10">
                             {!b.endTime && (
                               <button
                                 disabled={starting === b.employee?.id}

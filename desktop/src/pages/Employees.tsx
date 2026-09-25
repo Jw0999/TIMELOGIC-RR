@@ -38,6 +38,12 @@ const METHOD_LABEL: Record<EmployeeCheckInMethod, string> = {
   BOTH: 'Phone + Station (Coming Soon)',
 };
 
+const TABLE_METHOD_LABEL: Record<string, string> = {
+  PHONE: 'Phone (Soon)',
+  MANUAL: 'Station (PWA 2.0)',
+  BOTH: 'Station + Phone',
+};
+
 function availableMethods(organization: AdminOrganization | null): EmployeeCheckInMethod[] {
   if (!organization) return [];
   const methods: EmployeeCheckInMethod[] = [];
@@ -566,90 +572,95 @@ export default function Employees() {
         </div>
         {loading ? <Spinner /> : (
           <div className="bg-[var(--card-bg)] rounded-2xl border border-[var(--border)] shadow-sm overflow-hidden transition-colors">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--border)] bg-[var(--hover-bg)]">
-                  {['Employee','Code','Office','Department','Shift','Method','Face','Status','Actions'].map((h) => (
-                    <th key={h} className="text-left text-xs font-semibold text-[var(--text-muted)] px-4 py-3">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border)]">
-                {filtered.map((e: any) => (
-                  <tr key={e.id} className="hover:bg-[var(--hover-bg)] transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2.5">
-                        {/* Face photo avatar — shows photo if uploaded, initials otherwise */}
-                        {e.profileImageUrl && <img src={fileUrl(e.profileImageUrl, e.updatedAt ?? e.id)} alt="face"
-                          onError={(event) => { event.currentTarget.style.display = 'none'; event.currentTarget.nextElementSibling?.classList.remove('hidden'); }}
-                          className="w-9 h-9 rounded-full object-cover border-2 border-emerald-500 flex-shrink-0" />}
-                        <div className={`w-9 h-9 rounded-full bg-primary-100 dark:bg-primary-900/40 items-center justify-center flex-shrink-0 border-2 border-dashed border-slate-300 ${e.profileImageUrl ? 'hidden' : 'flex'}`}>
-                          <span className="text-xs font-bold text-primary-700">{e.firstName?.[0]}{e.lastName?.[0]}</span>
-                        </div>
-                        <div>
-                          <p className="font-semibold text-[var(--text-main)]">{e.firstName} {e.lastName}</p>
-                          <p className="text-xs text-[var(--text-muted)]">{e.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 font-mono text-sm text-primary-600">{e.employeeCode ?? '—'}</td>
-                    <td className="px-4 py-3 font-medium text-[var(--text-main)]">
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-800">
-                        {e.office?.name ?? 'Main Office'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-[var(--text-muted)]">{e.department?.name ?? '—'}</td>
-                    <td className="px-4 py-3"><span className="text-xs font-medium text-[var(--text-muted)] bg-[var(--hover-bg)] px-2 py-0.5 rounded-full border border-[var(--border)]">{SHIFT_LABEL[e.shiftType] ?? e.shiftType}</span></td>
-                    <td className="px-4 py-3">
-                      <span className="text-[11px] font-bold text-primary-700 bg-primary-100 dark:bg-primary-900/30 px-2 py-1 rounded-full whitespace-nowrap">
-                        {METHOD_LABEL[(e.checkInMethod as EmployeeCheckInMethod) ?? 'MANUAL'] ?? e.checkInMethod ?? '—'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      {e.profileImageUrl
-                        ? <span className="text-xs font-semibold text-emerald-600">✓ Registered</span>
-                        : <span className="text-xs text-amber-600">⚠ Not set</span>
-                      }
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLE[e.status] ?? 'bg-slate-100 text-slate-500'}`}>
-                        {e.status === 'TERMINATED' ? '🚫 SACKED' : e.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-1.5">
-                        <button onClick={() => setViewEmp(e)} className="p-1.5 rounded-lg hover:bg-[var(--hover-bg)] text-[var(--text-muted)] transition" title="View profile"><Eye size={14} /></button>
-                        {e.status !== 'TERMINATED' && (
-                          <>
-                            <button onClick={() => setEditEmp(e)} className="p-1.5 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/20 text-primary-600 transition" title="Edit employee settings"><Pencil size={14} /></button>
-                            <button onClick={async () => { e.status === 'ACTIVE' ? await suspendUser(e.id) : await activateUser(e.id); load(); }}
-                              className={`text-xs font-semibold px-2 py-1 rounded-lg transition ${e.status === 'ACTIVE' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 hover:bg-amber-100' : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 hover:bg-emerald-100'}`}>
-                              {e.status === 'ACTIVE' ? 'Suspend' : 'Activate'}
-                            </button>
-                            {organization?.allowDeviceCheckIn && ['PHONE', 'BOTH'].includes(e.checkInMethod ?? 'PHONE') && <button onClick={async () => {
-                              if (!window.confirm(`Reset device for ${e.firstName} ${e.lastName}?\n\nThis unlinks their current phone. The NEXT device they sign in on becomes their bound device, and the old one will stop working. Use this when an employee gets a new phone.`)) return;
-                              try { await resetDevice(e.id); alert('Device unlinked. The employee can now sign in on their new phone.'); } catch (err: any) { alert(err?.message ?? 'Could not reset device.'); }
-                            }} className="p-1.5 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/20 text-primary-600 transition" title="Reset device (allow login on a new phone)">
-                              <Smartphone size={14} />
-                            </button>}
-                            <button onClick={async () => {
-                              if (!window.confirm(`Terminate ${e.firstName} ${e.lastName}?\n\nThey will be marked as SACKED and can no longer log in.\nAll their records (attendance, leaves, breaks) are preserved and visible only to Super Admin.`)) return;
-                              await deleteEmployee(e.id);
-                              load();
-                            }} className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/20 text-red-500 transition" title="Terminate employee (soft delete)">
-                              <X size={14} />
-                            </button>
-                          </>
-                        )}
-                        {e.status === 'TERMINATED' && (
-                          <span className="text-[10px] text-slate-400 italic px-1">Record only</span>
-                        )}
-                      </div>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[1020px]">
+                <thead>
+                  <tr className="border-b border-[var(--border)] bg-[var(--hover-bg)]">
+                    {['Employee','Code','Office','Department','Shift','Method','Face','Status'].map((h) => (
+                      <th key={h} className="text-left text-xs font-semibold text-[var(--text-muted)] px-4 py-3">{h}</th>
+                    ))}
+                    <th className="sticky right-0 bg-[var(--hover-bg)] text-left text-xs font-semibold text-[var(--text-muted)] px-4 py-3 shadow-[-4px_0_6px_rgba(0,0,0,0.06)] z-10">
+                      Actions
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-[var(--border)]">
+                  {filtered.map((e: any) => (
+                    <tr key={e.id} className="hover:bg-[var(--hover-bg)] transition-colors">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2.5">
+                          {/* Face photo avatar — shows photo if uploaded, initials otherwise */}
+                          {e.profileImageUrl && <img src={fileUrl(e.profileImageUrl, e.updatedAt ?? e.id)} alt="face"
+                            onError={(event) => { event.currentTarget.style.display = 'none'; event.currentTarget.nextElementSibling?.classList.remove('hidden'); }}
+                            className="w-9 h-9 rounded-full object-cover border-2 border-emerald-500 flex-shrink-0" />}
+                          <div className={`w-9 h-9 rounded-full bg-primary-100 dark:bg-primary-900/40 items-center justify-center flex-shrink-0 border-2 border-dashed border-slate-300 ${e.profileImageUrl ? 'hidden' : 'flex'}`}>
+                            <span className="text-xs font-bold text-primary-700">{e.firstName?.[0]}{e.lastName?.[0]}</span>
+                          </div>
+                          <div>
+                            <p className="font-semibold text-[var(--text-main)]">{e.firstName} {e.lastName}</p>
+                            <p className="text-xs text-[var(--text-muted)]">{e.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 font-mono text-sm text-primary-600">{e.employeeCode ?? '—'}</td>
+                      <td className="px-4 py-3 font-medium text-[var(--text-main)]">
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-800">
+                          {e.office?.name ?? 'Main Office'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-[var(--text-muted)]">{e.department?.name ?? '—'}</td>
+                      <td className="px-4 py-3"><span className="text-xs font-medium text-[var(--text-muted)] bg-[var(--hover-bg)] px-2 py-0.5 rounded-full border border-[var(--border)]">{SHIFT_LABEL[e.shiftType] ?? e.shiftType}</span></td>
+                      <td className="px-4 py-3">
+                        <span className="text-[11px] font-bold text-primary-700 bg-primary-100 dark:bg-primary-900/30 px-2 py-1 rounded-full whitespace-nowrap">
+                          {TABLE_METHOD_LABEL[e.checkInMethod] ?? METHOD_LABEL[(e.checkInMethod as EmployeeCheckInMethod) ?? 'MANUAL'] ?? e.checkInMethod ?? '—'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {e.profileImageUrl
+                          ? <span className="text-xs font-semibold text-emerald-600">✓ Registered</span>
+                          : <span className="text-xs text-amber-600">⚠ Not set</span>
+                        }
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLE[e.status] ?? 'bg-slate-100 text-slate-500'}`}>
+                          {e.status === 'TERMINATED' ? '🚫 SACKED' : e.status}
+                        </span>
+                      </td>
+                      <td className="sticky right-0 bg-[var(--card-bg)] px-4 py-3 shadow-[-4px_0_6px_rgba(0,0,0,0.06)] z-10">
+                        <div className="flex gap-1.5">
+                          <button onClick={() => setViewEmp(e)} className="p-1.5 rounded-lg hover:bg-[var(--hover-bg)] text-[var(--text-muted)] transition" title="View profile"><Eye size={14} /></button>
+                          {e.status !== 'TERMINATED' && (
+                            <>
+                              <button onClick={() => setEditEmp(e)} className="p-1.5 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/20 text-primary-600 transition" title="Edit employee settings"><Pencil size={14} /></button>
+                              <button onClick={async () => { e.status === 'ACTIVE' ? await suspendUser(e.id) : await activateUser(e.id); load(); }}
+                                className={`text-xs font-semibold px-2 py-1 rounded-lg transition ${e.status === 'ACTIVE' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 hover:bg-amber-100' : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 hover:bg-emerald-100'}`}>
+                                {e.status === 'ACTIVE' ? 'Suspend' : 'Activate'}
+                              </button>
+                              {organization?.allowDeviceCheckIn && ['PHONE', 'BOTH'].includes(e.checkInMethod ?? 'PHONE') && <button onClick={async () => {
+                                if (!window.confirm(`Reset device for ${e.firstName} ${e.lastName}?\n\nThis unlinks their current phone. The NEXT device they sign in on becomes their bound device, and the old one will stop working. Use this when an employee gets a new phone.`)) return;
+                                try { await resetDevice(e.id); alert('Device unlinked. The employee can now sign in on their new phone.'); } catch (err: any) { alert(err?.message ?? 'Could not reset device.'); }
+                              }} className="p-1.5 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/20 text-primary-600 transition" title="Reset device (allow login on a new phone)">
+                                <Smartphone size={14} />
+                              </button>}
+                              <button onClick={async () => {
+                                if (!window.confirm(`Terminate ${e.firstName} ${e.lastName}?\n\nThey will be marked as SACKED and can no longer log in.\nAll their records (attendance, leaves, breaks) are preserved and visible only to Super Admin.`)) return;
+                                await deleteEmployee(e.id);
+                                load();
+                              }} className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/20 text-red-500 transition" title="Terminate employee (soft delete)">
+                                <X size={14} />
+                              </button>
+                            </>
+                          )}
+                          {e.status === 'TERMINATED' && (
+                            <span className="text-[10px] text-slate-400 italic px-1">Record only</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             {filtered.length === 0 && <div className="text-center py-12 text-[var(--text-muted)] text-sm">No employees found</div>}
           </div>
         )}

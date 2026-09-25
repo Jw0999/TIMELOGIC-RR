@@ -49,20 +49,20 @@ export default function Dashboard() {
         ) : (
           <>
             {/* Stats Grid */}
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <StatCard label="Total Employees" value={stats.total ?? 0} icon={Users} color="text-primary-700" bgColor="bg-primary-100" />
               <StatCard label="Present Today" value={stats.present ?? 0} icon={CheckCircle} color="text-emerald-600" bgColor="bg-emerald-100" sub={`${stats.attendanceRate ?? 0}% rate`} />
               <StatCard label="Late Arrivals" value={stats.late ?? 0} icon={Clock} color="text-amber-600" bgColor="bg-amber-100" />
               <StatCard label="Absent" value={stats.absent ?? 0} icon={XCircle} color="text-red-500" bgColor="bg-red-100" />
             </div>
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <StatCard label="On Leave" value={stats.onLeave ?? 0} icon={Calendar} color="text-violet-600" bgColor="bg-violet-100" />
               <StatCard label="Flagged Records" value={stats.flagged ?? 0} icon={AlertTriangle} color="text-orange-600" bgColor="bg-orange-100" />
               <StatCard label="Open Fraud Alerts" value={stats.openAlerts ?? 0} icon={ShieldAlert} color="text-red-600" bgColor="bg-red-100" />
               <StatCard label="Active Sessions" value={stats.activeSessions ?? 0} icon={Activity} color="text-primary-700" bgColor="bg-primary-100" />
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Attendance breakdown */}
               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
                 <h3 className="font-bold text-slate-800 mb-4">Attendance Breakdown</h3>

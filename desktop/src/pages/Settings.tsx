@@ -113,7 +113,7 @@ export default function Settings() {
 
         {/* PWA 2.0 Station Password Card */}
         <div className="bg-[var(--card-bg)] rounded-2xl border border-[var(--border)] p-5">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
             <div>
               <h3 className="font-bold text-[var(--text-main)] flex items-center gap-2">
                 <KeyRound size={16} className="text-primary-600" />
@@ -123,7 +123,7 @@ export default function Settings() {
                 Set the dedicated password used to unlock and monitor PWA 2.0 attendance kiosks. This is completely separate from your Desktop Admin account password.
               </p>
             </div>
-            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${hasStationPassword ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30'}`}>
+            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full shrink-0 ${hasStationPassword ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30'}`}>
               {hasStationPassword ? 'Station Password Set' : 'Default / Not Set'}
             </span>
           </div>
@@ -202,7 +202,7 @@ export default function Settings() {
             {/* Work hours */}
             <div className="bg-[var(--card-bg)] rounded-2xl border border-[var(--border)] p-5">
               <h3 className="font-bold text-[var(--text-main)] mb-3 flex items-center gap-2"><Clock size={16} className="text-primary-600" />Work Hours</h3>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {[
                   { label: 'Opens (check-in)', value: selected?.openTime ?? '—' },
                   { label: 'Closes (check-out)', value: selected?.closeTime ?? '—' },
