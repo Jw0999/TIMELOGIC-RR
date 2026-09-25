@@ -358,6 +358,15 @@ function UsersModal({ org, onClose }: { org: any; onClose: () => void }) {
     }
   };
 
+  const handleReassignShift = async (userId: string, shiftType: string) => {
+    try {
+      await reassignUserOffice(userId, undefined, shiftType);
+      load();
+    } catch (err: any) {
+      alert(err?.message ?? 'Failed to update shift');
+    }
+  };
+
   const offices = org.offices || [];
 
   return (
@@ -398,7 +407,23 @@ function UsersModal({ org, onClose }: { org: any; onClose: () => void }) {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 self-end sm:self-center">
+                  <div className="flex flex-wrap items-center gap-2 self-end sm:self-center">
+                    {/* Shift selector for employees */}
+                    {u.role === 'EMPLOYEE' && (
+                      <div className="flex items-center gap-1 text-xs">
+                        <span className="text-[11px] text-[var(--text-muted)]">Shift:</span>
+                        <select
+                          value={u.shiftType || 'FULL_TIME'}
+                          onChange={(e) => handleReassignShift(u.id, e.target.value)}
+                          className="border border-[var(--input-border)] bg-[var(--input-bg)] text-[var(--text-main)] text-xs rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-500 font-medium"
+                        >
+                          <option value="FULL_TIME">Full Time</option>
+                          <option value="MORNING">Morning Shift</option>
+                          <option value="EVENING">Evening Shift</option>
+                        </select>
+                      </div>
+                    )}
+
                     {/* Office selector / display */}
                     {offices.length > 0 && u.role !== 'SUPER_ADMIN' ? (
                       <div className="flex items-center gap-1 text-xs">

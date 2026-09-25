@@ -861,29 +861,36 @@ const resetAdminPassword = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// PUT /api/super/users/:userId/office — change an employee's assigned office
+// PUT /api/super/users/:userId/office — change an employee's assigned office and/or shift
 const reassignUserOffice = async (req, res, next) => {
   try {
     const { userId } = req.params;
-    const { officeId } = req.body;
+    const { officeId, shiftType } = req.body;
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, orgId: true, role: true },
     });
     if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
-    if (officeId) {
+    if (officeId !== undefined && officeId) {
       const office = await prisma.office.findFirst({
         where: { id: officeId, orgId: user.orgId },
         select: { id: true, name: true },
       });
       if (!office) return res.status(400).json({ success: false, message: 'Office does not belong to user organization.' });
     }
+    const updateData = {};
+    if (officeId !== undefined) {
+      updateData.officeId = officeId || null;
+    }
+    if (shiftType !== undefined) {
+      updateData.shiftType = shiftType;
+    }
     const updated = await prisma.user.update({
       where: { id: userId },
-      data: { officeId: officeId || null },
-      select: { id: true, firstName: true, lastName: true, officeId: true, office: { select: { id: true, name: true } } },
+      data: updateData,
+      select: { id: true, firstName: true, lastName: true, officeId: true, shiftType: true, office: { select: { id: true, name: true } } },
     });
-    res.json({ success: true, data: updated, message: 'Employee office updated successfully.' });
+    res.json({ success: true, data: updated, message: 'Employee updated successfully.' });
   } catch (err) { next(err); }
 };
 
