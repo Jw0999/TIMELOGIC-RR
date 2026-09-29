@@ -175,7 +175,7 @@ class AttendanceService {
         id: uuidv4(), adminId, orgId: admin.orgId, loggedInAt: loginAt,
         attendanceStatus: evaluation.status,
         minutesLate: evaluation.minutesLate,
-        penalty: evaluation.penalty,
+        penalty: 0,
         ipAddress: context.ipAddress || null,
         userAgent: context.userAgent ? String(context.userAgent).slice(0, 500) : null,
       },
@@ -201,7 +201,7 @@ class AttendanceService {
       loggedInAt: event.loggedInAt,
       status: event.attendanceStatus,
       minutesLate: event.minutesLate,
-      penalty: event.penalty,
+      penalty: 0,
       openingTime: admin.organization.openingTime,
       timezone: admin.organization.timezone,
       sessionId: activeSession?.id ?? null,
@@ -270,13 +270,13 @@ class AttendanceService {
           id: uuidv4(), employeeId: admin.id, sessionId, date: recordDate,
           clockInTime: firstLogin.loggedInAt,
           status: firstLogin.attendanceStatus,
-          penalty: firstLogin.penalty,
+          penalty: 0,
           checkInSource: 'ADMIN_LOGIN',
         },
         update: {
           clockInTime: firstLogin.loggedInAt,
           status: firstLogin.attendanceStatus,
-          penalty: firstLogin.penalty,
+          penalty: 0,
           checkInSource: 'ADMIN_LOGIN',
         },
       });
@@ -1384,6 +1384,9 @@ class AttendanceService {
   //  ≤ lateAfterMinutes after open  → PRESENT, gracePenalty (₦ off salary)
   //  > lateAfterMinutes after open  → COMPLETELY_LATE, latePenalty (₦ off salary)
   _computeStatusAndPenalty(clockInTime, session, employee = null) {
+    if (employee?.role === 'ADMIN' || employee?.role === 'SUPER_ADMIN') {
+      return { status: 'PRESENT', penalty: 0, minutesLate: 0 };
+    }
     const o = session.office ?? {};
     let hours = officeHoursFor(clockInTime, o);
 
