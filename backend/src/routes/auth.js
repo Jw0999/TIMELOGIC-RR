@@ -26,4 +26,14 @@ router.post('/station-login', authLimiter, [
   body('password').notEmpty().withMessage('Password is required'),
 ], validate, ctrl.stationLogin);
 
+router.post('/forgot-password/verify', authLimiter, [
+  body('email').isEmail().withMessage('A valid email address is required').normalizeEmail(),
+], validate, ctrl.verifyResetEmail);
+
+router.post('/forgot-password/reset', authLimiter, [
+  body('email').isEmail().withMessage('A valid email address is required').normalizeEmail(),
+  body('resetToken').notEmpty().withMessage('Reset token is required'),
+  body('newPassword').isLength({ min: 8 }).withMessage('Password must be at least 8 characters long'),
+], validate, ctrl.resetPasswordWithToken);
+
 module.exports = router;

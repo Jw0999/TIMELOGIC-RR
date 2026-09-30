@@ -256,11 +256,72 @@ class AuthenticationService {
     });
   }
 
-  async resetPassword(email) {
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) return; // silent — don't reveal existence
-    logger.info(`Password reset requested for ${email}`);
-    // TODO: integrate email service when SMTP is configured
+  async verifyResetEmail(email) {
+    const normalized = String(email || '').trim().toLowerCase();
+    const user = await prisma.user.findUnique({
+      where: { email: normalized },
+      select: { id: true, email: true, firstName: true, lastName: true, role: true, status: true },
+    });
+
+    if (!user || user.status !== 'ACTIVE') {
+      throw Object.assign(new Error('No active account found associated with this email address.'), { status: 404 });
+    }
+
+    if (!['SUPER_ADMIN', 'ADMIN'].includes(user.role)) {
+      throw Object.assign(new Error('Password reset is only available for administrative accounts.'), { status: 403 });
+    }
+
+    const resetToken = jwt.sign(
+      { sub: user.id, email: user.email, role: user.role, purpose: 'PASSWORD_RESET' },
+      env.JWT_ACCESS_SECRET,
+      { expiresIn: '15m' }
+    );
+
+    logger.info(`Password reset verified for ${user.email} (${user.role})`);
+
+    return {
+      verified: true,
+      email: user.email,
+      firstName: user.firstName,
+      role: user.role,
+      resetToken,
+    };
+  }
+
+  async resetPasswordWithToken(email, resetToken, newPassword) {
+    const normalized = String(email || '').trim().toLowerCase();
+    let payload;
+    try {
+      payload = jwt.verify(resetToken, env.JWT_ACCESS_SECRET);
+    } catch {
+      throw Object.assign(new Error('Reset token has expired or is invalid. Please verify your email again.'), { status: 400 });
+    }
+
+    if (payload.purpose !== 'PASSWORD_RESET' || String(payload.email).toLowerCase() !== normalized) {
+      throw Object.assign(new Error('Invalid password reset token for this email.'), { status: 400 });
+    }
+
+    if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 8) {
+      throw Object.assign(new Error('Password must be at least 8 characters long.'), { status: 400 });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: payload.sub } });
+    if (!user || user.status !== 'ACTIVE') {
+      throw Object.assign(new Error('Account not found or inactive.'), { status: 404 });
+    }
+
+    const hash = await bcrypt.hash(newPassword, env.BCRYPT_ROUNDS || 12);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash: hash },
+    });
+
+    await prisma.refreshToken.deleteMany({ where: { userId: user.id } });
+    await redis.del(`${PREFIXES.SOCKET}${user.id}`);
+
+    logger.info(`Password successfully reset for user ${user.email}`);
+
+    return { success: true, message: 'Password has been updated successfully.' };
   }
 
   async changePassword(userId, currentPassword, newPassword) {

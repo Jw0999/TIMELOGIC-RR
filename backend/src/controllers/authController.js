@@ -82,5 +82,21 @@ const stationLogin = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { login, logout, refresh, me, changePassword, stationLogin };
+const verifyResetEmail = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const result = await AuthService.verifyResetEmail(email);
+    res.json({ success: true, data: result });
+  } catch (err) { next(err); }
+};
+
+const resetPasswordWithToken = async (req, res, next) => {
+  try {
+    const { email, resetToken, newPassword } = req.body;
+    const result = await AuthService.resetPasswordWithToken(email, resetToken, newPassword);
+    res.json({ success: true, message: result.message });
+  } catch (err) { next(err); }
+};
+
+module.exports = { login, logout, refresh, me, changePassword, stationLogin, verifyResetEmail, resetPasswordWithToken };
 

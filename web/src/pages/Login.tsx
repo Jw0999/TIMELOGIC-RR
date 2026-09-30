@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, Building2, Shield, BarChart3, CheckCircle } from 'lucide-react';
+import { Users, Building2, Shield, BarChart3, CheckCircle, ArrowLeft, Eye, EyeOff, KeyRound, Mail } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../services/api';
 
 /* ── Mini dashboard mockup shown on the right panel ───────────────────── */
 function DashboardMockup() {
@@ -83,22 +84,87 @@ function DashboardMockup() {
   );
 }
 
+type Mode = 'login' | 'forgot-email' | 'forgot-password';
+
 export default function Login() {
   const { login }   = useAuth();
   const navigate    = useNavigate();
-  const [email, setEmail]       = useState('');
-  const [password, setPassword] = useState('');
-  const [remember, setRemember] = useState(false);
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState('');
+  const [mode, setMode]                     = useState<Mode>('login');
+  const [email, setEmail]                   = useState('');
+  const [password, setPassword]             = useState('');
+  const [newPassword, setNewPassword]       = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword]     = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [resetToken, setResetToken]         = useState('');
+  const [verifiedEmail, setVerifiedEmail]   = useState('');
+  const [remember, setRemember]             = useState(false);
+  const [loading, setLoading]               = useState(false);
+  const [error, setError]                   = useState('');
+  const [success, setSuccess]               = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(''); setLoading(true);
+    setError(''); setSuccess(''); setLoading(true);
     const result = await login(email, password);
     setLoading(false);
     if (result.ok) navigate('/dashboard');
     else setError(result.error ?? 'Unable to sign in.');
+  };
+
+  const handleVerifyEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(''); setSuccess(''); setLoading(true);
+    try {
+      const res = await api.post<{ success: boolean; data: { resetToken: string; email: string; firstName: string } }>(
+        '/auth/forgot-password/verify',
+        { email }
+      );
+      setResetToken(res.data.resetToken);
+      setVerifiedEmail(res.data.email);
+      setMode('forgot-password');
+      setSuccess(`Account verified for ${res.data.email}. Please set your new password.`);
+    } catch (err: any) {
+      setError(err.message || 'Unable to verify email address.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(''); setSuccess('');
+    if (newPassword.length < 8) {
+      setError('Password must be at least 8 characters long.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match. Please retype carefully.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await api.post<{ success: boolean; message: string }>(
+        '/auth/forgot-password/reset',
+        {
+          email: verifiedEmail,
+          resetToken,
+          newPassword,
+        }
+      );
+      setSuccess(res.message || 'Password updated successfully! Please sign in with your new password.');
+      setEmail(verifiedEmail);
+      setPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setResetToken('');
+      setMode('login');
+    } catch (err: any) {
+      setError(err.message || 'Unable to reset password. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const inputCls =
@@ -114,93 +180,246 @@ export default function Login() {
         {/* ── LEFT: Form panel ───────────────────────────────────── */}
         <div className="flex-1 flex flex-col justify-between px-10 py-10 min-w-0">
           <div className="flex-1 flex flex-col justify-center w-full max-w-[340px] mx-auto">
+
+            {/* Back button for forgot-password modes */}
+            {mode !== 'login' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setError('');
+                  setSuccess('');
+                  if (mode === 'forgot-password') setMode('forgot-email');
+                  else setMode('login');
+                }}
+                className="inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-primary-600 font-semibold mb-4 transition-colors w-fit"
+              >
+                <ArrowLeft size={14} />
+                {mode === 'forgot-password' ? 'Change email' : 'Back to sign in'}
+              </button>
+            )}
+
+            {/* Header Title & Subtitle */}
             <h1 className="text-[26px] font-black text-[var(--text-main)] leading-tight mb-1">
-              Welcome back
+              {mode === 'login' && 'Welcome back'}
+              {mode === 'forgot-email' && 'Reset password'}
+              {mode === 'forgot-password' && 'New password'}
             </h1>
-            <p className="text-sm text-[var(--text-muted)] mb-7">
-              Enter your details to access your account.
+            <p className="text-sm text-[var(--text-muted)] mb-6">
+              {mode === 'login' && 'Enter your details to access your account.'}
+              {mode === 'forgot-email' && 'Enter your Gmail/email associated with your account.'}
+              {mode === 'forgot-password' && `Create a new password for ${verifiedEmail}`}
             </p>
 
+            {/* Success alert */}
+            {success && (
+              <div className="mb-4 p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs font-medium text-emerald-700 dark:text-emerald-300 flex items-start gap-2">
+                <CheckCircle size={16} className="text-emerald-500 flex-shrink-0 mt-0.5" />
+                <span>{success}</span>
+              </div>
+            )}
+
+            {/* Error alert */}
             {error && (
               <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-xl text-sm text-red-600 dark:text-red-400">
                 {error}
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Email */}
-              <div>
-                <label className="block text-sm font-semibold text-[var(--text-main)] mb-1.5">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
-                  className={inputCls}
-                  required
-                  autoComplete="email"
-                />
-              </div>
-
-              {/* Password */}
-              <div>
-                <label className="block text-sm font-semibold text-[var(--text-main)] mb-1.5">
-                  Password
-                </label>
-                <div className="relative">
+            {/* ── MODE 1: LOGIN ──────────────────────────────── */}
+            {mode === 'login' && (
+              <form onSubmit={handleLoginSubmit} className="space-y-4">
+                {/* Email */}
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--text-main)] mb-1.5">
+                    Email
+                  </label>
                   <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your password"
-                    className={`${inputCls} pr-10`}
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter your email"
+                    className={inputCls}
                     required
-                    autoComplete="current-password"
+                    autoComplete="email"
                   />
                 </div>
-              </div>
 
-              {/* Remember me + Forgot */}
-              <div className="flex items-center justify-between pt-0.5">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <div
-                    onClick={() => setRemember(!remember)}
-                    className={`w-4 h-4 rounded flex items-center justify-center border transition-colors cursor-pointer ${
-                      remember
-                        ? 'bg-primary-600 border-primary-600'
-                        : 'border-[var(--input-border)] bg-[var(--input-bg)]'
-                    }`}
-                  >
-                    {remember && (
-                      <svg viewBox="0 0 10 8" className="w-2.5 h-2.5 fill-none stroke-white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="1,4 4,7 9,1" />
-                      </svg>
-                    )}
+                {/* Password */}
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--text-main)] mb-1.5">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter your password"
+                      className={`${inputCls} pr-10`}
+                      required
+                      autoComplete="current-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
                   </div>
-                  <span className="text-sm text-[var(--text-main)]">Remember me</span>
-                </label>
-                <button
-                  type="button"
-                  className="text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors"
-                >
-                  Forgot password?
-                </button>
-              </div>
+                </div>
 
-              {/* Sign In button */}
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-2.5 rounded-xl transition-all shadow-md shadow-primary-300/30 dark:shadow-primary-900/30 disabled:opacity-60 flex items-center justify-center gap-2 text-sm mt-1"
-              >
-                {loading && (
-                  <span className="animate-spin border-2 border-white border-t-transparent rounded-full w-4 h-4" />
-                )}
-                {loading ? 'Signing in...' : 'Sign in'}
-              </button>
-            </form>
+                {/* Remember me + Forgot */}
+                <div className="flex items-center justify-between pt-0.5">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <div
+                      onClick={() => setRemember(!remember)}
+                      className={`w-4 h-4 rounded flex items-center justify-center border transition-colors cursor-pointer ${
+                        remember
+                          ? 'bg-primary-600 border-primary-600'
+                          : 'border-[var(--input-border)] bg-[var(--input-bg)]'
+                      }`}
+                    >
+                      {remember && (
+                        <svg viewBox="0 0 10 8" className="w-2.5 h-2.5 fill-none stroke-white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="1,4 4,7 9,1" />
+                        </svg>
+                      )}
+                    </div>
+                    <span className="text-sm text-[var(--text-main)]">Remember me</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setError('');
+                      setSuccess('');
+                      setMode('forgot-email');
+                    }}
+                    className="text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+
+                {/* Sign In button */}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-2.5 rounded-xl transition-all shadow-md shadow-primary-300/30 dark:shadow-primary-900/30 disabled:opacity-60 flex items-center justify-center gap-2 text-sm mt-1"
+                >
+                  {loading && (
+                    <span className="animate-spin border-2 border-white border-t-transparent rounded-full w-4 h-4" />
+                  )}
+                  {loading ? 'Signing in...' : 'Sign in'}
+                </button>
+              </form>
+            )}
+
+            {/* ── MODE 2: FORGOT PASSWORD - STEP 1 (VERIFY EMAIL) ───── */}
+            {mode === 'forgot-email' && (
+              <form onSubmit={handleVerifyEmail} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--text-main)] mb-1.5 flex items-center gap-1.5">
+                    <Mail size={15} className="text-primary-600" />
+                    Account Email (Gmail)
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="e.g. superadmin@acme.com"
+                    className={inputCls}
+                    required
+                    autoFocus
+                    autoComplete="email"
+                  />
+                  <p className="text-xs text-[var(--text-muted)] mt-1.5">
+                    We will verify that this email is registered to an authorized administrator account.
+                  </p>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading || !email.trim()}
+                  className="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-2.5 rounded-xl transition-all shadow-md shadow-primary-300/30 dark:shadow-primary-900/30 disabled:opacity-60 flex items-center justify-center gap-2 text-sm mt-2"
+                >
+                  {loading && (
+                    <span className="animate-spin border-2 border-white border-t-transparent rounded-full w-4 h-4" />
+                  )}
+                  {loading ? 'Verifying Account...' : 'Verify Email & Continue'}
+                </button>
+              </form>
+            )}
+
+            {/* ── MODE 3: FORGOT PASSWORD - STEP 2 (SET NEW PASSWORD) ─ */}
+            {mode === 'forgot-password' && (
+              <form onSubmit={handleResetPassword} className="space-y-4">
+                {/* New Password */}
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--text-main)] mb-1.5 flex items-center gap-1.5">
+                    <KeyRound size={15} className="text-primary-600" />
+                    New Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="At least 8 characters"
+                      className={`${inputCls} pr-10`}
+                      required
+                      autoFocus
+                      autoComplete="new-password"
+                      minLength={8}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                    >
+                      {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Retype / Confirm Password */}
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--text-main)] mb-1.5">
+                    Retype New Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Confirm new password"
+                      className={`${inputCls} pr-10`}
+                      required
+                      autoComplete="new-password"
+                      minLength={8}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                    >
+                      {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading || !newPassword || !confirmPassword}
+                  className="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-2.5 rounded-xl transition-all shadow-md shadow-primary-300/30 dark:shadow-primary-900/30 disabled:opacity-60 flex items-center justify-center gap-2 text-sm mt-2"
+                >
+                  {loading && (
+                    <span className="animate-spin border-2 border-white border-t-transparent rounded-full w-4 h-4" />
+                  )}
+                  {loading ? 'Updating Password...' : 'Save New Password'}
+                </button>
+              </form>
+            )}
 
           </div>
 
