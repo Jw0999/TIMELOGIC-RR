@@ -665,3 +665,22 @@ enum StudentStatus {
   ACTIVE
   INACTIVE
 }
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String
+  actorEmail String
+  actorRole  String
+  action     String
+  targetId   String?
+  targetType String?
+  details    Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

@@ -12,9 +12,13 @@ async function postToDeepFace(pathname, payload) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout for cold starts
   try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (env.INTERNAL_SERVICE_SECRET) {
+      headers['X-Internal-Secret'] = env.INTERNAL_SERVICE_SECRET;
+    }
     const res = await fetch(`${DEEPFACE_URL}${pathname}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(payload),
       signal: controller.signal,
     });

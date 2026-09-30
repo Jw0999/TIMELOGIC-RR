@@ -3,7 +3,9 @@ const { v4: uuidv4 } = require('uuid');
 const { prisma } = require('../config/database');
 const env = require('../config/env');
 const logger = require('../config/logger');
+const { redis, PREFIXES } = require('../config/redis');
 const EmployeePolicy = require('../services/EmployeePolicyService');
+const AuditService = require('../services/AuditService');
 
 const defaultWeeklySchedule = (openTime = '08:00', closeTime = '17:00') => ({
   monday: { openTime, closeTime },
@@ -201,6 +203,18 @@ const createOrg = async (req, res, next) => {
       return { org, offices: createdOffices.length > 0 ? createdOffices : [defaultOffice], departments: createdDepts, adminUser };
     });
 
+    await AuditService.log({
+      actorId: req.user?.id,
+      actorEmail: req.user?.email || 'superadmin@timelogic.app',
+      actorRole: req.user?.role || 'SUPER_ADMIN',
+      action: 'ORG_CREATED',
+      targetId: result.org.id,
+      targetType: 'ORGANIZATION',
+      details: { orgName: result.org.name, adminEmail: result.adminUser?.email },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
     res.status(201).json({ success: true, data: result });
   } catch (err) { next(err); }
 };
@@ -368,12 +382,26 @@ const deleteOrg = async (req, res, next) => {
       return res.status(403).json({ success: false, message: 'Cannot delete an organization that contains a Super Admin account.' });
     }
 
+    const targetOrg = await prisma.organization.findUnique({ where: { id }, select: { name: true } });
     const orgUserIds = (await prisma.user.findMany({
       where: { orgId: id },
       select: { id: true },
     })).map((user) => user.id);
     await prisma.notificationLog.deleteMany({ where: { userId: { in: orgUserIds } } });
     await prisma.organization.delete({ where: { id } });
+
+    await AuditService.log({
+      actorId: req.user?.id,
+      actorEmail: req.user?.email || 'superadmin@timelogic.app',
+      actorRole: req.user?.role || 'SUPER_ADMIN',
+      action: 'ORG_DELETED',
+      targetId: id,
+      targetType: 'ORGANIZATION',
+      details: { orgName: targetOrg?.name || id },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
     res.json({ success: true, message: 'Organization and all related data removed.' });
   } catch (err) { next(err); }
 };
@@ -552,6 +580,18 @@ const resetSystem = async (req, res, next) => {
     }
 
     logger.info(`SYSTEM RESET performed by ${req.user.id} — all data cleared except Super Admin`);
+
+    await AuditService.log({
+      actorId: req.user?.id,
+      actorEmail: req.user?.email || 'superadmin@timelogic.app',
+      actorRole: req.user?.role || 'SUPER_ADMIN',
+      action: 'SYSTEM_RESET',
+      targetType: 'SYSTEM',
+      details: { timestamp: new Date().toISOString() },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
     res.json({ success: true, message: 'System reset complete. Only the Super Admin account remains.' });
   } catch (err) { next(err); }
 };
@@ -578,13 +618,30 @@ const updateProfile = async (req, res, next) => {
 // PUT /api/super/users/:userId/suspend — Super Admin may suspend ADMINS only
 const suspendAdmin = async (req, res, next) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.params.userId }, select: { role: true } });
+    const user = await prisma.user.findUnique({ where: { id: req.params.userId }, select: { role: true, email: true } });
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
     if (user.role === 'SUPER_ADMIN') return res.status(403).json({ success: false, message: 'Cannot suspend a Super Admin.' });
     if (user.role !== 'ADMIN') return res.status(403).json({ success: false, message: 'Only admins can be suspended. Employees are managed by their own admin.' });
 
     await prisma.user.update({ where: { id: req.params.userId }, data: { status: 'SUSPENDED' } });
     await prisma.refreshToken.deleteMany({ where: { userId: req.params.userId } });
+
+    // Instantly invalidate active sessions
+    await redis.set(`tl:revoked:${req.params.userId}`, String(Date.now()), 'EX', 86400 * 7);
+    await redis.del(`${PREFIXES.SOCKET}${req.params.userId}`);
+
+    await AuditService.log({
+      actorId: req.user?.id,
+      actorEmail: req.user?.email || 'superadmin@timelogic.app',
+      actorRole: req.user?.role || 'SUPER_ADMIN',
+      action: 'ADMIN_SUSPENDED',
+      targetId: req.params.userId,
+      targetType: 'USER',
+      details: { targetEmail: user.email },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
     res.json({ success: true, message: 'Admin suspended' });
   } catch (err) { next(err); }
 };
@@ -592,10 +649,23 @@ const suspendAdmin = async (req, res, next) => {
 // PUT /api/super/users/:userId/activate — re-enable a suspended ADMIN
 const activateAdmin = async (req, res, next) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.params.userId }, select: { role: true } });
+    const user = await prisma.user.findUnique({ where: { id: req.params.userId }, select: { role: true, email: true } });
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
     if (user.role !== 'ADMIN') return res.status(403).json({ success: false, message: 'Only admins can be activated here.' });
     await prisma.user.update({ where: { id: req.params.userId }, data: { status: 'ACTIVE' } });
+
+    await AuditService.log({
+      actorId: req.user?.id,
+      actorEmail: req.user?.email || 'superadmin@timelogic.app',
+      actorRole: req.user?.role || 'SUPER_ADMIN',
+      action: 'ADMIN_ACTIVATED',
+      targetId: req.params.userId,
+      targetType: 'USER',
+      details: { targetEmail: user.email },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
     res.json({ success: true, message: 'Admin activated' });
   } catch (err) { next(err); }
 };
@@ -745,6 +815,18 @@ const reemployEmployee = async (req, res, next) => {
 
     logger.info(`Super Admin re-employed ${user.firstName} ${user.lastName} (${user.email})`);
 
+    await AuditService.log({
+      actorId: req.user?.id,
+      actorEmail: req.user?.email || 'superadmin@timelogic.app',
+      actorRole: req.user?.role || 'SUPER_ADMIN',
+      action: 'EMPLOYEE_REEMPLOYED',
+      targetId: user.id,
+      targetType: 'USER',
+      details: { employeeEmail: user.email, orgId: user.orgId },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
     res.json({
       success: true,
       message: `${user.firstName} ${user.lastName} has been re-employed successfully. They can now log in with their existing credentials.`,
@@ -843,7 +925,7 @@ const resetAdminPassword = async (req, res, next) => {
     }
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, role: true, orgId: true, firstName: true, lastName: true },
+      select: { id: true, role: true, orgId: true, firstName: true, lastName: true, email: true },
     });
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found.' });
@@ -857,7 +939,33 @@ const resetAdminPassword = async (req, res, next) => {
       data: { passwordHash },
     });
     await prisma.refreshToken.deleteMany({ where: { userId } });
+
+    // Instantly invalidate active sessions
+    await redis.set(`tl:revoked:${userId}`, String(Date.now()), 'EX', 86400 * 7);
+    await redis.del(`${PREFIXES.SOCKET}${userId}`);
+
+    await AuditService.log({
+      actorId: req.user?.id,
+      actorEmail: req.user?.email || 'superadmin@timelogic.app',
+      actorRole: req.user?.role || 'SUPER_ADMIN',
+      action: 'ADMIN_PASSWORD_RESET',
+      targetId: user.id,
+      targetType: 'USER',
+      details: { targetEmail: user.email, targetRole: user.role },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
     res.json({ success: true, message: `Password for ${user.firstName} ${user.lastName} has been updated successfully.` });
+  } catch (err) { next(err); }
+};
+
+// GET /api/super/audit-logs — paginated system audit logs for Super Admin
+const getAuditLogs = async (req, res, next) => {
+  try {
+    const { page, limit, action, actorEmail, fromDate, toDate } = req.query;
+    const result = await AuditService.getLogs({ page, limit, action, actorEmail, fromDate, toDate });
+    res.json({ success: true, data: result });
   } catch (err) { next(err); }
 };
 
@@ -900,5 +1008,5 @@ module.exports = {
   systemStats, getNotifications, officeSecurityDetail, updateOfficeSecurity,
   systemReport, addDepartment, getDepartmentBreakPolicy, updateDepartmentBreakPolicy,
   employeeFullRecord, reemployEmployee, suspendAdmin, activateAdmin, reassignEmployee,
-  updateProfile, resetSystem, getLeavePolicy, setLeavePolicy,
+  updateProfile, resetSystem, getLeavePolicy, setLeavePolicy, getAuditLogs,
 };

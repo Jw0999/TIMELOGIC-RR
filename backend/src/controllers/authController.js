@@ -1,4 +1,5 @@
 const AuthService = require('../services/AuthenticationService');
+const AuditService = require('../services/AuditService');
 const { prisma } = require('../config/database');
 
 const login = async (req, res, next) => {
@@ -66,6 +67,18 @@ const changePassword = async (req, res, next) => {
     }
     const { currentPassword, newPassword } = req.body;
     await AuthService.changePassword(req.user.id, currentPassword, newPassword);
+
+    await AuditService.log({
+      actorId: req.user.id,
+      actorEmail: req.user.email || req.user.id,
+      actorRole: req.user.role,
+      action: 'PASSWORD_CHANGED',
+      targetId: req.user.id,
+      targetType: 'USER',
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+
     res.json({ success: true, message: 'Password changed' });
   } catch (err) { next(err); }
 };
@@ -94,6 +107,17 @@ const resetPasswordWithToken = async (req, res, next) => {
   try {
     const { email, resetToken, newPassword } = req.body;
     const result = await AuthService.resetPasswordWithToken(email, resetToken, newPassword);
+
+    await AuditService.log({
+      actorId: email,
+      actorEmail: email,
+      actorRole: 'USER',
+      action: 'PASSWORD_RESET_COMPLETED',
+      targetType: 'USER',
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+
     res.json({ success: true, message: result.message });
   } catch (err) { next(err); }
 };

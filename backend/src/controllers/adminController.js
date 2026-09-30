@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const EmergencyControlService = require('../services/EmergencyControlService');
 const AttendanceService = require('../services/AttendanceService');
 const EmployeePolicy = require('../services/EmployeePolicyService');
+const AuditService = require('../services/AuditService');
 const { hasValidEnrolledFace } = require('../utils/faceVerify');
 
 // ── Organization / Office / Department ────────────────────────────────────────
@@ -627,6 +628,19 @@ const createPenalty = async (req, res, next) => {
         createdBy: { select: { firstName: true, lastName: true } },
       },
     });
+
+    await AuditService.log({
+      actorId: req.user?.id,
+      actorEmail: req.user?.email || 'admin@timelogic.app',
+      actorRole: req.user?.role || 'ADMIN',
+      action: 'PENALTY_CREATED',
+      targetId: penalty.id,
+      targetType: 'MANUAL_PENALTY',
+      details: { employeeId, amount: Number(amount), reason: reason.trim() },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
     res.status(201).json({ success: true, data: penalty });
   } catch (err) { next(err); }
 };
@@ -640,6 +654,19 @@ const deletePenalty = async (req, res, next) => {
     });
     if (!penalty) return res.status(404).json({ success: false, message: 'Manual penalty not found.' });
     await prisma.manualPenalty.delete({ where: { id } });
+
+    await AuditService.log({
+      actorId: req.user?.id,
+      actorEmail: req.user?.email || 'admin@timelogic.app',
+      actorRole: req.user?.role || 'ADMIN',
+      action: 'PENALTY_DELETED',
+      targetId: id,
+      targetType: 'MANUAL_PENALTY',
+      details: { amount: penalty.amount, employeeId: penalty.employeeId },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
     res.json({ success: true, message: 'Penalty removed successfully.' });
   } catch (err) { next(err); }
 };
@@ -681,6 +708,18 @@ const waiveEmployeeAutoPenalties = async (req, res, next) => {
         data: { penalty: 0 },
       }),
     ]);
+
+    await AuditService.log({
+      actorId: req.user?.id,
+      actorEmail: req.user?.email || 'admin@timelogic.app',
+      actorRole: req.user?.role || 'ADMIN',
+      action: 'AUTO_PENALTIES_WAIVED',
+      targetId: employeeId,
+      targetType: 'EMPLOYEE',
+      details: { month: month || 'all', recordsUpdated: (updatedAttendance.count || 0) + (updatedBreaks.count || 0) },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
 
     res.json({
       success: true,

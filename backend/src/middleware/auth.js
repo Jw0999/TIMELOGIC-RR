@@ -21,6 +21,18 @@ async function authenticate(req, res, next) {
     return res.status(401).json({ success: false, message: 'Invalid token' });
   }
 
+  const { redis } = require('../config/redis');
+  try {
+    const revokedAt = await redis.get(`tl:revoked:${payload.sub}`);
+    if (revokedAt && payload.iat && (payload.iat * 1000) < parseInt(revokedAt, 10)) {
+      return res.status(401).json({
+        success: false,
+        code: 'SESSION_REVOKED',
+        message: 'Your session has been terminated due to a security update or password change. Please log in again.',
+      });
+    }
+  } catch (_) {}
+
   try {
     const user = await prisma.user.findUnique({
       where: { id: payload.sub },

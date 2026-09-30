@@ -178,12 +178,18 @@ router.put('/station-password', authenticate, isAdmin, [
   body('stationPassword').isLength({ min: 6 }).withMessage('Station password must be at least 6 characters'),
 ], validate, ctrl.setStationPassword);
 
+const { validateStrongPassword } = require('../utils/passwordPolicy');
+
 // Create an employee user
 router.post('/employees', authenticate, isAdmin, [
   body('firstName').notEmpty(),
   body('lastName').notEmpty(),
   body('email').isEmail().normalizeEmail(),
-  body('password').isLength({ min: 8 }),
+  body('password').custom((val) => {
+    const check = validateStrongPassword(val);
+    if (!check.valid) throw new Error(check.message);
+    return true;
+  }),
   body('checkInMethod').optional().isIn(['PHONE', 'MANUAL', 'BOTH']),
   body('officeId').optional({ nullable: true }).isUUID(),
   body('shiftType').optional().isIn(['FULL_TIME', 'MORNING', 'EVENING', 'AFTERNOON', 'NIGHT', 'FLEXIBLE']),

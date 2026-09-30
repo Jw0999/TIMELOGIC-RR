@@ -25,6 +25,18 @@ haar_cascade = cv2.CascadeClassifier(HAAR_PATH) if os.path.exists(HAAR_PATH) els
 # SFace cosine similarity threshold: >= 0.363 is considered the same person
 COSINE_THRESHOLD = 0.363
 
+INTERNAL_SERVICE_SECRET = os.environ.get('INTERNAL_SERVICE_SECRET', '')
+
+@app.before_request
+def require_internal_secret():
+    if request.path == '/health':
+        return None
+    if INTERNAL_SERVICE_SECRET:
+        auth_header = request.headers.get('X-Internal-Secret')
+        if not auth_header or auth_header != INTERNAL_SERVICE_SECRET:
+            return jsonify({'error': 'Unauthorized service access'}), 401
+    return None
+
 
 def decode_image(img_input):
     """Decode base64 data URI, raw base64, or file path to OpenCV BGR numpy array."""

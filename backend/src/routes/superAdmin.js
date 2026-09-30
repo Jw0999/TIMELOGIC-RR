@@ -47,6 +47,8 @@ const breakPolicyValidators = [
   body('autoEndAfterMinutes').optional().isInt({ min: 1 }),
 ];
 
+const { validateStrongPassword } = require('../utils/passwordPolicy');
+
 // All routes require authentication + SUPER_ADMIN role
 router.use(authenticate, isSuperAdmin);
 
@@ -58,7 +60,11 @@ router.post('/organizations', [
   body('admin.firstName').trim().notEmpty().withMessage('Admin first name is required'),
   body('admin.lastName').trim().notEmpty().withMessage('Admin last name is required'),
   body('admin.email').isEmail().normalizeEmail().withMessage('Valid admin email required'),
-  body('admin.password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+  body('admin.password').custom((val) => {
+    const check = validateStrongPassword(val);
+    if (!check.valid) throw new Error(check.message);
+    return true;
+  }),
   ...organizationPolicyValidators,
 ], validate, ctrl.createOrg);
 router.put('/organizations/:id', [
@@ -86,11 +92,17 @@ router.put('/profile',                           ctrl.updateProfile);
 router.post('/reset',                            ctrl.resetSystem);
 router.put('/users/:userId/suspend',             ctrl.suspendAdmin);
 router.put('/users/:userId/activate',            ctrl.activateAdmin);
-router.put('/users/:userId/name',                 ctrl.renameAdmin);
+router.put('/users/:userId/name',                ctrl.renameAdmin);
+
 router.put('/users/:userId/password', [
-  body('newPassword').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+  body('newPassword').custom((val) => {
+    const check = validateStrongPassword(val);
+    if (!check.valid) throw new Error(check.message);
+    return true;
+  }),
 ], validate, ctrl.resetAdminPassword);
 router.put('/users/:userId/office',              ctrl.reassignUserOffice);
 router.put('/users/:userId/reassign',            ctrl.reassignEmployee);
+router.get('/audit-logs',                        ctrl.getAuditLogs);
 
 module.exports = router;

@@ -11,15 +11,47 @@ const EmployeePolicy = require('./EmployeePolicyService');
 class AuthenticationService {
   async login(identifier, password, deviceFingerprint = null, context = {}) {
     // Authentication uses email only; employee codes are organization-scoped display identifiers.
-    const normalizedIdentifier = String(identifier || '').trim();
-    const user = await prisma.user.findUnique({ where: { email: normalizedIdentifier.toLowerCase() } });
+    const normalizedIdentifier = String(identifier || '').trim().toLowerCase();
+
+    // Account-Level Lockout (5 consecutive failed attempts locks account for 15 minutes)
+    const lockoutKey = `tl:lockout:${normalizedIdentifier}`;
+    const attemptsKey = `tl:failed_attempts:${normalizedIdentifier}`;
+    try {
+      const isLocked = await redis.get(lockoutKey);
+      if (isLocked) {
+        const ttl = await redis.ttl(lockoutKey);
+        const minutes = Math.max(1, Math.ceil((ttl > 0 ? ttl : 900) / 60));
+        throw Object.assign(
+          new Error(`Account is temporarily locked due to multiple failed login attempts. Please try again in ${minutes} minute(s) or reset your password.`),
+          { status: 429, code: 'ACCOUNT_LOCKED' }
+        );
+      }
+    } catch (err) {
+      if (err.status === 429) throw err;
+    }
+
+    const recordFailedAttempt = async () => {
+      try {
+        const attempts = await redis.incr(attemptsKey);
+        if (attempts === 1) {
+          await redis.expire(attemptsKey, 900); // 15 mins window
+        } else if (attempts >= 5) {
+          await redis.set(lockoutKey, '1', 'EX', 900); // 15 mins lockout
+          await redis.del(attemptsKey);
+        }
+      } catch (_) {}
+    };
+
+    const user = await prisma.user.findUnique({ where: { email: normalizedIdentifier } });
 
     if (!user) {
+      await recordFailedAttempt();
       throw Object.assign(new Error('Invalid credentials'), { status: 401 });
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
+      await recordFailedAttempt();
       if (user.role === 'ADMIN' && user.orgId) {
         const orgCheck = await prisma.organization.findUnique({
           where: { id: user.orgId },
@@ -31,6 +63,12 @@ class AuthenticationService {
       }
       throw Object.assign(new Error('Invalid credentials'), { status: 401 });
     }
+
+    // Login successful: reset failed attempt tracking and lockout
+    try {
+      await redis.del(attemptsKey);
+      await redis.del(lockoutKey);
+    } catch (_) {}
 
     if (user.status !== 'ACTIVE') {
       throw Object.assign(new Error(`Account is ${user.status.toLowerCase()}`), { status: 403 });
@@ -319,6 +357,13 @@ class AuthenticationService {
     await prisma.refreshToken.deleteMany({ where: { userId: user.id } });
     await redis.del(`${PREFIXES.SOCKET}${user.id}`);
 
+    // Invalidate any active JWT access tokens immediately
+    await redis.set(`tl:revoked:${user.id}`, String(Date.now()), 'EX', 86400 * 7);
+
+    // Clear failed attempts and lockout so user can immediately authenticate
+    await redis.del(`tl:failed_attempts:${normalized}`);
+    await redis.del(`tl:lockout:${normalized}`);
+
     logger.info(`Password successfully reset for user ${user.email}`);
 
     return { success: true, message: 'Password has been updated successfully.' };
@@ -329,9 +374,12 @@ class AuthenticationService {
     if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
       throw Object.assign(new Error('Current password is incorrect'), { status: 400 });
     }
-    const hash = await bcrypt.hash(newPassword, env.BCRYPT_ROUNDS);
+    const hash = await bcrypt.hash(newPassword, env.BCRYPT_ROUNDS || 12);
     await prisma.user.update({ where: { id: userId }, data: { passwordHash: hash } });
     await prisma.refreshToken.deleteMany({ where: { userId } });
+
+    // Invalidate any active JWT access tokens immediately
+    await redis.set(`tl:revoked:${userId}`, String(Date.now()), 'EX', 86400 * 7);
   }
 
   // ── helpers ──────────────────────────────────────────────────────────────────

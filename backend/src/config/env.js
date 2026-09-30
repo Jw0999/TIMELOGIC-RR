@@ -71,6 +71,7 @@ module.exports = {
 
   REDIS_URL: localServiceUrl('REDIS_URL', 'redis://localhost:6379'),
   DEEPFACE_URL: localServiceUrl('DEEPFACE_URL', isProduction ? 'https://timelogic-deepface.onrender.com' : 'http://localhost:5001'),
+  INTERNAL_SERVICE_SECRET: process.env.INTERNAL_SERVICE_SECRET || 'tl-internal-service-secret-development',
 
   JWT_ACCESS_SECRET: required('JWT_ACCESS_SECRET'),
   JWT_REFRESH_SECRET: required('JWT_REFRESH_SECRET'),
