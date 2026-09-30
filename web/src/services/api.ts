@@ -68,7 +68,7 @@ async function request<T>(method: Method, path: string, body?: unknown, allowRef
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     });
   } catch {
-    throw new ApiError(`Cannot reach the TimeLogic backend at ${API_URL}. Check your internet connection and try again.`, 0);
+    throw new ApiError('Unable to connect to TimeLogic services. Please check your internet connection and try again.', 0);
   }
 
   const data = await res.json().catch(() => null);

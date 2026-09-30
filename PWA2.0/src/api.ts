@@ -40,7 +40,7 @@ async function request<T>(path: string, options: RequestInit = {}, retry = true)
       },
     });
   } catch {
-    throw new Error('Cannot reach the TimeLogic backend. Check your connection.');
+    throw new Error('Unable to connect to TimeLogic services. Please check your internet connection and try again.');
   }
   const body = await response.json().catch(() => null);
   if (response.status === 401 && retry && !path.includes('/auth/')) {

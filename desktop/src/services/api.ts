@@ -96,7 +96,7 @@ async function request<T>(method: Method, path: string, body?: unknown, allowRef
       res = await doFetch();
     } catch (retryErr) {
       console.error('[API Connection Error]', initialErr, retryErr);
-      throw new Error(`Cannot reach the TimeLogic backend at ${API_URL}. The server may be waking up from sleep, or check your connection.`);
+      throw new Error('Unable to connect to TimeLogic services. Please check your internet connection and try again.');
     }
   }
 
