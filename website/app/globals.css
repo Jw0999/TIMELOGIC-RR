@@ -5,22 +5,22 @@
    Grounded, high-contrast, professional enterprise B2B palette.
    ───────────────────────────────────────────────────────────── */
 @theme {
-  --color-ink: #08090d;           /* Page background, deep obsidian */
-  --color-base: #0f1117;          /* Elevated surface */
-  --color-surface: #141721;       /* Container / card surface */
-  --color-surface-hover: #1b1f2e; /* Interactive hover surface */
-  --color-surface-elevated: #1f2436;
+  --color-ink: #070d1e;           /* Deep obsidian-navy canvas */
+  --color-base: #0b142c;          /* Structural section surface */
+  --color-surface: #0f1c3d;       /* Primary panel / card surface */
+  --color-surface-hover: #152550; /* Interactive hover surface */
+  --color-surface-elevated: #1b2f66;
 
   --color-brand: #2563eb;         /* TimeLogic primary electric blue */
   --color-brand-hover: #1d4ed8;   /* Primary active/hover */
   --color-brand-subtle: rgba(37, 99, 235, 0.12); /* Tint/badge */
-  --color-sky: #60a5fa;           /* Accent blue */
+  --color-sky: #38bdf8;           /* Crisp cyan-blue accent */
 
-  --color-fg: #f1f5f9;            /* Primary high-contrast text */
-  --color-muted: #94a3b8;         /* Secondary descriptive text */
-  --color-faint: #64748b;         /* Tertiary subtle labels */
-  --color-line: rgba(255, 255, 255, 0.08); /* Clean structural divider */
-  --color-line-strong: rgba(255, 255, 255, 0.15);
+  --color-fg: #f8fafc;            /* High-contrast slate-50 primary text */
+  --color-muted: #94a3b8;         /* Secondary descriptive slate-400 */
+  --color-faint: #64748b;         /* Tertiary subtle labels slate-500 */
+  --color-line: rgba(255, 255, 255, 0.08); /* Clean 1px structural divider */
+  --color-line-strong: rgba(255, 255, 255, 0.16);
 
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
@@ -39,16 +39,16 @@
 html {
   scroll-behavior: smooth;
   overflow-x: hidden;
-  background-color: var(--color-ink);
+  background-color: #070d1e;
   color-scheme: dark;
 }
 
 body {
-  background: var(--color-ink);
+  background: #070d1e;
   position: relative;
   width: 100%;
   max-width: 100%;
-  color: var(--color-fg);
+  color: #f8fafc;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -56,31 +56,44 @@ body {
 }
 
 ::selection {
-  background: rgba(37, 99, 235, 0.35);
-  color: #fff;
+  background: rgba(37, 99, 235, 0.4);
+  color: #ffffff;
 }
 
-/* Subtle focus outline for keyboard accessibility */
+/* Accessible focus outline */
 :focus-visible {
-  outline: 2px solid var(--color-brand);
+  outline: 2px solid #38bdf8;
   outline-offset: 2px;
+}
+
+/* Subtle engineering grid background */
+.bg-grid-pattern {
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+}
+
+.bg-dot-pattern {
+  background-size: 24px 24px;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
 }
 
 /* Restrained utility classes */
 .border-subtle {
-  border-color: var(--color-line);
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 .surface-card {
-  background-color: var(--color-surface);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-lg);
+  background-color: #0b142c;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
 }
 
 .surface-hover {
-  transition: background-color 150ms ease, border-color 150ms ease;
+  transition: background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
 }
 .surface-hover:hover {
-  background-color: var(--color-surface-hover);
-  border-color: var(--color-line-strong);
+  background-color: #0f1c3d;
+  border-color: rgba(255, 255, 255, 0.16);
 }

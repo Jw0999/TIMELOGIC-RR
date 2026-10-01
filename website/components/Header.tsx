@@ -7,11 +7,7 @@ import { MessageSquare, Menu, X, ArrowRight } from "lucide-react";
 import { Logo, Wordmark } from "./ui/Logo";
 import { Button } from "./ui/Button";
 
-interface HeaderProps {
-  onCallClick?: () => void;
-}
-
-export function Header({ onCallClick }: HeaderProps) {
+export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
 
@@ -21,18 +17,19 @@ export function Header({ onCallClick }: HeaderProps) {
   }, [pathname]);
 
   const navLinks = [
-    { label: "Solution", href: "/solution" },
-    { label: "Pricing", href: "/pricing" },
-    { label: "Post", href: "/post" },
+    { label: "Overview", href: "/" },
+    { label: "Architecture", href: "/solution" },
+    { label: "System UI", href: "/post" },
+    { label: "Monthly Plans", href: "/pricing" },
     { label: "Investors", href: "/investors" },
     { label: "Team", href: "/team" },
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-white/[0.08] bg-[#070e24]/90 backdrop-blur-md transition-colors">
+    <header className="sticky top-0 z-50 w-full border-b border-white/[0.08] bg-[#070d1e]/90 backdrop-blur-md transition-colors">
       <div className="max-w-7xl mx-auto px-6 sm:px-8 h-16 flex items-center justify-between">
         {/* Left: Brand Logo + Primary Nav */}
-        <div className="flex items-center gap-10">
+        <div className="flex items-center gap-8 lg:gap-10">
           <Link href="/" className="flex items-center gap-3 group select-none">
             <Logo size={32} />
             <Wordmark className="text-lg font-bold tracking-tight text-white" />
@@ -46,10 +43,10 @@ export function Header({ onCallClick }: HeaderProps) {
                 <Link
                   key={item.label}
                   href={item.href}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors ${
                     isActive
-                      ? "text-white bg-white/[0.1] font-semibold"
-                      : "text-slate-300 hover:text-white hover:bg-white/[0.05]"
+                      ? "text-white bg-white/[0.08] font-semibold"
+                      : "text-slate-300 hover:text-white hover:bg-white/[0.04]"
                   }`}
                 >
                   {item.label}
@@ -66,7 +63,7 @@ export function Header({ onCallClick }: HeaderProps) {
             size="sm"
             href="https://wa.me/2349113380364"
             icon={<MessageSquare size={13} />}
-            className="text-xs text-white border-white/20 hover:bg-white/10"
+            className="text-xs text-slate-200 border-white/15 hover:bg-white/10 hover:text-white"
           >
             Chat on WhatsApp
           </Button>
@@ -76,9 +73,9 @@ export function Header({ onCallClick }: HeaderProps) {
             size="sm"
             href="/pricing"
             icon={<ArrowRight size={13} />}
-            className="text-xs font-bold shadow-md hover:shadow-lg"
+            className="text-xs font-semibold shadow-sm hover:shadow-md"
           >
-            View Pricing
+            Deploy Plans
           </Button>
         </div>
 
@@ -92,7 +89,7 @@ export function Header({ onCallClick }: HeaderProps) {
             aria-controls="mobile-navigation-menu"
             aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
           >
-            {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
         </div>
       </div>
@@ -101,7 +98,7 @@ export function Header({ onCallClick }: HeaderProps) {
       {mobileMenuOpen && (
         <div
           id="mobile-navigation-menu"
-          className="border-b border-white/[0.1] bg-[#070e24] px-6 py-5 sm:hidden space-y-4 shadow-2xl relative z-50 animate-in fade-in duration-150"
+          className="border-b border-white/[0.08] bg-[#070d1e] px-6 py-5 sm:hidden space-y-4 shadow-2xl relative z-50 animate-in fade-in duration-150"
         >
           <nav className="flex flex-col gap-1">
             {navLinks.map((item) => {
@@ -111,10 +108,10 @@ export function Header({ onCallClick }: HeaderProps) {
                   key={item.label}
                   href={item.href}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`px-3 py-2.5 rounded-lg text-base font-medium transition-colors ${
+                  className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                     isActive
-                      ? "text-white bg-blue-600/30 border border-blue-500/40 font-semibold"
-                      : "text-slate-200 hover:text-white hover:bg-white/[0.06]"
+                      ? "text-white bg-blue-600/25 border border-blue-500/30 font-semibold"
+                      : "text-slate-300 hover:text-white hover:bg-white/[0.04]"
                   }`}
                 >
                   {item.label}
@@ -123,16 +120,16 @@ export function Header({ onCallClick }: HeaderProps) {
             })}
           </nav>
 
-          <div className="pt-4 border-t border-white/[0.1] flex flex-col gap-2.5">
+          <div className="pt-4 border-t border-white/[0.08] flex flex-col gap-2.5">
             <Button
               variant="primary"
               size="md"
               href="/pricing"
               onClick={() => setMobileMenuOpen(false)}
-              icon={<ArrowRight size={15} />}
-              className="w-full justify-center py-2.5 text-sm font-bold shadow-md"
+              icon={<ArrowRight size={14} />}
+              className="w-full justify-center py-2 text-xs font-semibold shadow-sm"
             >
-              View Pricing & Plans
+              View Monthly Plans
             </Button>
 
             <Button
@@ -140,10 +137,10 @@ export function Header({ onCallClick }: HeaderProps) {
               size="md"
               href="https://wa.me/2349113380364"
               onClick={() => setMobileMenuOpen(false)}
-              icon={<MessageSquare size={15} />}
-              className="w-full justify-center py-2.5 text-sm text-white border-white/20 hover:bg-white/10"
+              icon={<MessageSquare size={14} />}
+              className="w-full justify-center py-2 text-xs text-slate-200 border-white/15 hover:bg-white/10"
             >
-              Chat on WhatsApp
+              Chat on WhatsApp (+2349113380364)
             </Button>
           </div>
         </div>

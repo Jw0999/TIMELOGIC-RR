@@ -17,17 +17,8 @@ import {
 interface StagedOrgData {
   refCode?: string;
   orgName?: string;
-  industry?: string;
-  timezone?: string;
-  officeName?: string;
-  officeAddress?: string;
-  adminName?: string;
-  adminFirstName?: string;
-  adminLastName?: string;
   adminEmail?: string;
-  selectedPlan?: string;
   planName?: string;
-  amount?: string;
 }
 
 export default function SuccessPage() {
@@ -50,165 +41,154 @@ export default function SuccessPage() {
   }, []);
 
   return (
-    <div className="min-h-screen w-full bg-white text-slate-900 flex flex-col justify-between">
+    <div className="min-h-screen w-full bg-[#070d1e] text-white flex flex-col justify-between">
       {/* Header */}
       <Header />
 
-      {/* ── SECTION 1: PAYMENT CONFIRMATION & OPEN EMAIL INSTRUCTION (WHITE BG) ── */}
-      <section className="pt-16 sm:pt-24 pb-16 sm:pb-20 bg-white text-slate-900 border-b border-slate-200">
+      {/* ── SECTION 1: CONFIRMATION & EMAIL INSTRUCTION ── */}
+      <section className="pt-16 sm:pt-20 pb-16 bg-[#070d1e] border-b border-white/[0.08] bg-grid-pattern">
         <div className="max-w-3xl mx-auto px-6 sm:px-8 space-y-8 text-center">
           {/* Status Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-50 border border-emerald-300 text-emerald-700 text-xs font-bold tracking-wide">
-            <CheckCircle2 size={15} className="text-emerald-600" />
-            <span>PAYMENT CONFIRMED · WORKSPACE PROVISIONED</span>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-emerald-950/60 border border-emerald-500/20 text-xs font-mono font-medium text-emerald-300">
+            <CheckCircle2 size={14} className="text-emerald-400" />
+            <span>WORKSPACE PROVISIONED & ACTIVE</span>
           </div>
 
           {/* Heading */}
           <div className="space-y-3">
-            <h1 className="text-3xl sm:text-5xl font-extrabold text-slate-950 tracking-tight leading-tight">
-              Subscription & Payment Successful!
+            <h1 className="text-3xl sm:text-5xl font-bold text-white tracking-tight leading-tight">
+              Subscription & Workspace Activated
             </h1>
-            <p className="text-slate-600 text-base sm:text-lg max-w-xl mx-auto leading-relaxed">
+            <p className="text-slate-300 text-sm sm:text-base max-w-xl mx-auto leading-relaxed">
               Thank you for subscribing to TimeLogic. Your workspace for{" "}
-              <strong className="text-slate-900 font-semibold">{data.orgName || "your organization"}</strong> has been activated and confirmed.
+              <strong className="text-white font-semibold">{data.orgName || "your organization"}</strong> has been confirmed.
             </p>
           </div>
 
-          {/* ── PRIMARY NOTICE CARD: OPEN YOUR EMAIL ── */}
-          <div className="p-7 sm:p-10 rounded-2xl bg-gradient-to-br from-blue-50 via-sky-50 to-indigo-50 border-2 border-blue-400/50 shadow-xl text-left space-y-6">
+          {/* Notice Card: Open Your Email */}
+          <div className="p-7 sm:p-9 rounded-xl bg-[#0b142c] border border-white/[0.08] text-left space-y-6 shadow-xl">
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
-                <Inbox size={26} />
+              <div className="w-10 h-10 rounded-lg bg-blue-600/20 text-sky-400 flex items-center justify-center flex-shrink-0">
+                <Inbox size={22} />
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-bold uppercase tracking-wider text-blue-700">
-                    Important Notice
+                  <span className="text-xs font-mono font-bold uppercase tracking-wider text-sky-400">
+                    Important Next Step
                   </span>
-                  <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-emerald-950 border border-emerald-500/30 text-emerald-300">
                     DISPATCH SENT
                   </span>
                 </div>
-                <h2 className="text-xl sm:text-2xl font-bold text-slate-950 tracking-tight">
-                  Please Open Your Email Inbox For All Information
+                <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+                  Please Open Your Email Inbox For System Credentials
                 </h2>
               </div>
             </div>
 
-            <div className="p-4 sm:p-5 rounded-xl bg-white/90 border border-blue-200/80 space-y-3 text-sm text-slate-700 leading-relaxed shadow-sm">
+            <div className="p-4 sm:p-5 rounded-lg bg-[#070d1e] border border-white/[0.06] space-y-3 text-xs sm:text-sm text-slate-300 leading-relaxed">
               <p>
-                A comprehensive activation email has been automatically dispatched to your administrator email address:
+                An activation dispatch containing your master login credentials and station pairing token has been sent to:
               </p>
-              <div className="p-3 rounded-lg bg-blue-50/80 border border-blue-200 font-mono text-xs sm:text-sm font-bold text-blue-900 break-all flex items-center gap-2">
-                <Mail size={16} className="text-blue-600 flex-shrink-0" />
+              <div className="p-3 rounded-md bg-[#0b142c] border border-white/[0.08] font-mono text-xs sm:text-sm font-bold text-sky-300 break-all flex items-center gap-2">
+                <Mail size={15} className="text-sky-400 flex-shrink-0" />
                 <span>{data.adminEmail || "your administrator email"}</span>
               </div>
               <p>
-                All your organization details, master administrator login credentials, portal access link, and hardware kiosk pairing token are contained in that email.
+                All your organization details, administrator access credentials, and hardware kiosk pairing instructions are contained in that dispatch.
               </p>
             </div>
 
-            <div className="space-y-2 text-xs text-slate-600 leading-relaxed bg-blue-100/40 p-3.5 rounded-xl border border-blue-200/60">
-              <div className="flex items-center gap-2 font-semibold text-slate-800">
-                <Lock size={14} className="text-blue-600" />
+            <div className="space-y-1.5 text-xs text-slate-400 leading-relaxed bg-blue-950/20 p-3.5 rounded-lg border border-blue-500/20">
+              <div className="flex items-center gap-2 font-semibold text-slate-200">
+                <Lock size={13} className="text-sky-400" />
                 <span>Security Notice:</span>
               </div>
               <p>
-                For data protection and organizational privacy, master administrator passwords and station tokens are never exposed on this website. Please open your mail inbox to access all credentials.
-              </p>
-              <p className="text-slate-500 pt-1">
-                Tip: If you do not see the email within 2 to 3 minutes, please check your Spam or Junk folder.
+                For organizational privacy, administrator passwords and station tokens are never displayed on this website. Please check your spam folder if the dispatch does not appear in your inbox within 3 minutes.
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ── SECTION 2: WHAT TO DO NEXT (BLUE BG) ── */}
-      <section className="py-16 sm:py-24 bg-[#0a1638] text-white border-y border-blue-900/60">
-        <div className="max-w-4xl mx-auto px-6 sm:px-8 space-y-10">
+      {/* ── SECTION 2: WHAT TO DO NEXT ── */}
+      <section className="py-16 sm:py-20 bg-[#091124] border-b border-white/[0.08]">
+        <div className="max-w-4xl mx-auto px-6 sm:px-8 space-y-8">
           <div className="text-center space-y-2">
-            <div className="text-xs font-mono font-bold uppercase tracking-wider text-sky-400">
-              Onboarding Checklist
-            </div>
-            <h2 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
+            <h2 className="text-xl sm:text-3xl font-bold text-white tracking-tight">
               Next Steps After Opening Your Email
             </h2>
-            <p className="text-sm text-blue-100/75 max-w-xl mx-auto leading-relaxed">
-              Here is what to do once you open your welcome email dispatch from TimeLogic:
+            <p className="text-xs sm:text-sm text-slate-300">
+              Follow these three simple onboarding steps:
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="p-6 rounded-2xl bg-[#0c1a42] border border-blue-400/25 shadow-lg space-y-3">
-              <div className="w-9 h-9 rounded-xl bg-blue-600/30 border border-blue-400/40 text-sky-300 flex items-center justify-center font-bold text-sm">
-                1
+            <div className="p-6 rounded-xl bg-[#0b142c] border border-white/[0.08] space-y-2">
+              <div className="w-8 h-8 rounded-lg bg-blue-500/15 text-sky-300 flex items-center justify-center font-bold text-xs font-mono">
+                01
               </div>
-              <h3 className="text-base font-bold text-white">Find Your Email</h3>
-              <p className="text-xs text-blue-100/80 leading-relaxed">
-                Look for the dispatch titled <em>"Welcome to TimeLogic — Workspace Active & Master Administrator Credentials"</em> in your inbox.
+              <h3 className="text-sm font-bold text-white">Find Your Email</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Open the dispatch titled <em>"Welcome to TimeLogic — Workspace Active & Master Credentials"</em>.
               </p>
             </div>
 
-            <div className="p-6 rounded-2xl bg-[#0c1a42] border border-blue-400/25 shadow-lg space-y-3">
-              <div className="w-9 h-9 rounded-xl bg-blue-600/30 border border-blue-400/40 text-sky-300 flex items-center justify-center font-bold text-sm">
-                2
+            <div className="p-6 rounded-xl bg-[#0b142c] border border-white/[0.08] space-y-2">
+              <div className="w-8 h-8 rounded-lg bg-blue-500/15 text-sky-300 flex items-center justify-center font-bold text-xs font-mono">
+                02
               </div>
-              <h3 className="text-base font-bold text-white">Sign In to Dashboard</h3>
-              <p className="text-xs text-blue-100/80 leading-relaxed">
-                Use your master administrator email and temporary password provided in the email to sign in and configure your team roster.
+              <h3 className="text-sm font-bold text-white">Sign In to Dashboard</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Log into the TimeLogic administrative portal to configure your shift hours and import your team roster.
               </p>
             </div>
 
-            <div className="p-6 rounded-2xl bg-[#0c1a42] border border-blue-400/25 shadow-lg space-y-3">
-              <div className="w-9 h-9 rounded-xl bg-blue-600/30 border border-blue-400/40 text-sky-300 flex items-center justify-center font-bold text-sm">
-                3
+            <div className="p-6 rounded-xl bg-[#0b142c] border border-white/[0.08] space-y-2">
+              <div className="w-8 h-8 rounded-lg bg-blue-500/15 text-sky-300 flex items-center justify-center font-bold text-xs font-mono">
+                03
               </div>
-              <h3 className="text-base font-bold text-white">Pair Your Kiosk Station</h3>
-              <p className="text-xs text-blue-100/80 leading-relaxed">
-                Enter your unique hardware station pairing token on your dedicated office tablet or kiosk screen to start verifying attendance.
+              <h3 className="text-sm font-bold text-white">Pair Your Kiosk Station</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Enter your unique station token on your designated office computer or tablet to begin verifying check-ins.
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ── SECTION 3: ASSISTANCE & RETURN HOME (WHITE BG) ── */}
-      <section className="py-16 sm:py-20 bg-white text-slate-900 border-b border-slate-200">
+      {/* ── SECTION 3: ASSISTANCE & RETURN HOME ── */}
+      <section className="py-16 sm:py-20 bg-[#070d1e]">
         <div className="max-w-3xl mx-auto px-6 sm:px-8 text-center space-y-6">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700">
-            <ShieldCheck size={14} className="text-blue-600" />
-            <span>Dedicated Technical Onboarding</span>
-          </div>
-
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-950">
+          <h2 className="text-xl sm:text-2xl font-bold text-white">
             Need Live Assistance or Haven't Received Your Email?
           </h2>
 
-          <p className="text-slate-600 text-sm sm:text-base max-w-lg mx-auto leading-relaxed">
-            Our systems architecture and deployment leads are active to immediately verify your workspace status or walk you through station hardware deployment.
+          <p className="text-slate-300 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed">
+            Our systems architecture and deployment leads are active to immediately verify your workspace status or assist with kiosk hardware pairing.
           </p>
 
-          <div className="pt-2 flex items-center justify-center gap-4 flex-wrap">
+          <div className="pt-2 flex items-center justify-center gap-3.5 flex-wrap">
             <Button
               variant="primary"
-              size="lg"
+              size="md"
               href="https://wa.me/2349113380364"
-              icon={<MessageSquare size={16} />}
-              className="shadow-md hover:shadow-lg"
+              icon={<MessageSquare size={14} />}
+              className="text-xs sm:text-sm font-semibold shadow-sm"
             >
               Chat with Deployment Lead
             </Button>
 
             <Button
               variant="outline"
-              size="lg"
+              size="md"
               href="/"
-              icon={<ArrowRight size={16} />}
+              icon={<ArrowRight size={14} />}
               iconPosition="right"
-              className="text-slate-800 border-slate-300 hover:bg-slate-50"
+              className="text-xs sm:text-sm text-slate-200 border-white/15 hover:bg-white/10"
             >
-              Return to Homepage
+              Return to Overview
             </Button>
           </div>
         </div>

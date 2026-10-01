@@ -1,197 +1,173 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
 import Image from "next/image";
-import { motion } from "motion/react";
+import Link from "next/link";
 import {
   MessageSquare,
   ArrowRight,
   ShieldCheck,
   CheckCircle2,
-  Lock,
   Cpu,
   Clock,
   FileSpreadsheet,
+  Lock,
 } from "lucide-react";
 import { Button } from "./ui/Button";
 
 export function Hero() {
   return (
-    <section className="relative w-full pt-12 sm:pt-16 lg:pt-20 pb-16 sm:pb-24 bg-[#070e24] text-white border-b border-blue-900/50 overflow-hidden">
-      {/* Subtle architectural gradient background matching TimeLogic web app */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-20%,rgba(37,99,235,0.22),transparent)]" />
-      <div className="pointer-events-none absolute -top-40 -right-40 w-[600px] h-[600px] rounded-full bg-blue-600/10 blur-[140px]" />
-      <div className="pointer-events-none absolute -bottom-40 -left-40 w-[600px] h-[600px] rounded-full bg-indigo-600/10 blur-[140px]" />
+    <section className="relative w-full pt-12 sm:pt-16 lg:pt-20 pb-16 sm:pb-20 bg-[#070d1e] text-white border-b border-white/[0.08] overflow-hidden bg-grid-pattern">
+      {/* Subtle architectural radial lighting (restrained, no cartoon neon) */}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_-10%,rgba(37,99,235,0.14),transparent)]" />
 
       <div className="max-w-7xl mx-auto px-6 sm:px-8 relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-14 items-center">
           
-          {/* ── Left Column: Editorial Headline, Subtitle, and CTAs (Slide In Left) ── */}
-          <motion.div
-            initial={{ opacity: 0, x: -35 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
-            className="lg:col-span-7 space-y-6 text-left"
-          >
-            {/* Subtle mature status chip */}
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/15 border border-blue-400/30 text-xs font-semibold text-sky-300">
-              <ShieldCheck size={14} className="text-sky-400" />
-              <span>TimeLogic Enterprise Attendance Kiosk</span>
-              <span className="text-blue-300/60">•</span>
-              <span>Zero Buddy-Punching</span>
+          {/* ── Left Column: Precise Value Proposition & Clear CTAs ── */}
+          <div className="lg:col-span-6 space-y-6 text-left">
+            {/* Status indicator */}
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-blue-950/60 border border-blue-500/20 text-xs font-medium text-sky-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              <span>On-Premise Biometric Kiosk Infrastructure</span>
             </div>
 
-            {/* Well-proportioned, mature typography */}
-            <h1 className="text-3xl sm:text-4xl lg:text-[44px] font-bold text-white tracking-[-0.03em] leading-[1.18]">
-              Workforce attendance you can <br className="hidden sm:inline" />
-              <span className="text-sky-400">actually verify.</span>
+            {/* High-conviction typography */}
+            <h1 className="text-3xl sm:text-4xl lg:text-[42px] font-bold text-white tracking-[-0.03em] leading-[1.18]">
+              Workforce attendance locked to <br className="hidden sm:inline" />
+              <span className="text-sky-400">physical company hardware.</span>
             </h1>
 
             <p className="text-sm sm:text-base text-slate-300 leading-relaxed font-normal max-w-xl">
-              Eliminate ghost workers, buddy-punching, and unmonitored breaks. TimeLogic locks daily check-ins to authorized on-premise kiosk stations, biometric facial verification, and live office network presence.
+              Eliminate proxy check-ins, mobile GPS spoofing, and unmonitored break overstays. TimeLogic binds attendance strictly to authorized on-premise kiosk terminals with facial biometric verification and 1-click Excel payroll exports.
             </p>
 
-            {/* Action Buttons: View Plans & Direct Call Button */}
+            {/* Direct Action Buttons */}
             <div className="pt-2 flex items-center gap-3.5 flex-wrap">
               <Button
                 variant="primary"
-                size="lg"
+                size="md"
                 href="/pricing"
-                icon={<ArrowRight size={16} />}
-                className="shadow-lg hover:shadow-xl shadow-blue-600/30 font-bold"
+                icon={<ArrowRight size={15} />}
+                iconPosition="right"
+                className="font-semibold shadow-sm text-xs sm:text-sm"
               >
-                Explore Plans & Pricing
+                View Monthly Plans & Pricing
               </Button>
 
               <Button
                 variant="outline"
-                size="lg"
+                size="md"
                 href="https://wa.me/2349113380364"
-                icon={<MessageSquare size={16} />}
-                className="text-white border-white/20 hover:bg-white/10"
+                icon={<MessageSquare size={14} />}
+                className="text-xs sm:text-sm text-slate-200 border-white/15 hover:bg-white/10"
               >
                 Chat with Deployment Team
               </Button>
             </div>
 
             {/* Operational Verification Highlights */}
-            <div className="pt-6 grid grid-cols-2 sm:grid-cols-4 gap-4 border-t border-white/10 text-xs text-slate-300 font-medium">
+            <div className="pt-6 grid grid-cols-2 gap-3 border-t border-white/[0.08] text-xs text-slate-300">
               <div className="flex items-center gap-2">
-                <CheckCircle2 size={15} className="text-sky-400 flex-shrink-0" />
-                <span>Hardware-locked kiosk</span>
+                <CheckCircle2 size={14} className="text-sky-400 flex-shrink-0" />
+                <span>Zero GPS mock-location spoofing</span>
               </div>
               <div className="flex items-center gap-2">
-                <CheckCircle2 size={15} className="text-sky-400 flex-shrink-0" />
-                <span>Zero GPS spoofing</span>
+                <CheckCircle2 size={14} className="text-sky-400 flex-shrink-0" />
+                <span>Sub-second biometric facial lock</span>
               </div>
               <div className="flex items-center gap-2">
-                <CheckCircle2 size={15} className="text-sky-400 flex-shrink-0" />
-                <span>Live break window audit</span>
+                <CheckCircle2 size={14} className="text-sky-400 flex-shrink-0" />
+                <span>Automated break overstay alarms</span>
               </div>
               <div className="flex items-center gap-2">
-                <CheckCircle2 size={15} className="text-sky-400 flex-shrink-0" />
-                <span>1-click Excel export</span>
+                <CheckCircle2 size={14} className="text-sky-400 flex-shrink-0" />
+                <span>1-click Microsoft Excel export</span>
               </div>
             </div>
-          </motion.div>
+          </div>
 
-          {/* ── Right Column: Secure.png 3D Shield (Slide In Right + Subtle Float) ── */}
-          <motion.div
-            initial={{ opacity: 0, x: 40, scale: 0.95 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            transition={{ duration: 0.75, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
-            className="lg:col-span-5 flex flex-col items-center justify-center relative"
-          >
-            {/* Ambient shield glow backdrop */}
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className="w-[340px] h-[340px] sm:w-[420px] sm:h-[420px] rounded-full bg-blue-500/20 blur-[90px]" />
+          {/* ── Right Column: Authentic Production Interface Showcase ── */}
+          <div className="lg:col-span-6">
+            <div className="rounded-xl border border-white/[0.12] bg-[#0b142c] shadow-2xl overflow-hidden">
+              {/* Window Titlebar */}
+              <div className="h-9 px-4 bg-[#080d1e] border-b border-white/[0.08] flex items-center justify-between text-xs text-slate-400">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80 inline-block" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block" />
+                  </div>
+                  <span className="font-mono text-[11px] text-slate-400 ml-2">timelogic-admin · Live Presence</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
+                  <span className="text-[11px] text-emerald-400 font-mono font-medium">Terminal Paired</span>
+                </div>
+              </div>
+
+              {/* Main Interface Capture */}
+              <div className="relative aspect-[16/10] bg-[#070d1e] overflow-hidden">
+                <img
+                  src="/screenshots/admin-dashboard.png"
+                  alt="TimeLogic Live Executive Attendance Dashboard"
+                  className="w-full h-full object-cover object-top"
+                />
+              </div>
+
+              {/* Hardware telemetry status ribbon */}
+              <div className="px-4 py-2.5 bg-[#080d1e] border-t border-white/[0.08] flex items-center justify-between text-[11px] font-mono text-slate-300">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck size={13} className="text-sky-400" />
+                  <span>On-Premise Kiosk #01 Active</span>
+                </div>
+                <div className="flex items-center gap-3 text-slate-400">
+                  <span>Server Clock Sync: 0ms drift</span>
+                  <span className="hidden sm:inline text-sky-400">Verification: 100% Locked</span>
+                </div>
+              </div>
             </div>
-
-            {/* Floating 3D Shield Image */}
-            <motion.div
-              animate={{ y: [0, -10, 0] }}
-              transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-              className="relative z-10 w-full max-w-[340px] sm:max-w-[420px] lg:max-w-[460px] aspect-square flex items-center justify-center p-4 drop-shadow-[0_25px_45px_rgba(0,0,0,0.6)]"
-            >
-              <img
-                src="/secure.png"
-                alt="TimeLogic Verified Security Shield — Tamper-Proof Attendance Guarantee"
-                className="w-full h-full object-contain filter drop-shadow-[0_20px_40px_rgba(37,99,235,0.4)]"
-              />
-            </motion.div>
-
-            {/* Subtle verification badge below shield */}
-            <motion.div
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-              className="mt-2 relative z-20 px-4 py-2 rounded-xl bg-[#0e1e4a]/90 border border-blue-400/30 shadow-lg backdrop-blur-md flex items-center gap-2.5 text-xs text-blue-100 font-medium"
-            >
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>100% Cryptographic On-Premise Lock</span>
-              <span className="text-blue-300">•</span>
-              <span className="text-sky-300">Biometric Verified</span>
-            </motion.div>
-          </motion.div>
+          </div>
 
         </div>
 
         {/* ── 3 Concrete Infrastructure Pillars ── */}
-        <div className="mt-16 sm:mt-24 grid grid-cols-1 md:grid-cols-3 gap-6">
-          <motion.div
-            initial={{ opacity: 0, y: 25 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="p-7 rounded-2xl bg-[#0e1d44] border border-blue-400/20 shadow-md space-y-3"
-          >
-            <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-sky-300 flex items-center justify-center font-bold">
-              <Cpu size={20} />
+        <div className="mt-14 sm:mt-20 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="p-6 rounded-xl bg-[#0b142c] border border-white/[0.08] space-y-3">
+            <div className="w-9 h-9 rounded-lg bg-blue-500/15 text-sky-300 flex items-center justify-center">
+              <Cpu size={18} />
             </div>
-            <h3 className="text-base font-bold text-white tracking-tight">
-              On-Premise Kiosk Authorization
+            <h3 className="text-sm font-semibold text-white tracking-tight">
+              Hardware-Bound Kiosk Authorization
             </h3>
-            <p className="text-xs sm:text-sm text-blue-100/75 leading-relaxed">
-              Attendance can only be logged on authorized company kiosk terminals physically located on the office network. Employees cannot check in from home, beds, or vehicles.
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Check-ins can only be registered on designated company computers or tablets physically paired to your workplace network. Remote GPS spoofing is architecturally impossible.
             </p>
-          </motion.div>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 25 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="p-7 rounded-2xl bg-[#0e1d44] border border-blue-400/20 shadow-md space-y-3"
-          >
-            <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-sky-300 flex items-center justify-center font-bold">
-              <Clock size={20} />
+          <div className="p-6 rounded-xl bg-[#0b142c] border border-white/[0.08] space-y-3">
+            <div className="w-9 h-9 rounded-lg bg-blue-500/15 text-sky-300 flex items-center justify-center">
+              <Clock size={18} />
             </div>
-            <h3 className="text-base font-bold text-white tracking-tight">
+            <h3 className="text-sm font-semibold text-white tracking-tight">
               Granular Break & Policy Tracking
             </h3>
-            <p className="text-xs sm:text-sm text-blue-100/75 leading-relaxed">
-              Monitor lunch, short breaks, prayer, and nursing hours against strict daily windows. The system automatically triggers high-priority alerts if break durations are exceeded.
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Enforce defined allowances for lunch, short breaks, and prayer sessions. The system automatically logs duration in minutes and alerts managers the moment an employee overstays.
             </p>
-          </motion.div>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 25 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-            className="p-7 rounded-2xl bg-[#0e1d44] border border-blue-400/20 shadow-md space-y-3"
-          >
-            <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-sky-300 flex items-center justify-center font-bold">
-              <FileSpreadsheet size={20} />
+          <div className="p-6 rounded-xl bg-[#0b142c] border border-white/[0.08] space-y-3">
+            <div className="w-9 h-9 rounded-lg bg-blue-500/15 text-sky-300 flex items-center justify-center">
+              <FileSpreadsheet size={18} />
             </div>
-            <h3 className="text-base font-bold text-white tracking-tight">
+            <h3 className="text-sm font-semibold text-white tracking-tight">
               1-Click Payroll-Ready Reporting
             </h3>
-            <p className="text-xs sm:text-sm text-blue-100/75 leading-relaxed">
-              Stop wasting 3 to 5 days manually tallying paper logbooks. One click exports clean, audited Excel and CSV spreadsheets ready for immediate salary computation.
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Replace multi-day manual spreadsheet compilation. Export fully audited, mathematically verified Microsoft Excel (.xlsx) and CSV sheets ready for instant payroll disbursement.
             </p>
-          </motion.div>
+          </div>
         </div>
       </div>
     </section>

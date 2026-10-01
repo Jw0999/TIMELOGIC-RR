@@ -1,242 +1,369 @@
 "use client";
 
+import React from "react";
+import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Hero } from "@/components/Hero";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/Button";
-import Link from "next/link";
-import { motion } from "motion/react";
 import {
   ArrowRight,
   MessageSquare,
+  CheckCircle2,
+  XCircle,
+  ShieldCheck,
+  Cpu,
+  Clock,
+  FileSpreadsheet,
+  AlertTriangle,
+  HelpCircle,
 } from "lucide-react";
 
 export default function Home() {
+  const comparisonRows = [
+    {
+      feature: "Proxy Clock-In (Buddy-Punching)",
+      timelogic: "Impossible: Irreversible facial biometric lock + PIN required",
+      paper: "Trivially forged by coworkers signing for absent friends",
+      gpsApps: "Frequent: coworkers share phone logins or swap credentials",
+      fingerprint: "Medium: silicone molds and fake finger sleeves",
+    },
+    {
+      feature: "Location Verification & Spoofing",
+      timelogic: "Hardware-bound: punches only valid on authorized on-premise kiosk",
+      paper: "Zero verification: sheets can be filled anywhere at any time",
+      gpsApps: "Easily bypassed using common Android mock-location GPS apps",
+      fingerprint: "High hardware bound, but high maintenance & optical failure",
+    },
+    {
+      feature: "Break & Overstay Monitoring",
+      timelogic: "Second-accurate tracking with automated overstay alarms",
+      paper: "Completely untracked: breaks are never accurately recorded",
+      gpsApps: "Manual self-reporting only: workers rarely clock out for breaks",
+      fingerprint: "Rarely supported: causes terminal bottlenecks at doors",
+    },
+    {
+      feature: "Hardware Requirements & Cost",
+      timelogic: "Zero proprietary lock-in: runs on any standard office PC, laptop, or tablet",
+      paper: "Low initial cost, massive ongoing losses from time theft & ghost workers",
+      gpsApps: "Requires employee personal phones (battery drain & privacy friction)",
+      fingerprint: "Expensive proprietary terminals ($300-$800 per unit + sensor wear)",
+    },
+    {
+      feature: "Payroll Export & Reconciliation",
+      timelogic: "1-Click verified export directly to Microsoft Excel (.xlsx) & CSV",
+      paper: "3 to 5 days of manual compilation, math errors, and disputes",
+      gpsApps: "Basic CSV exports requiring extensive post-processing cleanup",
+      fingerprint: "Clunky USB flash drive extraction or outdated desktop utilities",
+    },
+  ];
+
+  const faqs = [
+    {
+      q: "What hardware is required to run the TimeLogic Attendance Kiosk?",
+      a: "TimeLogic is completely hardware-agnostic. Any desktop computer, laptop, or tablet running Windows, Linux, macOS, or Android with a working front camera and internet connection can be paired as an authorized on-premise kiosk station in under 10 minutes.",
+    },
+    {
+      q: "How does TimeLogic prevent workers from spoofing check-ins with mock location apps?",
+      a: "Unlike mobile-first attendance apps that depend on phone GPS signals that employees easily spoof with mock-location utilities, TimeLogic anchors attendance strictly to your physical hardware terminal and verified company network.",
+    },
+    {
+      q: "Can we configure multiple shifts, grace periods, and break windows?",
+      a: "Yes. Shift start times, closing times, grace periods, late penalty thresholds, and break durations (such as lunch or prayer slots) are fully configurable per department or organization.",
+    },
+    {
+      q: "How quickly can TimeLogic be deployed in our organization?",
+      a: "Standard deployment takes less than 24 hours. Our technical team assists with account setup, kiosk pairing, and employee roster import directly over WhatsApp or on-site.",
+    },
+  ];
+
   return (
-    <div className="min-h-screen w-full bg-[#070e24] text-white flex flex-col justify-between">
-      {/* ── SECTION 1: HEADER & HERO (BLUE BG LIKE WEB APP) ── */}
+    <div className="min-h-screen w-full bg-[#070d1e] text-white flex flex-col justify-between">
+      {/* ── HEADER & HERO ── */}
       <Header />
       <Hero />
 
-      {/* ── SECTION 2: OPERATIONAL WORKFLOW (WHITE BG) ── */}
-      <section className="py-20 sm:py-28 bg-white text-slate-900 border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-6 sm:px-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.55 }}
-            className="max-w-2xl space-y-3 mb-14"
-          >
-            <div className="text-xs font-bold uppercase tracking-wider text-blue-600">
-              Operational Workflow
+      {/* ── SECTION 2: THREE-STAGE OPERATIONAL ARCHITECTURE ── */}
+      <section className="py-20 sm:py-24 bg-[#091124] border-b border-white/[0.08]">
+        <div className="max-w-7xl mx-auto px-6 sm:px-8 space-y-14">
+          <div className="max-w-3xl space-y-3">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-blue-950/60 border border-blue-500/20 text-xs font-mono font-medium text-sky-300">
+              Operational Sequence
             </div>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-950 tracking-tight">
-              How TimeLogic eliminates attendance fraud in three steps.
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white tracking-tight">
+              How TimeLogic establishes tamper-proof attendance in three steps.
             </h2>
-            <p className="text-slate-600 text-base leading-relaxed">
-              Designed from the ground up to prevent the vulnerabilities inherent in paper sheets, punch cards, and mobile GPS check-in apps.
+            <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
+              Engineered from first principles to eliminate the structural vulnerabilities found in paper logbooks, optical fingerprint scanners, and mobile GPS check-in apps.
             </p>
-          </motion.div>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {/* Step 1 */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-              className="p-8 rounded-2xl bg-slate-50 border border-slate-200/90 shadow-sm space-y-4"
-            >
-              <div className="text-xs font-mono font-bold text-blue-600">01 / DEPLOYMENT</div>
-              <h3 className="text-xl font-bold text-slate-950 tracking-tight">
-                Pair Hardware On-Premise
-              </h3>
-              <p className="text-sm text-slate-600 leading-relaxed">
-                Designate any office computer or tablet as an authorized Attendance Kiosk Station. The station is cryptographically bound to your physical network.
-              </p>
-              <div className="pt-2 text-xs text-slate-500 font-medium">
-                • Locked to server clock · Hardware ID authentication
+            <div className="p-7 rounded-xl bg-[#0b142c] border border-white/[0.08] flex flex-col justify-between space-y-5">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono font-bold text-sky-400">STAGE 01</span>
+                  <span className="text-[11px] font-mono text-slate-400">ON-PREMISE PAIRING</span>
+                </div>
+                <h3 className="text-lg font-bold text-white tracking-tight">
+                  Designate Kiosk Station
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  Authenticate any standard office computer or tablet as an authorized company kiosk. The station cryptographically binds to your physical network and server clock.
+                </p>
               </div>
-            </motion.div>
+              <div className="pt-4 border-t border-white/[0.06] text-xs text-slate-400 space-y-1.5 font-mono">
+                <div>• Zero mobile GPS spoofing</div>
+                <div>• Server-locked timestamp precision</div>
+              </div>
+            </div>
 
             {/* Step 2 */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              className="p-8 rounded-2xl bg-slate-50 border border-slate-200/90 shadow-sm space-y-4"
-            >
-              <div className="text-xs font-mono font-bold text-blue-600">02 / VERIFICATION</div>
-              <h3 className="text-xl font-bold text-slate-950 tracking-tight">
-                Employee Facial & PIN Punch
-              </h3>
-              <p className="text-sm text-slate-600 leading-relaxed">
-                Staff check in upon arrival using authorized employee credentials and biometric facial verification. Check-in takes under 3 seconds per employee.
-              </p>
-              <div className="pt-2 text-xs text-slate-500 font-medium">
-                • Zero proxy punching · Enforced shift schedule windows
+            <div className="p-7 rounded-xl bg-[#0b142c] border border-white/[0.08] flex flex-col justify-between space-y-5">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono font-bold text-sky-400">STAGE 02</span>
+                  <span className="text-[11px] font-mono text-slate-400">BIOMETRIC PUNCH</span>
+                </div>
+                <h3 className="text-lg font-bold text-white tracking-tight">
+                  Facial & PIN Verification
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  Employees step up to the kiosk, enter their unique employee PIN, and verify identity via sub-second facial match. Transactions execute in under 3 seconds.
+                </p>
               </div>
-            </motion.div>
+              <div className="pt-4 border-t border-white/[0.06] text-xs text-slate-400 space-y-1.5 font-mono">
+                <div>• Permanent face template lock</div>
+                <div>• Zero proxy check-ins or buddy punches</div>
+              </div>
+            </div>
 
             {/* Step 3 */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-              className="p-8 rounded-2xl bg-slate-50 border border-slate-200/90 shadow-sm space-y-4"
-            >
-              <div className="text-xs font-mono font-bold text-blue-600">03 / INTELLIGENCE</div>
-              <h3 className="text-xl font-bold text-slate-950 tracking-tight">
-                Live Audit & Payroll Export
-              </h3>
-              <p className="text-sm text-slate-600 leading-relaxed">
-                Management monitors live floor presence and automated fraud alerts in real time. At month-end, export pristine Excel spreadsheets ready for payroll.
-              </p>
-              <div className="pt-2 text-xs text-slate-500 font-medium">
-                • Direct Excel/CSV download · Second-accurate audit trail
+            <div className="p-7 rounded-xl bg-[#0b142c] border border-white/[0.08] flex flex-col justify-between space-y-5">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono font-bold text-sky-400">STAGE 03</span>
+                  <span className="text-[11px] font-mono text-slate-400">AUDIT & PAYROLL</span>
+                </div>
+                <h3 className="text-lg font-bold text-white tracking-tight">
+                  Live Audit & Excel Export
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  Supervisors monitor live floor presence and break overstay alarms in real time. At the end of the month, export mathematically verified Excel spreadsheets ready for payroll.
+                </p>
               </div>
-            </motion.div>
+              <div className="pt-4 border-t border-white/[0.06] text-xs text-slate-400 space-y-1.5 font-mono">
+                <div>• 1-Click Excel (.xlsx) / CSV export</div>
+                <div>• Automatic overtime & penalty ledger</div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ── SECTION 3: CORE MODULES & REAL SCREENS (BLUE BG) ── */}
-      <section className="py-20 sm:py-28 bg-[#0a1638] text-white border-b border-blue-900/60">
+      {/* ── SECTION 3: ARCHITECTURAL COMPARISON MATRIX ── */}
+      <section className="py-20 sm:py-24 bg-[#070d1e] border-b border-white/[0.08]">
+        <div className="max-w-7xl mx-auto px-6 sm:px-8 space-y-12">
+          <div className="max-w-3xl space-y-3">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-blue-950/60 border border-blue-500/20 text-xs font-mono font-medium text-sky-300">
+              Technical Comparison
+            </div>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white tracking-tight">
+              Why Alternative Attendance Methods Fail In Practice
+            </h2>
+            <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
+              Paper books, mobile GPS apps, and optical fingerprint scanners create operational vulnerabilities that silently leak thousands of dollars in unverified payroll each month.
+            </p>
+          </div>
+
+          {/* Structured Table */}
+          <div className="rounded-xl border border-white/[0.08] bg-[#0b142c] overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                <thead>
+                  <tr className="border-b border-white/[0.08] bg-[#080d1e] text-slate-300 font-semibold">
+                    <th className="py-4 px-5 sm:px-6 w-1/4">Operational Capability</th>
+                    <th className="py-4 px-5 sm:px-6 w-1/3 text-sky-400 bg-blue-950/30">
+                      TimeLogic Biometric Kiosk
+                    </th>
+                    <th className="py-4 px-4 text-slate-400 hidden lg:table-cell">Paper Logbooks</th>
+                    <th className="py-4 px-4 text-slate-400">Mobile GPS Apps</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/[0.06] text-slate-300">
+                  {comparisonRows.map((row, idx) => (
+                    <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="py-4 px-5 sm:px-6 font-medium text-white">
+                        {row.feature}
+                      </td>
+                      <td className="py-4 px-5 sm:px-6 bg-blue-950/20 font-medium text-sky-200">
+                        <div className="flex items-start gap-2">
+                          <CheckCircle2 size={16} className="text-sky-400 flex-shrink-0 mt-0.5" />
+                          <span>{row.timelogic}</span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4 text-slate-400 hidden lg:table-cell">
+                        <div className="flex items-start gap-2">
+                          <XCircle size={15} className="text-rose-400 flex-shrink-0 mt-0.5" />
+                          <span>{row.paper}</span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4 text-slate-400">
+                        <div className="flex items-start gap-2">
+                          <XCircle size={15} className="text-amber-400 flex-shrink-0 mt-0.5" />
+                          <span>{row.gpsApps}</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── SECTION 4: REAL PRODUCTION MODULES & SCREENSHOT SHOWCASE ── */}
+      <section className="py-20 sm:py-24 bg-[#091124] border-b border-white/[0.08]">
         <div className="max-w-7xl mx-auto px-6 sm:px-8 space-y-16">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.55 }}
-            className="flex flex-col sm:flex-row sm:items-end justify-between gap-6"
-          >
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
             <div className="max-w-2xl space-y-3">
-              <div className="text-xs font-bold uppercase tracking-wider text-sky-400">
-                Core System Modules
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-blue-950/60 border border-blue-500/20 text-xs font-mono font-medium text-sky-300">
+                Production System Modules
               </div>
-              <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-                Engineered for operational rigor across all departments.
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white tracking-tight">
+                Authentic Interfaces Engineered For Operational Rigor
               </h2>
+              <p className="text-sm text-slate-300 leading-relaxed">
+                Take a look at the actual software screens utilized daily by administrative leads, supervisors, and floor workers.
+              </p>
             </div>
             <Button
               variant="outline"
-              size="md"
+              size="sm"
               href="/post"
-              icon={<ArrowRight size={15} />}
+              icon={<ArrowRight size={14} />}
               iconPosition="right"
-              className="text-white border-white/25 hover:bg-white/10"
+              className="text-xs text-slate-200 border-white/15 hover:bg-white/10"
             >
-              View All 8 System Screens
+              Explore All 9 System Screens
             </Button>
-          </motion.div>
+          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Feature 1: Kiosk Station */}
-            <motion.div
-              initial={{ opacity: 0, x: -30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-              className="rounded-2xl border border-blue-400/20 bg-[#0e1f4e] overflow-hidden flex flex-col justify-between shadow-xl"
-            >
-              <div className="p-8 space-y-3">
-                <div className="text-xs font-bold text-sky-400 uppercase tracking-wider">
-                  Check-In Station Portal
-                </div>
-                <h3 className="text-xl font-bold text-white">
-                  Dedicated On-Premise Touch Kiosk
-                </h3>
-                <p className="text-sm text-blue-100/75 leading-relaxed">
-                  Intuitive touch interface for staff check-ins. Tracks shift schedule hours, biometric enrollment counts, and active workforce capacity.
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Module 1: Workforce Check-In Station */}
+            <div className="rounded-xl border border-white/[0.08] bg-[#0b142c] overflow-hidden flex flex-col justify-between shadow-xl">
+              <div className="p-6 sm:p-7 space-y-2">
+                <div className="text-xs font-mono font-bold text-sky-400">TERMINAL UI · SCREEN 03</div>
+                <h3 className="text-lg font-bold text-white">Workforce Check-In Station</h3>
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  The primary staff check-in station. Displays active shift schedules, enrollment counters, and biometric confirmation in under 3 seconds.
                 </p>
               </div>
-              <div className="border-t border-blue-400/20 bg-slate-950 p-4">
+              <div className="border-t border-white/[0.08] bg-[#070d1e] p-3 sm:p-4">
                 <img
                   src="/screenshots/workforce-checkin.png"
-                  alt="Workforce Check-In Kiosk Interface"
-                  className="rounded-lg border border-white/10 w-full h-auto object-cover"
+                  alt="Workforce Check-In Interface"
+                  className="rounded-lg border border-white/[0.08] w-full h-auto object-cover"
                 />
               </div>
-            </motion.div>
+            </div>
 
-            {/* Feature 2: Fraud Alerts Engine */}
-            <motion.div
-              initial={{ opacity: 0, x: 30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-              className="rounded-2xl border border-blue-400/20 bg-[#0e1f4e] overflow-hidden flex flex-col justify-between shadow-xl"
-            >
-              <div className="p-8 space-y-3">
-                <div className="text-xs font-bold text-sky-400 uppercase tracking-wider">
-                  Automated Anomaly Detection
-                </div>
-                <h3 className="text-xl font-bold text-white">
-                  Real-Time Policy Violation Auditing
-                </h3>
-                <p className="text-sm text-blue-100/75 leading-relaxed">
-                  Continuous audit engine that automatically flags overstayed breaks, suspicious timestamps, and off-network check-in attempts with resolution logs.
+            {/* Module 2: Automated Fraud Alerts Engine */}
+            <div className="rounded-xl border border-white/[0.08] bg-[#0b142c] overflow-hidden flex flex-col justify-between shadow-xl">
+              <div className="p-6 sm:p-7 space-y-2">
+                <div className="text-xs font-mono font-bold text-sky-400">ANOMALY ENGINE · SCREEN 07</div>
+                <h3 className="text-lg font-bold text-white">Automated Policy Violation Engine</h3>
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  Real-time detection ledger that flags overstayed break allowances, suspicious punch timestamps, and policy infractions with resolution workflows.
                 </p>
               </div>
-              <div className="border-t border-blue-400/20 bg-slate-950 p-4">
+              <div className="border-t border-white/[0.08] bg-[#070d1e] p-3 sm:p-4">
                 <img
                   src="/screenshots/fraud-alerts.png"
-                  alt="Fraud Alerts and Anomaly Resolution Engine"
-                  className="rounded-lg border border-white/10 w-full h-auto object-cover"
+                  alt="Fraud Alerts Engine"
+                  className="rounded-lg border border-white/[0.08] w-full h-auto object-cover"
                 />
               </div>
-            </motion.div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ── SECTION 4: DEPLOYMENT CTA BANNER (WHITE BG) ── */}
-      <section className="py-22 bg-slate-50 text-slate-900 border-t border-slate-200">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.96 }}
-          whileInView={{ opacity: 1, scale: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
-          className="max-w-5xl mx-auto px-6 sm:px-8 text-center space-y-6"
-        >
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-100 border border-blue-200 text-xs font-semibold text-blue-800">
-            Rapid Deployment Guarantee
+      {/* ── SECTION 5: REAL DEPLOYMENT FAQS ── */}
+      <section className="py-20 sm:py-24 bg-[#070d1e] border-b border-white/[0.08]">
+        <div className="max-w-4xl mx-auto px-6 sm:px-8 space-y-12">
+          <div className="text-center space-y-3">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-blue-950/60 border border-blue-500/20 text-xs font-mono font-medium text-sky-300">
+              Technical FAQ
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+              Deployment & Hardware Specifications
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-300">
+              Concrete operational details regarding TimeLogic on-premise installation and licensing.
+            </p>
           </div>
 
-          <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-950 tracking-tight">
-            Ready to secure your organization's attendance?
+          <div className="space-y-4">
+            {faqs.map((faq, idx) => (
+              <div
+                key={idx}
+                className="p-6 rounded-xl bg-[#0b142c] border border-white/[0.08] space-y-2"
+              >
+                <div className="flex items-start gap-2.5 text-sm sm:text-base font-semibold text-white">
+                  <HelpCircle size={18} className="text-sky-400 flex-shrink-0 mt-0.5" />
+                  <span>{faq.q}</span>
+                </div>
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed pl-7">
+                  {faq.a}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── SECTION 6: CONSULTATION & DEPLOYMENT BANNER ── */}
+      <section className="py-20 sm:py-24 bg-[#091124]">
+        <div className="max-w-5xl mx-auto px-6 sm:px-8 text-center space-y-6">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md bg-blue-500/15 border border-blue-400/25 text-xs font-medium text-sky-300">
+            <ShieldCheck size={14} className="text-sky-400" />
+            <span>24-Hour Deployment Guarantee</span>
+          </div>
+
+          <h2 className="text-2xl sm:text-4xl font-bold text-white tracking-tight">
+            Ready to secure your workplace attendance?
           </h2>
 
-          <p className="text-slate-600 text-base sm:text-lg max-w-xl mx-auto leading-relaxed">
-            Our deployment engineers assist with kiosk hardware pairing, staff enrollment, and admin configuration within 24 hours.
+          <p className="text-sm sm:text-base text-slate-300 max-w-xl mx-auto leading-relaxed">
+            Our systems architecture and deployment leads are ready to assist with kiosk station hardware pairing, staff enrollment, and admin portal setup.
           </p>
 
-          <div className="pt-4 flex items-center justify-center gap-4 flex-wrap">
+          <div className="pt-2 flex items-center justify-center gap-4 flex-wrap">
             <Button
               variant="primary"
-              size="lg"
+              size="md"
               href="https://wa.me/2349113380364"
-              icon={<MessageSquare size={16} />}
-              className="shadow-lg hover:shadow-xl"
+              icon={<MessageSquare size={15} />}
+              className="font-semibold shadow-sm text-xs sm:text-sm"
             >
               Chat with Deployment Lead
             </Button>
             <Button
               variant="outline"
-              size="lg"
+              size="md"
               href="/pricing"
-              className="text-slate-800 border-slate-300 hover:bg-slate-100 hover:text-slate-950"
+              className="text-xs sm:text-sm text-slate-200 border-white/15 hover:bg-white/10"
             >
               View Monthly Plans
             </Button>
           </div>
-        </motion.div>
+        </div>
       </section>
 
-      {/* Footer */}
+      {/* FOOTER */}
       <Footer />
     </div>
   );
