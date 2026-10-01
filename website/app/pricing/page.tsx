@@ -1,7 +1,7 @@
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/Button";
-import { Check, PhoneCall, HelpCircle, Mail, ExternalLink } from "lucide-react";
+import { Check, PhoneCall, HelpCircle, Mail } from "lucide-react";
 
 export default function PricingPage() {
   const plans = [
@@ -11,8 +11,6 @@ export default function PricingPage() {
       period: "/ month",
       capacity: "20 Employees",
       billing: "Paid monthly (₦20k/mo)",
-      paystackUrl: "https://paystack.shop/pay/eh6-mzczwq",
-      isCustomContact: false,
       description: "Designed for small commercial offices, studios, and single-location businesses eliminating buddy-punching.",
       sentences: [
         "Ideal for boutique offices and studios seeking to eliminate proxy clock-ins.",
@@ -27,7 +25,7 @@ export default function PricingPage() {
         "Standard policy violation alerts",
         "1-Click CSV attendance report exports",
       ],
-      ctaText: "Get Starter Plan",
+      ctaText: "Deploy Starter Plan",
       highlighted: false,
     },
     {
@@ -36,8 +34,6 @@ export default function PricingPage() {
       period: "/ month",
       capacity: "60 Employees",
       billing: "Paid monthly (₦60k/mo)",
-      paystackUrl: "https://paystack.shop/pay/fx02rvbsve",
-      isCustomContact: false,
       description: "Built for expanding companies, manufacturing plants, and multi-department teams requiring full operational oversight.",
       sentences: [
         "Engineered for multi-department organizations, factories, and commercial facilities.",
@@ -53,7 +49,7 @@ export default function PricingPage() {
         "Direct Microsoft Excel (.xlsx) payroll export",
         "Departmental punctuality & overtime rankings",
       ],
-      ctaText: "Get Enterprise Plan",
+      ctaText: "Deploy Enterprise Plan",
       highlighted: true,
     },
     {
@@ -62,7 +58,6 @@ export default function PricingPage() {
       period: "Pricing",
       capacity: "Custom Headcount",
       billing: "Custom monthly terms",
-      isCustomContact: true,
       description: "Tailored for large multi-branch corporations, educational institutions, and multi-location enterprises.",
       sentences: [
         "Engineered for large enterprises, multi-branch corporations, schools, and institutions.",
@@ -194,62 +189,31 @@ export default function PricingPage() {
                   </div>
                 </div>
 
-                {/* Action Buttons */}
+                {/* Action Buttons: Direct Phone Call & Direct Email Deployment */}
                 <div className="pt-4 border-t border-blue-400/20 space-y-2.5">
-                  {plan.isCustomContact ? (
-                    <>
-                      <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-400/20 text-[11px] text-blue-200 text-center font-medium">
-                        Self-serve online checkout is disabled for custom organisation headcount. Contact our team to configure your deployment:
-                      </div>
+                  <Button
+                    variant={plan.highlighted ? "primary" : "outline"}
+                    size="md"
+                    href="tel:09036627043"
+                    icon={<PhoneCall size={14} />}
+                    className={`w-full justify-center font-bold transition-all ${
+                      plan.highlighted
+                        ? "bg-sky-400 hover:bg-sky-300 text-slate-950 shadow-md hover:shadow-lg ring-1 ring-sky-300"
+                        : "bg-blue-600 hover:bg-blue-500 text-white border-blue-500 shadow-xs"
+                    }`}
+                  >
+                    Deploy {plan.name} — Call 09036627043
+                  </Button>
 
-                      <Button
-                        variant="outline"
-                        size="md"
-                        href="mailto:deployment@timelogic.app?subject=TimeLogic%20Custom%20Organisation%20Deployment%20Inquiry&body=Hello%20TimeLogic%20Team%2C%0A%0AWe%20would%20like%20to%20deploy%20TimeLogic%20for%20our%20organisation%20with%20custom%20headcount.%0A%0AOrganisation%20Name%3A%20...%0AEstimated%20Employees%3A%20...%0APhone%20Number%3A%20..."
-                        icon={<Mail size={14} />}
-                        className="w-full justify-center font-semibold text-white border-white/25 hover:bg-white/10"
-                      >
-                        Email Deployment Team
-                      </Button>
-
-                      <Button
-                        variant="primary"
-                        size="md"
-                        href="tel:09036627043"
-                        icon={<PhoneCall size={14} />}
-                        className="w-full justify-center font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-md hover:shadow-lg"
-                      >
-                        Call Phone: 09036627043
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button
-                        variant={plan.highlighted ? "primary" : "outline"}
-                        size="md"
-                        href={plan.paystackUrl}
-                        external
-                        icon={<ExternalLink size={14} />}
-                        className={`w-full justify-center font-bold transition-all ${
-                          plan.highlighted
-                            ? "bg-sky-400 hover:bg-sky-300 text-slate-950 shadow-md hover:shadow-lg ring-1 ring-sky-300"
-                            : "bg-blue-600 hover:bg-blue-500 text-white border-blue-500 shadow-xs"
-                        }`}
-                      >
-                        Subscribe to {plan.name} ({plan.price}/mo)
-                      </Button>
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        href="tel:09036627043"
-                        icon={<PhoneCall size={13} />}
-                        className="w-full justify-center text-xs text-blue-200 border-white/20 hover:bg-white/10"
-                      >
-                        Call Deployment: 09036627043
-                      </Button>
-                    </>
-                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    href={`mailto:deployment@timelogics.tech?subject=TimeLogic%20${encodeURIComponent(plan.name)}%20Deployment%20Inquiry&body=Hello%20TimeLogic%20Deployment%20Team%2C%0A%0AWe%20would%20like%20to%20deploy%20TimeLogic%20(${encodeURIComponent(plan.name)}%20Tier).%0A%0AOrganisation%20Name%3A%20...%0AEstimated%20Employees%3A%20...%0APhone%20Number%3A%20...`}
+                    icon={<Mail size={13} />}
+                    className="w-full justify-center text-xs text-blue-200 border-white/20 hover:bg-white/10"
+                  >
+                    Email Deployment Team
+                  </Button>
                 </div>
               </div>
             ))}
