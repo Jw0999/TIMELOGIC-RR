@@ -10,6 +10,7 @@ function generate8DigitCode() {
 
 /**
  * Evaluate organization subscription status based on current server clock.
+ * Any newly created organization or expired organization requires activation code.
  * @param {object} org - Organization model instance
  * @returns {object} Subscription assessment
  */
@@ -21,14 +22,15 @@ function getOrgSubscriptionStatus(org) {
   const now = new Date();
   const expiresAt = org.subscriptionExpiresAt ? new Date(org.subscriptionExpiresAt) : null;
 
-  if (!expiresAt) {
+  // If no expiration date is set, or org was never activated, or status is explicitly EXPIRED
+  if (!expiresAt || org.subscriptionStatus === 'EXPIRED') {
     return {
-      isExpired: false,
-      status: 'ACTIVE',
-      subscriptionStart: org.subscriptionStart || org.createdAt,
-      subscriptionExpiresAt: null,
-      lastActivatedAt: org.lastActivatedAt,
-      daysRemaining: 30,
+      isExpired: true,
+      status: 'EXPIRED',
+      subscriptionStart: org.subscriptionStart || null,
+      subscriptionExpiresAt: expiresAt ? expiresAt.toISOString() : null,
+      lastActivatedAt: org.lastActivatedAt ? (org.lastActivatedAt instanceof Date ? org.lastActivatedAt.toISOString() : new Date(org.lastActivatedAt).toISOString()) : null,
+      daysRemaining: 0,
     };
   }
 
@@ -48,13 +50,13 @@ function getOrgSubscriptionStatus(org) {
     status,
     subscriptionStart: org.subscriptionStart || org.createdAt,
     subscriptionExpiresAt: expiresAt.toISOString(),
-    lastActivatedAt: org.lastActivatedAt ? org.lastActivatedAt.toISOString() : null,
+    lastActivatedAt: org.lastActivatedAt ? (org.lastActivatedAt instanceof Date ? org.lastActivatedAt.toISOString() : new Date(org.lastActivatedAt).toISOString()) : null,
     daysRemaining,
   };
 }
 
 /**
- * Redeem an 8-digit activation code to extend organization subscription.
+ * Redeem an 8-digit activation code to activate or extend organization subscription.
  */
 async function redeemActivationCode({ orgId, code, adminId, adminIp }) {
   const cleanCode = String(code || '').trim().replace(/[-\s]/g, '');
@@ -100,7 +102,7 @@ async function redeemActivationCode({ orgId, code, adminId, adminIp }) {
   const durationDays = activationRecord.durationDays || 30;
   const currentExpiry = org.subscriptionExpiresAt ? new Date(org.subscriptionExpiresAt) : null;
 
-  // If current expiry is in the future, extend from that future date; otherwise extend from now
+  // If current expiry is in the future, extend from that future date; otherwise extend from now (current server time)
   const baseDate = currentExpiry && currentExpiry.getTime() > now.getTime() ? currentExpiry : now;
   const newExpiry = new Date(baseDate.getTime() + durationDays * 24 * 60 * 60 * 1000);
 
@@ -119,6 +121,7 @@ async function redeemActivationCode({ orgId, code, adminId, adminIp }) {
       where: { id: orgId },
       data: {
         subscriptionStatus: 'ACTIVE',
+        subscriptionStart: org.subscriptionStart || now,
         subscriptionExpiresAt: newExpiry,
         lastActivatedAt: now,
       },
@@ -129,7 +132,7 @@ async function redeemActivationCode({ orgId, code, adminId, adminIp }) {
 
   return {
     success: true,
-    message: `Subscription successfully renewed for ${durationDays} days!`,
+    message: `Subscription successfully activated/renewed for ${durationDays} days!`,
     subscriptionExpiresAt: newExpiry.toISOString(),
     status: 'ACTIVE',
     daysRemaining,

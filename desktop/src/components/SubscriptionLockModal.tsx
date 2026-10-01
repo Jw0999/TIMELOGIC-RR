@@ -6,7 +6,7 @@ import { redeemActivationCode } from '../services';
 const SUPPORT_WHATSAPP = '2349113380364';
 
 export default function SubscriptionLockModal() {
-  const { organization, isSubscriptionExpired, refreshSubscription, logout } = useAuth();
+  const { organization, subscription, isSubscriptionExpired, refreshSubscription, logout } = useAuth();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -15,6 +15,8 @@ export default function SubscriptionLockModal() {
   if (!isSubscriptionExpired) {
     return null;
   }
+
+  const isInitialActivation = !subscription?.lastActivatedAt;
 
   const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Only allow digits, max 8 characters
@@ -36,7 +38,7 @@ export default function SubscriptionLockModal() {
 
     try {
       const res = await redeemActivationCode(code);
-      setSuccess(res?.message || 'Subscription successfully renewed! Unlocking TimeLogic...');
+      setSuccess(res?.message || 'Subscription successfully activated! Unlocking TimeLogic...');
       setTimeout(async () => {
         await refreshSubscription();
       }, 1200);
@@ -49,22 +51,30 @@ export default function SubscriptionLockModal() {
 
   const orgName = organization?.name || 'Your Organization';
   const whatsappUrl = `https://wa.me/${SUPPORT_WHATSAPP}?text=${encodeURIComponent(
-    `Hello TimeLogic Support, our organization "${orgName}" subscription has expired. Please send our 8-digit monthly activation code.`
+    isInitialActivation
+      ? `Hello TimeLogic Support, our organization "${orgName}" is newly registered and requires an 8-digit activation code to start our 30-day subscription.`
+      : `Hello TimeLogic Support, our organization "${orgName}" subscription has expired. Please send our 8-digit monthly activation code.`
   )}`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 select-none">
       <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
         {/* Top warning stripe */}
-        <div className="bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 p-6 text-white flex items-center gap-4">
+        <div className={`p-6 text-white flex items-center gap-4 ${
+          isInitialActivation
+            ? 'bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800'
+            : 'bg-gradient-to-r from-red-600 via-rose-600 to-amber-600'
+        }`}>
           <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0 shadow-inner">
             <Lock className="w-8 h-8 text-white stroke-[2.5]" />
           </div>
           <div>
             <span className="text-[11px] font-bold uppercase tracking-wider bg-white/25 px-2.5 py-0.5 rounded-full inline-block mb-1">
-              Service Locked
+              {isInitialActivation ? 'Activation Required' : 'Service Locked'}
             </span>
-            <h2 className="text-xl font-black tracking-tight leading-snug">Subscription Expired</h2>
+            <h2 className="text-xl font-black tracking-tight leading-snug">
+              {isInitialActivation ? 'Activate Your Organization' : 'Subscription Expired'}
+            </h2>
             <p className="text-xs text-white/90 font-medium truncate max-w-xs">{orgName}</p>
           </div>
         </div>
@@ -86,12 +96,25 @@ export default function SubscriptionLockModal() {
           )}
 
           <div className="text-xs text-[var(--text-muted)] space-y-1.5 leading-relaxed">
-            <p>
-              Your monthly subscription for <strong className="text-[var(--text-main)]">{orgName}</strong> has ended.
-            </p>
-            <p>
-              Desktop operations and attendance kiosk punch-ins are temporarily suspended. Please enter your <strong>8-digit activation code</strong> below to immediately unlock the system for the next 30 days.
-            </p>
+            {isInitialActivation ? (
+              <>
+                <p>
+                  Welcome to TimeLogic! Your organization account <strong className="text-[var(--text-main)]">{orgName}</strong> requires an activation code to begin.
+                </p>
+                <p>
+                  Please enter your <strong>8-digit activation code</strong> below to activate and unlock desktop admin and kiosk access for the next 30 days.
+                </p>
+              </>
+            ) : (
+              <>
+                <p>
+                  Your monthly subscription for <strong className="text-[var(--text-main)]">{orgName}</strong> has ended.
+                </p>
+                <p>
+                  Desktop operations and attendance kiosk punch-ins are temporarily suspended. Please enter your <strong>8-digit activation code</strong> below to immediately unlock the system for the next 30 days.
+                </p>
+              </>
+            )}
           </div>
 
           <form onSubmit={handleRedeem} className="space-y-4">
@@ -127,7 +150,7 @@ export default function SubscriptionLockModal() {
                 <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
               ) : (
                 <>
-                  <span>Activate & Unlock System</span>
+                  <span>{isInitialActivation ? 'Activate 30-Day Access' : 'Activate & Unlock System'}</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}

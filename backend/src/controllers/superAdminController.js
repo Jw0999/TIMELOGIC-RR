@@ -101,16 +101,17 @@ const createOrg = async (req, res, next) => {
     const passwordHash = await bcrypt.hash(admin.password, +env.BCRYPT_ROUNDS || 12);
 
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Create the organization
+      // 1. Create the organization (starts locked/expired, requiring Super Admin 8-digit activation code)
       const org = await tx.organization.create({
         data: {
           id: uuidv4(),
           name: String(name).trim(),
           industry: industry || 'General',
           subscriptionTier: 'enterprise',
-          subscriptionStatus: 'ACTIVE',
-          subscriptionStart: new Date(),
-          subscriptionExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          subscriptionStatus: 'EXPIRED',
+          subscriptionStart: null,
+          subscriptionExpiresAt: new Date(Date.now() - 1000),
+          lastActivatedAt: null,
           allowDeviceCheckIn: Boolean(allowDeviceCheckIn),
           allowManualCheckIn: Boolean(allowManualCheckIn),
           hasStudents: Boolean(hasStudents),
