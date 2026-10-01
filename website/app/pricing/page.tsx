@@ -20,14 +20,14 @@ export default function PricingPage() {
         "Real-time admin dashboard with live presence tracking and standard CSV exports.",
       ],
       features: [
-        "Up to 20 registered employees",
+        "Up to 20 active employees",
         "1 Active On-Premise Kiosk Station",
         "Biometric facial & employee PIN verification",
         "Live Executive Presence Dashboard",
         "Standard policy violation alerts",
         "1-Click CSV attendance report exports",
       ],
-      ctaText: "Register Starter Plan",
+      ctaText: "Get Starter Plan",
       highlighted: false,
     },
     {
@@ -45,7 +45,7 @@ export default function PricingPage() {
         "Comprehensive department performance metrics with direct Microsoft Excel payroll integration.",
       ],
       features: [
-        "Up to 60 registered employees",
+        "Up to 60 active employees",
         "Multi-kiosk terminal support across departments",
         "Automated Fraud Detection & Incident Logging",
         "Granular Break Tracking (Lunch, Prayer, Nursing)",
@@ -53,7 +53,7 @@ export default function PricingPage() {
         "Direct Microsoft Excel (.xlsx) payroll export",
         "Departmental punctuality & overtime rankings",
       ],
-      ctaText: "Register Enterprise Plan",
+      ctaText: "Get Enterprise Plan",
       highlighted: true,
     },
     {
@@ -227,14 +227,16 @@ export default function PricingPage() {
                       <Button
                         variant={plan.highlighted ? "primary" : "outline"}
                         size="md"
-                        href={`/register?plan=${plan.name.toLowerCase()}`}
+                        href={plan.paystackUrl}
+                        external
+                        icon={<ExternalLink size={14} />}
                         className={`w-full justify-center font-bold transition-all ${
                           plan.highlighted
                             ? "bg-sky-400 hover:bg-sky-300 text-slate-950 shadow-md hover:shadow-lg ring-1 ring-sky-300"
                             : "bg-blue-600 hover:bg-blue-500 text-white border-blue-500 shadow-xs"
                         }`}
                       >
-                        Register {plan.name} ({plan.price}/mo)
+                        Subscribe to {plan.name} ({plan.price}/mo)
                       </Button>
 
                       <Button

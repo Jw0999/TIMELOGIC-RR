@@ -47,8 +47,8 @@ export const DOWNLOADS: Record<DownloadKey, DownloadItem> = {
 };
 
 export const CONTACT = {
-  email: "hello@timelogic.app",
-  phone: "+234 800 000 0000",
+  email: "hello@timelogics.tech",
+  phone: "09036627043",
   region: "Lagos, Nigeria · Remote-first",
 };
 

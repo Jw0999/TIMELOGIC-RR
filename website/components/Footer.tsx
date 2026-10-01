@@ -83,11 +83,11 @@ export function Footer() {
               </li>
               <li>
                 <a
-                  href="mailto:hello@timelogic.app"
+                  href="mailto:hello@timelogics.tech"
                   className="inline-flex items-center gap-1.5 hover:text-white transition-colors"
                 >
                   <Mail size={13} />
-                  <span>hello@timelogic.app</span>
+                  <span>hello@timelogics.tech</span>
                 </a>
               </li>
               <li className="flex items-center gap-1.5 text-slate-500 text-xs pt-1">

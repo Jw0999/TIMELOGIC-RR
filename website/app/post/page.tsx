@@ -42,7 +42,7 @@ export default function PostPage() {
       badge: "Employee Check-In",
       image: "/screenshots/workforce-checkin.png",
       summary:
-        "The primary employee-facing check-in screen. Staff punch in with under 3 seconds per transaction using their registered employee credentials and facial biometric verification.",
+        "The primary employee-facing check-in screen. Staff punch in with under 3 seconds per transaction using their authorized employee credentials and facial biometric verification.",
       keyCapabilities: [
         "Displays current active session schedule (e.g. Main Office 07:20 – 19:30).",
         "Tracks total organization staff and live clock-in counts.",

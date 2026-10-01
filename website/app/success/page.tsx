@@ -33,7 +33,7 @@ interface StagedOrgData {
 export default function SuccessPage() {
   const [data, setData] = useState<StagedOrgData>({
     orgName: "Your Organization",
-    adminEmail: "your registered administrator email",
+    adminEmail: "your administrator email",
     planName: "TimeLogic Subscription",
   });
 
@@ -66,11 +66,11 @@ export default function SuccessPage() {
           {/* Heading */}
           <div className="space-y-3">
             <h1 className="text-3xl sm:text-5xl font-extrabold text-slate-950 tracking-tight leading-tight">
-              Registration & Payment Successful!
+              Subscription & Payment Successful!
             </h1>
             <p className="text-slate-600 text-base sm:text-lg max-w-xl mx-auto leading-relaxed">
               Thank you for subscribing to TimeLogic. Your workspace for{" "}
-              <strong className="text-slate-900 font-semibold">{data.orgName || "your organization"}</strong> has been registered and confirmed.
+              <strong className="text-slate-900 font-semibold">{data.orgName || "your organization"}</strong> has been activated and confirmed.
             </p>
           </div>
 
@@ -101,7 +101,7 @@ export default function SuccessPage() {
               </p>
               <div className="p-3 rounded-lg bg-blue-50/80 border border-blue-200 font-mono text-xs sm:text-sm font-bold text-blue-900 break-all flex items-center gap-2">
                 <Mail size={16} className="text-blue-600 flex-shrink-0" />
-                <span>{data.adminEmail || "your registered email"}</span>
+                <span>{data.adminEmail || "your administrator email"}</span>
               </div>
               <p>
                 All your organization details, master administrator login credentials, portal access link, and hardware kiosk pairing token are contained in that email.

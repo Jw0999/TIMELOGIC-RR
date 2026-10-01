@@ -73,7 +73,7 @@ export default function Home() {
                 Employee Facial & PIN Punch
               </h3>
               <p className="text-sm text-slate-600 leading-relaxed">
-                Staff check in upon arrival using registered employee credentials and biometric facial verification. Check-in takes under 3 seconds per employee.
+                Staff check in upon arrival using authorized employee credentials and biometric facial verification. Check-in takes under 3 seconds per employee.
               </p>
               <div className="pt-2 text-xs text-slate-500 font-medium">
                 • Zero proxy punching · Enforced shift schedule windows

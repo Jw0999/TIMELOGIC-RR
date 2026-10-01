@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { PhoneCall, Menu, X, Building2 } from "lucide-react";
+import { PhoneCall, Menu, X, ArrowRight } from "lucide-react";
 import { Logo, Wordmark } from "./ui/Logo";
 import { Button } from "./ui/Button";
 
@@ -75,11 +75,11 @@ export function Header({ onCallClick }: HeaderProps) {
           <Button
             variant="primary"
             size="sm"
-            href="/register"
-            icon={<Building2 size={13} />}
+            href="/pricing"
+            icon={<ArrowRight size={13} />}
             className="text-xs font-bold shadow-md hover:shadow-lg"
           >
-            Register Organisation
+            View Pricing
           </Button>
         </div>
 
@@ -128,12 +128,12 @@ export function Header({ onCallClick }: HeaderProps) {
             <Button
               variant="primary"
               size="md"
-              href="/register"
+              href="/pricing"
               onClick={() => setMobileMenuOpen(false)}
-              icon={<Building2 size={15} />}
+              icon={<ArrowRight size={15} />}
               className="w-full justify-center py-2.5 text-sm font-bold shadow-md"
             >
-              Register Organisation
+              View Pricing & Plans
             </Button>
 
             <Button

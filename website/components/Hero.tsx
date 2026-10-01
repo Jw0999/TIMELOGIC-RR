@@ -53,16 +53,16 @@ export function Hero() {
               Eliminate ghost workers, buddy-punching, and unmonitored breaks. TimeLogic locks daily check-ins to authorized on-premise kiosk stations, biometric facial verification, and live office network presence.
             </p>
 
-            {/* Action Buttons: Register Your Organisation Button & Direct Call Button */}
+            {/* Action Buttons: View Plans & Direct Call Button */}
             <div className="pt-2 flex items-center gap-3.5 flex-wrap">
               <Button
                 variant="primary"
                 size="lg"
-                href="/register"
-                icon={<Building2 size={16} />}
+                href="/pricing"
+                icon={<ArrowRight size={16} />}
                 className="shadow-lg hover:shadow-xl shadow-blue-600/30 font-bold"
               >
-                Register Your Organisation
+                Explore Plans & Pricing
               </Button>
 
               <Button

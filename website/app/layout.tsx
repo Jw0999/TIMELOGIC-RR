@@ -6,7 +6,7 @@ import "./globals.css";
 const TITLE = "TimeLogic — Attendance you can actually trust";
 const DESCRIPTION =
   "TimeLogic verifies every workforce check-in by Wi-Fi, registered device, and authorized time. Secure, real-time attendance for offices, schools, clinics, factories, and multi-branch teams.";
-const SITE_URL = "https://timelogic.app";
+const SITE_URL = "https://timelogics.tech";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
