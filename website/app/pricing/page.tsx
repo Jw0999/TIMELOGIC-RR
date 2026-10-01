@@ -133,44 +133,44 @@ export default function PricingPage() {
   ];
 
   return (
-    <div className="min-h-screen w-full theme-page-bg transition-colors flex flex-col justify-between">
+    <div className="min-h-screen w-full bg-[#070d1e] text-white flex flex-col justify-between">
       {/* Header */}
       <Header />
 
       {/* ── SECTION 1: HEADER & INTRO ── */}
-      <section className="pt-16 sm:pt-20 pb-16 theme-page-bg border-b border-theme bg-grid-pattern transition-colors">
+      <section className="pt-16 sm:pt-20 pb-16 bg-[#070d1e] border-b border-white/[0.08] bg-grid-pattern">
         <div className="max-w-4xl mx-auto px-6 sm:px-8 text-center space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-500/20 text-xs font-mono font-medium text-blue-700 dark:text-sky-300">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-blue-950/80 border border-blue-400/30 text-xs font-mono font-medium text-sky-300">
             Licensing & Deployment
           </div>
 
-          <h1 className="text-3xl sm:text-5xl font-bold theme-text-primary tracking-tight leading-tight">
+          <h1 className="text-3xl sm:text-5xl font-bold text-white tracking-tight leading-tight">
             Transparent Monthly Deployment Plans
           </h1>
 
-          <p className="theme-text-secondary text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
+          <p className="text-slate-200 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
             Predictable monthly billing based on verified employee headcount. No proprietary hardware lock-in or per-punch surcharges.
           </p>
         </div>
       </section>
 
       {/* ── SECTION 2: 3 PRICING CARDS ── */}
-      <section className="py-20 sm:py-24 theme-section-bg border-b border-theme transition-colors">
+      <section className="py-20 sm:py-24 bg-[#091124] border-b border-white/[0.08]">
         <div className="max-w-7xl mx-auto px-6 sm:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
             {plans.map((plan) => (
               <div
                 key={plan.name}
-                className={`rounded-xl p-7 sm:p-8 flex flex-col justify-between transition-all shadow-xs ${
+                className={`rounded-xl p-7 sm:p-8 flex flex-col justify-between transition-all shadow-md ${
                   plan.highlighted
-                    ? "theme-card-bg border-2 border-blue-500 ring-2 ring-blue-500/20"
-                    : "theme-card-bg border border-theme"
+                    ? "bg-[#0d1838] border-2 border-blue-500 shadow-xl"
+                    : "bg-[#0b142c] border border-white/[0.08]"
                 }`}
               >
                 <div>
                   {/* Header */}
                   <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-bold theme-text-primary tracking-tight">
+                    <h3 className="text-lg font-bold text-white tracking-tight">
                       {plan.name}
                     </h3>
                     {plan.highlighted && (
@@ -183,32 +183,32 @@ export default function PricingPage() {
                   {/* Price & Headcount */}
                   <div className="mt-5 mb-2">
                     <div className="flex items-baseline gap-2">
-                      <div className="text-3xl sm:text-4xl font-extrabold theme-text-primary tracking-tight">
+                      <div className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
                         {plan.price}
                       </div>
                       {plan.period && (
-                        <div className="text-xs sm:text-sm font-medium theme-text-muted">
+                        <div className="text-xs sm:text-sm font-medium text-slate-300">
                           {plan.period}
                         </div>
                       )}
                     </div>
-                    <div className="text-xs font-mono font-semibold text-blue-600 dark:text-sky-400 mt-1">
+                    <div className="text-xs font-mono font-semibold text-sky-400 mt-1">
                       {plan.capacity} · {plan.billing}
                     </div>
                   </div>
 
-                  <p className="text-xs theme-text-secondary leading-relaxed mt-3">
+                  <p className="text-xs text-slate-200 leading-relaxed mt-3">
                     {plan.description}
                   </p>
 
                   {/* Features */}
-                  <div className="space-y-2.5 my-6 pt-5 border-t border-theme">
-                    <div className="text-xs font-bold theme-text-primary uppercase tracking-wider mb-2">
+                  <div className="space-y-2.5 my-6 pt-5 border-t border-white/[0.08]">
+                    <div className="text-xs font-bold text-white uppercase tracking-wider mb-2">
                       Included Capabilities:
                     </div>
                     {plan.features.map((feat) => (
-                      <div key={feat} className="flex items-start gap-2.5 text-xs theme-text-secondary">
-                        <Check size={14} className="text-blue-600 dark:text-sky-400 flex-shrink-0 mt-0.5" />
+                      <div key={feat} className="flex items-start gap-2.5 text-xs text-slate-200">
+                        <Check size={14} className="text-sky-400 flex-shrink-0 mt-0.5" />
                         <span>{feat}</span>
                       </div>
                     ))}
@@ -216,7 +216,7 @@ export default function PricingPage() {
                 </div>
 
                 {/* Action Buttons: WhatsApp & Direct Email Deployment */}
-                <div className="pt-4 border-t border-theme space-y-2">
+                <div className="pt-4 border-t border-white/[0.08] space-y-2">
                   <Button
                     variant={plan.highlighted ? "primary" : "outline"}
                     size="sm"
@@ -225,7 +225,7 @@ export default function PricingPage() {
                     className={`w-full justify-center text-xs font-semibold ${
                       plan.highlighted
                         ? "shadow-xs"
-                        : "theme-text-primary border-theme hover:bg-slate-100 dark:hover:bg-white/10"
+                        : "text-white border-white/20 hover:bg-white/10"
                     }`}
                   >
                     Deploy {plan.name} on WhatsApp
@@ -236,7 +236,7 @@ export default function PricingPage() {
                     size="sm"
                     href={`mailto:deployment@timelogics.tech?subject=TimeLogic%20${encodeURIComponent(plan.name)}%20Deployment%20Inquiry&body=Hello%20TimeLogic%20Deployment%20Team%2C%0A%0AWe%20would%20like%20to%20deploy%20TimeLogic%20(${encodeURIComponent(plan.name)}%20Tier).%0A%0AOrganisation%20Name%3A%20...%0AEstimated%20Employees%3A%20...`}
                     icon={<Mail size={12} />}
-                    className="w-full justify-center text-[11px] theme-text-muted hover:theme-text-primary"
+                    className="w-full justify-center text-[11px] text-slate-300 hover:text-white"
                   >
                     Email Deployment Team
                   </Button>
@@ -248,82 +248,82 @@ export default function PricingPage() {
       </section>
 
       {/* ── SECTION 3: SIDE-BY-SIDE FEATURE MATRIX TABLE ── */}
-      <section className="py-20 sm:py-24 theme-page-bg border-b border-theme transition-colors">
+      <section className="py-20 sm:py-24 bg-[#070d1e] border-b border-white/[0.08]">
         <div className="max-w-7xl mx-auto px-6 sm:px-8 space-y-12">
           <div className="max-w-3xl space-y-3">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-500/20 text-xs font-mono font-medium text-blue-700 dark:text-sky-300">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-blue-950/80 border border-blue-400/30 text-xs font-mono font-medium text-sky-300">
               Feature Comparison
             </div>
-            <h2 className="text-2xl sm:text-3xl font-bold theme-text-primary tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
               Compare Plan Capabilities
             </h2>
-            <p className="text-xs sm:text-sm theme-text-secondary">
+            <p className="text-xs sm:text-sm text-slate-200">
               Starter includes complete biometric, policy, and Excel payroll capabilities for a single dedicated kiosk terminal.
             </p>
           </div>
 
-          <div className="rounded-xl border border-theme theme-card-bg overflow-hidden shadow-xs">
+          <div className="rounded-xl border border-white/[0.08] bg-[#0b142c] overflow-hidden shadow-lg">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs sm:text-sm">
                 <thead>
-                  <tr className="border-b border-theme bg-slate-100 dark:bg-[#080d1e] theme-text-primary font-semibold">
+                  <tr className="border-b border-white/[0.08] bg-[#080d1e] text-white font-semibold">
                     <th className="py-4 px-5 sm:px-6 w-1/3">Feature</th>
-                    <th className="py-4 px-4 text-center w-1/5 text-blue-600 dark:text-sky-400 font-bold">
+                    <th className="py-4 px-4 text-center w-1/5 text-sky-400 font-bold">
                       Starter (1 Terminal)
                     </th>
-                    <th className="py-4 px-4 text-center w-1/5 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-sky-300 font-bold">
+                    <th className="py-4 px-4 text-center w-1/5 bg-blue-950/40 text-sky-300 font-bold">
                       Enterprise
                     </th>
                     <th className="py-4 px-4 text-center w-1/5 font-bold">Organisation</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-theme theme-text-secondary">
+                <tbody className="divide-y divide-white/[0.06] text-slate-200">
                   {comparisonFeatures.map((group, gIdx) => (
                     <React.Fragment key={gIdx}>
-                      <tr className="bg-slate-50 dark:bg-[#080d1e]/80">
+                      <tr className="bg-[#080d1e]/80">
                         <td
                           colSpan={4}
-                          className="py-2.5 px-5 sm:px-6 font-mono text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-sky-400"
+                          className="py-2.5 px-5 sm:px-6 font-mono text-[11px] font-bold uppercase tracking-wider text-sky-400"
                         >
                           {group.category}
                         </td>
                       </tr>
                       {group.items.map((item, iIdx) => (
-                        <tr key={iIdx} className="hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors">
-                          <td className="py-3.5 px-5 sm:px-6 font-medium theme-text-primary">
+                        <tr key={iIdx} className="hover:bg-white/[0.02] transition-colors">
+                          <td className="py-3.5 px-5 sm:px-6 font-medium text-white">
                             {item.name}
                           </td>
                           <td className="py-3.5 px-4 text-center font-medium">
                             {typeof item.starter === "boolean" ? (
                               item.starter ? (
-                                <Check size={16} className="text-blue-600 dark:text-sky-400 mx-auto" />
+                                <Check size={16} className="text-sky-400 mx-auto" />
                               ) : (
-                                <Minus size={15} className="theme-text-muted mx-auto" />
+                                <Minus size={15} className="text-slate-500 mx-auto" />
                               )
                             ) : (
-                              <span className="text-xs font-semibold text-blue-700 dark:text-sky-300">{item.starter}</span>
+                              <span className="text-xs font-semibold text-sky-300">{item.starter}</span>
                             )}
                           </td>
-                          <td className="py-3.5 px-4 text-center bg-blue-50/50 dark:bg-blue-950/20 font-medium">
+                          <td className="py-3.5 px-4 text-center bg-blue-950/20 font-medium">
                             {typeof item.enterprise === "boolean" ? (
                               item.enterprise ? (
-                                <Check size={16} className="text-blue-600 dark:text-sky-400 mx-auto" />
+                                <Check size={16} className="text-sky-400 mx-auto" />
                               ) : (
-                                <Minus size={15} className="theme-text-muted mx-auto" />
+                                <Minus size={15} className="text-slate-500 mx-auto" />
                               )
                             ) : (
-                              <span className="text-xs text-blue-700 dark:text-sky-300 font-semibold">{item.enterprise}</span>
+                              <span className="text-xs text-sky-300 font-semibold">{item.enterprise}</span>
                             )}
                           </td>
                           <td className="py-3.5 px-4 text-center">
                             {typeof item.org === "boolean" ? (
                               item.org ? (
-                                <Check size={16} className="text-blue-600 dark:text-sky-400 mx-auto" />
+                                <Check size={16} className="text-sky-400 mx-auto" />
                               ) : (
-                                <Minus size={15} className="theme-text-muted mx-auto" />
+                                <Minus size={15} className="text-slate-500 mx-auto" />
                               )
                             ) : (
-                              <span className="text-xs theme-text-secondary">{item.org}</span>
+                              <span className="text-xs text-slate-200">{item.org}</span>
                             )}
                           </td>
                         </tr>
@@ -338,13 +338,13 @@ export default function PricingPage() {
       </section>
 
       {/* ── SECTION 4: OPERATIONAL FAQS ── */}
-      <section className="py-20 sm:py-24 theme-section-bg border-b border-theme transition-colors">
+      <section className="py-20 sm:py-24 bg-[#091124] border-b border-white/[0.08]">
         <div className="max-w-4xl mx-auto px-6 sm:px-8 space-y-12">
           <div className="text-center space-y-3">
-            <h2 className="text-2xl sm:text-3xl font-bold theme-text-primary tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
               Frequently Asked Billing & Deployment Questions
             </h2>
-            <p className="text-xs sm:text-sm theme-text-secondary">
+            <p className="text-xs sm:text-sm text-slate-200">
               Technical, licensing, and operational details regarding TimeLogic subscriptions.
             </p>
           </div>
@@ -353,13 +353,13 @@ export default function PricingPage() {
             {faqs.map((faq, fIdx) => (
               <div
                 key={fIdx}
-                className="p-6 rounded-xl theme-card-bg border border-theme space-y-2 shadow-xs"
+                className="p-6 rounded-xl bg-[#0b142c] border border-white/[0.08] space-y-2 shadow-sm"
               >
-                <div className="text-sm sm:text-base font-semibold theme-text-primary flex items-start gap-2.5">
-                  <HelpCircle size={18} className="text-blue-600 dark:text-sky-400 flex-shrink-0 mt-0.5" />
+                <div className="text-sm sm:text-base font-semibold text-white flex items-start gap-2.5">
+                  <HelpCircle size={18} className="text-sky-400 flex-shrink-0 mt-0.5" />
                   <span>{faq.q}</span>
                 </div>
-                <p className="text-xs sm:text-sm theme-text-secondary leading-relaxed pl-7">
+                <p className="text-xs sm:text-sm text-slate-200 leading-relaxed pl-7">
                   {faq.a}
                 </p>
               </div>

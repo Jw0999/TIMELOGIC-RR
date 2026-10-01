@@ -172,22 +172,22 @@ export default function PostPage() {
       : screens.filter((s) => s.category === activeCategory);
 
   return (
-    <div className="min-h-screen w-full theme-page-bg transition-colors flex flex-col justify-between">
+    <div className="min-h-screen w-full bg-[#070d1e] text-white flex flex-col justify-between">
       {/* Header */}
       <Header />
 
       {/* ── SECTION 1: HERO HEADER ── */}
-      <section className="pt-16 sm:pt-20 pb-16 theme-page-bg border-b border-theme bg-grid-pattern transition-colors">
+      <section className="pt-16 sm:pt-20 pb-16 bg-[#070d1e] border-b border-white/[0.08] bg-grid-pattern">
         <div className="max-w-4xl mx-auto px-6 sm:px-8 text-center space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-500/20 text-xs font-mono font-medium text-blue-700 dark:text-sky-300">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-blue-950/80 border border-blue-400/30 text-xs font-mono font-medium text-sky-300">
             System Tour
           </div>
 
-          <h1 className="text-3xl sm:text-5xl font-bold theme-text-primary tracking-tight leading-tight">
+          <h1 className="text-3xl sm:text-5xl font-bold text-white tracking-tight leading-tight">
             Inside TimeLogic: All 9 Production System Interfaces
           </h1>
 
-          <p className="theme-text-secondary text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
+          <p className="text-slate-200 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
             Authentic production captures of the TimeLogic platform. Review the operator interfaces, supervisory tools, and automated engines powering our enterprise attendance infrastructure.
           </p>
 
@@ -200,7 +200,7 @@ export default function PostPage() {
                 className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
                   activeCategory === cat.id
                     ? "bg-blue-600 text-white font-semibold shadow-xs"
-                    : "theme-card-bg theme-text-secondary border border-theme hover:theme-text-primary hover:bg-slate-100 dark:hover:bg-white/[0.06]"
+                    : "bg-[#0b142c] text-slate-200 border border-white/[0.08] hover:text-white hover:bg-white/[0.06]"
                 }`}
               >
                 {cat.label}
@@ -211,34 +211,34 @@ export default function PostPage() {
       </section>
 
       {/* ── SECTION 2: SYSTEM SCREENS LIST ── */}
-      <section className="py-20 sm:py-24 theme-section-bg border-b border-theme transition-colors">
+      <section className="py-20 sm:py-24 bg-[#091124] border-b border-white/[0.08]">
         <div className="max-w-6xl mx-auto px-6 sm:px-8 space-y-20">
           {filteredScreens.map((screen) => (
             <article
               key={screen.id}
-              className="p-7 sm:p-9 rounded-xl theme-card-bg border border-theme shadow-xs space-y-8"
+              className="p-7 sm:p-9 rounded-xl bg-[#0b142c] border border-white/[0.08] shadow-md space-y-8"
             >
               <div className="space-y-3">
-                <div className="flex items-center gap-3 text-xs text-blue-600 dark:text-sky-400">
+                <div className="flex items-center gap-3 text-xs text-sky-400">
                   <span className="font-mono font-bold">SCREEN {screen.number}</span>
-                  <span className="theme-text-muted">•</span>
-                  <span className="font-semibold theme-text-secondary">{screen.module}</span>
+                  <span className="text-slate-500">•</span>
+                  <span className="font-semibold text-slate-200">{screen.module}</span>
                 </div>
 
-                <h2 className="text-xl sm:text-2xl font-bold theme-text-primary tracking-tight">
+                <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
                   {screen.heading}
                 </h2>
 
-                <p className="text-xs sm:text-sm theme-text-secondary leading-relaxed max-w-3xl">
+                <p className="text-xs sm:text-sm text-slate-200 leading-relaxed max-w-3xl">
                   {screen.summary}
                 </p>
               </div>
 
               {/* Framed Window */}
-              <div className="rounded-lg border border-theme bg-slate-900 shadow-xl overflow-hidden">
-                <div className="h-8 px-4 bg-slate-100 dark:bg-[#080d1e] border-b border-theme flex items-center justify-between text-xs theme-text-secondary">
+              <div className="rounded-lg border border-white/[0.12] bg-slate-950 shadow-xl overflow-hidden">
+                <div className="h-8 px-4 bg-[#080d1e] border-b border-white/[0.08] flex items-center justify-between text-xs text-slate-300">
                   <span className="font-mono text-[11px]">timelogic.app / {screen.id}</span>
-                  <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono font-medium">Production Capture</span>
+                  <span className="text-[11px] text-emerald-400 font-mono font-medium">Production Capture</span>
                 </div>
                 <img
                   src={screen.image}
@@ -248,14 +248,14 @@ export default function PostPage() {
               </div>
 
               {/* Capabilities Grid */}
-              <div className="pt-4 border-t border-theme">
-                <div className="text-xs font-bold theme-text-primary uppercase tracking-wider mb-3">
+              <div className="pt-4 border-t border-white/[0.08]">
+                <div className="text-xs font-bold text-white uppercase tracking-wider mb-3">
                   Operational Capabilities:
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {screen.keyCapabilities.map((cap, cIdx) => (
-                    <div key={cIdx} className="flex items-start gap-2.5 text-xs theme-text-secondary">
-                      <CheckCircle2 size={14} className="text-blue-600 dark:text-sky-400 flex-shrink-0 mt-0.5" />
+                    <div key={cIdx} className="flex items-start gap-2.5 text-xs text-slate-200">
+                      <CheckCircle2 size={14} className="text-sky-400 flex-shrink-0 mt-0.5" />
                       <span>{cap}</span>
                     </div>
                   ))}
@@ -267,12 +267,12 @@ export default function PostPage() {
       </section>
 
       {/* ── SECTION 3: BOTTOM CTA ── */}
-      <section className="py-20 sm:py-24 theme-page-bg transition-colors">
+      <section className="py-20 sm:py-24 bg-[#070d1e]">
         <div className="max-w-4xl mx-auto px-6 sm:px-8 text-center space-y-6">
-          <h2 className="text-2xl sm:text-4xl font-bold theme-text-primary tracking-tight">
+          <h2 className="text-2xl sm:text-4xl font-bold text-white tracking-tight">
             Schedule a Live On-Premise Demonstration
           </h2>
-          <p className="theme-text-secondary text-sm sm:text-base max-w-lg mx-auto leading-relaxed">
+          <p className="text-slate-200 text-sm sm:text-base max-w-lg mx-auto leading-relaxed">
             Speak directly with our technical deployment team to see these screens functioning on your company network.
           </p>
           <div className="pt-2 flex items-center justify-center gap-4 flex-wrap">
@@ -289,7 +289,7 @@ export default function PostPage() {
               variant="outline"
               size="md"
               href="/pricing"
-              className="text-xs sm:text-sm theme-text-primary border-theme hover:bg-slate-100 dark:hover:bg-white/10"
+              className="text-xs sm:text-sm text-white border-white/20 hover:bg-white/10"
             >
               View Monthly Plans
             </Button>

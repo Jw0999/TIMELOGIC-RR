@@ -40,57 +40,57 @@ export default function SuccessPage() {
   }, []);
 
   return (
-    <div className="min-h-screen w-full theme-page-bg transition-colors flex flex-col justify-between">
+    <div className="min-h-screen w-full bg-[#070d1e] text-white flex flex-col justify-between">
       {/* Header */}
       <Header />
 
       {/* ── SECTION 1: CONFIRMATION & EMAIL INSTRUCTION ── */}
-      <section className="pt-16 sm:pt-20 pb-16 theme-page-bg border-b border-theme bg-grid-pattern transition-colors">
+      <section className="pt-16 sm:pt-20 pb-16 bg-[#070d1e] border-b border-white/[0.08] bg-grid-pattern">
         <div className="max-w-3xl mx-auto px-6 sm:px-8 space-y-8 text-center">
           {/* Status Badge */}
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-500/20 text-xs font-mono font-medium text-emerald-700 dark:text-emerald-300">
-            <CheckCircle2 size={14} className="text-emerald-600 dark:text-emerald-400" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-emerald-950/80 border border-emerald-500/30 text-xs font-mono font-medium text-emerald-300">
+            <CheckCircle2 size={14} className="text-emerald-400" />
             <span>WORKSPACE PROVISIONED & ACTIVE</span>
           </div>
 
           {/* Heading */}
           <div className="space-y-3">
-            <h1 className="text-3xl sm:text-5xl font-bold theme-text-primary tracking-tight leading-tight">
+            <h1 className="text-3xl sm:text-5xl font-bold text-white tracking-tight leading-tight">
               Subscription & Workspace Activated
             </h1>
-            <p className="theme-text-secondary text-sm sm:text-base max-w-xl mx-auto leading-relaxed">
+            <p className="text-slate-200 text-sm sm:text-base max-w-xl mx-auto leading-relaxed">
               Thank you for subscribing to TimeLogic. Your workspace for{" "}
-              <strong className="theme-text-primary font-semibold">{data.orgName || "your organization"}</strong> has been confirmed.
+              <strong className="text-white font-semibold">{data.orgName || "your organization"}</strong> has been confirmed.
             </p>
           </div>
 
           {/* Notice Card: Open Your Email */}
-          <div className="p-7 sm:p-9 rounded-xl theme-card-bg border border-theme text-left space-y-6 shadow-xs">
+          <div className="p-7 sm:p-9 rounded-xl bg-[#0b142c] border border-white/[0.08] text-left space-y-6 shadow-md">
             <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-600/20 text-blue-600 dark:text-sky-400 flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 rounded-lg bg-blue-600/20 text-sky-400 flex items-center justify-center flex-shrink-0">
                 <Inbox size={22} />
               </div>
               <div className="space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-mono font-bold uppercase tracking-wider text-blue-600 dark:text-sky-400">
+                  <span className="text-xs font-mono font-bold uppercase tracking-wider text-sky-400">
                     Important Next Step
                   </span>
-                  <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-300">
+                  <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-emerald-950 border border-emerald-500/30 text-emerald-300">
                     DISPATCH SENT
                   </span>
                 </div>
-                <h2 className="text-lg sm:text-xl font-bold theme-text-primary tracking-tight">
+                <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">
                   Please Open Your Email Inbox For System Credentials
                 </h2>
               </div>
             </div>
 
-            <div className="p-4 sm:p-5 rounded-lg bg-slate-50 dark:bg-[#070d1e] border border-theme space-y-3 text-xs sm:text-sm theme-text-secondary leading-relaxed">
+            <div className="p-4 sm:p-5 rounded-lg bg-[#070d1e] border border-white/[0.08] space-y-3 text-xs sm:text-sm text-slate-200 leading-relaxed">
               <p>
                 An activation dispatch containing your master login credentials and station pairing token has been sent to:
               </p>
-              <div className="p-3 rounded-md bg-white dark:bg-[#0b142c] border border-theme font-mono text-xs sm:text-sm font-bold text-blue-600 dark:text-sky-300 break-all flex items-center gap-2">
-                <Mail size={15} className="text-blue-600 dark:text-sky-400 flex-shrink-0" />
+              <div className="p-3 rounded-md bg-[#0b142c] border border-white/[0.1] font-mono text-xs sm:text-sm font-bold text-sky-300 break-all flex items-center gap-2">
+                <Mail size={15} className="text-sky-400 flex-shrink-0" />
                 <span>{data.adminEmail || "your administrator email"}</span>
               </div>
               <p>
@@ -98,9 +98,9 @@ export default function SuccessPage() {
               </p>
             </div>
 
-            <div className="space-y-1.5 text-xs theme-text-secondary leading-relaxed bg-blue-50 dark:bg-blue-950/20 p-3.5 rounded-lg border border-blue-200 dark:border-blue-500/20">
-              <div className="flex items-center gap-2 font-semibold theme-text-primary">
-                <Lock size={13} className="text-blue-600 dark:text-sky-400" />
+            <div className="space-y-1.5 text-xs text-slate-300 leading-relaxed bg-blue-950/40 p-3.5 rounded-lg border border-blue-400/20">
+              <div className="flex items-center gap-2 font-semibold text-white">
+                <Lock size={13} className="text-sky-400" />
                 <span>Security Notice:</span>
               </div>
               <p>
@@ -112,44 +112,44 @@ export default function SuccessPage() {
       </section>
 
       {/* ── SECTION 2: WHAT TO DO NEXT ── */}
-      <section className="py-16 sm:py-20 theme-section-bg border-b border-theme transition-colors">
+      <section className="py-16 sm:py-20 bg-[#091124] border-b border-white/[0.08]">
         <div className="max-w-4xl mx-auto px-6 sm:px-8 space-y-8">
           <div className="text-center space-y-2">
-            <h2 className="text-xl sm:text-3xl font-bold theme-text-primary tracking-tight">
+            <h2 className="text-xl sm:text-3xl font-bold text-white tracking-tight">
               Next Steps After Opening Your Email
             </h2>
-            <p className="text-xs sm:text-sm theme-text-secondary">
+            <p className="text-xs sm:text-sm text-slate-200">
               Follow these three simple onboarding steps:
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="p-6 rounded-xl theme-card-bg border border-theme space-y-2 shadow-xs">
-              <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-sky-300 flex items-center justify-center font-bold text-xs font-mono">
+            <div className="p-6 rounded-xl bg-[#0b142c] border border-white/[0.08] space-y-2 shadow-sm">
+              <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-sky-300 flex items-center justify-center font-bold text-xs font-mono">
                 01
               </div>
-              <h3 className="text-sm font-bold theme-text-primary">Find Your Email</h3>
-              <p className="text-xs theme-text-secondary leading-relaxed">
+              <h3 className="text-sm font-bold text-white">Find Your Email</h3>
+              <p className="text-xs text-slate-200 leading-relaxed">
                 Open the dispatch titled <em>"Welcome to TimeLogic — Workspace Active & Master Credentials"</em>.
               </p>
             </div>
 
-            <div className="p-6 rounded-xl theme-card-bg border border-theme space-y-2 shadow-xs">
-              <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-sky-300 flex items-center justify-center font-bold text-xs font-mono">
+            <div className="p-6 rounded-xl bg-[#0b142c] border border-white/[0.08] space-y-2 shadow-sm">
+              <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-sky-300 flex items-center justify-center font-bold text-xs font-mono">
                 02
               </div>
-              <h3 className="text-sm font-bold theme-text-primary">Sign In to Dashboard</h3>
-              <p className="text-xs theme-text-secondary leading-relaxed">
+              <h3 className="text-sm font-bold text-white">Sign In to Dashboard</h3>
+              <p className="text-xs text-slate-200 leading-relaxed">
                 Log into the TimeLogic administrative portal to configure your shift hours and import your team roster.
               </p>
             </div>
 
-            <div className="p-6 rounded-xl theme-card-bg border border-theme space-y-2 shadow-xs">
-              <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-sky-300 flex items-center justify-center font-bold text-xs font-mono">
+            <div className="p-6 rounded-xl bg-[#0b142c] border border-white/[0.08] space-y-2 shadow-sm">
+              <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-sky-300 flex items-center justify-center font-bold text-xs font-mono">
                 03
               </div>
-              <h3 className="text-sm font-bold theme-text-primary">Pair Your Kiosk Station</h3>
-              <p className="text-xs theme-text-secondary leading-relaxed">
+              <h3 className="text-sm font-bold text-white">Pair Your Kiosk Station</h3>
+              <p className="text-xs text-slate-200 leading-relaxed">
                 Enter your unique station token on your designated office computer or tablet to begin verifying check-ins.
               </p>
             </div>
@@ -158,13 +158,13 @@ export default function SuccessPage() {
       </section>
 
       {/* ── SECTION 3: ASSISTANCE & RETURN HOME ── */}
-      <section className="py-16 sm:py-20 theme-page-bg transition-colors">
+      <section className="py-16 sm:py-20 bg-[#070d1e]">
         <div className="max-w-3xl mx-auto px-6 sm:px-8 text-center space-y-6">
-          <h2 className="text-xl sm:text-2xl font-bold theme-text-primary">
+          <h2 className="text-xl sm:text-2xl font-bold text-white">
             Need Live Assistance or Haven't Received Your Email?
           </h2>
 
-          <p className="theme-text-secondary text-xs sm:text-sm max-w-lg mx-auto leading-relaxed">
+          <p className="text-slate-200 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed">
             Our systems architecture and deployment leads are active to immediately verify your workspace status or assist with kiosk hardware pairing.
           </p>
 
@@ -185,7 +185,7 @@ export default function SuccessPage() {
               href="/"
               icon={<ArrowRight size={14} />}
               iconPosition="right"
-              className="text-xs sm:text-sm theme-text-primary border-theme hover:bg-slate-100 dark:hover:bg-white/10"
+              className="text-xs sm:text-sm text-white border-white/20 hover:bg-white/10"
             >
               Return to Overview
             </Button>

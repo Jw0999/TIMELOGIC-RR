@@ -1,50 +1,10 @@
 @import "tailwindcss";
 
 /* ─────────────────────────────────────────────────────────────
-   TimeLogic Design System Tokens & Adaptive Theme Engine
-   High-contrast, professional enterprise B2B palette.
-   Supports seamless Dark and Light modes.
+   TimeLogic Production Design System
+   High-contrast, professional enterprise B2B dark canvas.
+   Ensures ALL text is bright, crisp, and 100% readable.
    ───────────────────────────────────────────────────────────── */
-
-:root {
-  --bg-page: #f8fafc;
-  --bg-section: #f1f5f9;
-  --bg-card: #ffffff;
-  --bg-card-hover: #f8fafc;
-  --bg-card-elevated: #ffffff;
-  --border-color: #e2e8f0;
-  --border-color-strong: #cbd5e1;
-  --text-primary: #0f172a;
-  --text-secondary: #334155;
-  --text-muted: #64748b;
-  --table-header: #f1f5f9;
-  --badge-bg: #e0f2fe;
-  --badge-border: #bae6fd;
-  --badge-text: #0284c7;
-  --grid-color: rgba(0, 0, 0, 0.04);
-  --header-bg: rgba(255, 255, 255, 0.92);
-  --footer-bg: #f1f5f9;
-}
-
-.dark {
-  --bg-page: #070d1e;
-  --bg-section: #091124;
-  --bg-card: #0b142c;
-  --bg-card-hover: #0f1c3d;
-  --bg-card-elevated: #0d1838;
-  --border-color: rgba(255, 255, 255, 0.1);
-  --border-color-strong: rgba(255, 255, 255, 0.2);
-  --text-primary: #ffffff;
-  --text-secondary: #cbd5e1;
-  --text-muted: #94a3b8;
-  --table-header: #080d1e;
-  --badge-bg: rgba(14, 165, 233, 0.15);
-  --badge-border: rgba(56, 189, 248, 0.3);
-  --badge-text: #38bdf8;
-  --grid-color: rgba(255, 255, 255, 0.03);
-  --header-bg: rgba(7, 13, 30, 0.92);
-  --footer-bg: #050915;
-}
 
 * {
   box-sizing: border-box;
@@ -53,37 +13,20 @@
 html {
   scroll-behavior: smooth;
   overflow-x: hidden;
-}
-
-html.dark {
   background-color: #070d1e;
   color-scheme: dark;
-}
-
-html.light {
-  background-color: #f8fafc;
-  color-scheme: light;
 }
 
 body {
   position: relative;
   width: 100%;
   max-width: 100%;
+  background-color: #070d1e;
+  color: #f8fafc;
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   overflow-x: hidden;
-  transition: background-color 200ms ease, color 200ms ease;
-}
-
-html.dark body {
-  background-color: #070d1e;
-  color: #ffffff;
-}
-
-html.light body {
-  background-color: #f8fafc;
-  color: #0f172a;
 }
 
 ::selection {
@@ -101,81 +44,27 @@ html.light body {
 .bg-grid-pattern {
   background-size: 32px 32px;
   background-image: 
-    linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
 }
 
 /* ─────────────────────────────────────────────────────────────
    Direct High-Contrast Guarantees
-   Fixes Tailwind lab() color-space bugs in legacy browsers.
-   Guarantees text is NEVER black on dark or white on light!
+   Fixes browser lab() / color-space bugs.
+   Guarantees ALL body & descriptive text is bright silver-white!
    ───────────────────────────────────────────────────────────── */
 
-html.dark .text-slate-300,
-html.dark .text-slate-400 {
-  color: #cbd5e1 !important;
-}
-html.dark .text-slate-200 {
+.text-slate-300,
+.text-slate-400 {
   color: #e2e8f0 !important;
 }
-html.dark .text-slate-100 {
-  color: #f1f5f9 !important;
+
+.text-slate-200,
+.text-slate-100 {
+  color: #f8fafc !important;
 }
-html.dark .text-slate-500 {
-  color: #94a3b8 !important;
-}
-html.dark .text-slate-600 {
+
+.text-slate-500,
+.text-slate-600 {
   color: #cbd5e1 !important;
-}
-
-html.light .text-slate-300,
-html.light .text-slate-400 {
-  color: #334155 !important;
-}
-html.light .text-slate-200 {
-  color: #1e293b !important;
-}
-html.light .text-slate-100 {
-  color: #0f172a !important;
-}
-html.light .text-slate-500,
-html.light .text-slate-600 {
-  color: #475569 !important;
-}
-
-/* Theme helper classes */
-.theme-page-bg {
-  background-color: var(--bg-page);
-}
-
-.theme-section-bg {
-  background-color: var(--bg-section);
-}
-
-.theme-card-bg {
-  background-color: var(--bg-card);
-}
-
-.theme-card-hover:hover {
-  background-color: var(--bg-card-hover);
-}
-
-.theme-border {
-  border-color: var(--border-color);
-}
-
-.theme-border-strong {
-  border-color: var(--border-color-strong);
-}
-
-.theme-text-primary {
-  color: var(--text-primary);
-}
-
-.theme-text-secondary {
-  color: var(--text-secondary);
-}
-
-.theme-text-muted {
-  color: var(--text-muted);
 }

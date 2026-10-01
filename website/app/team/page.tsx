@@ -29,40 +29,40 @@ export default function TeamPage() {
   ];
 
   return (
-    <div className="min-h-screen w-full theme-page-bg transition-colors flex flex-col justify-between">
+    <div className="min-h-screen w-full bg-[#070d1e] text-white flex flex-col justify-between">
       {/* Header */}
       <Header />
 
       {/* ── SECTION 1: HERO ── */}
-      <section className="pt-16 sm:pt-20 pb-16 theme-page-bg border-b border-theme bg-grid-pattern transition-colors">
+      <section className="pt-16 sm:pt-20 pb-16 bg-[#070d1e] border-b border-white/[0.08] bg-grid-pattern">
         <div className="max-w-4xl mx-auto px-6 sm:px-8 text-center space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-500/20 text-xs font-mono font-medium text-blue-700 dark:text-sky-300">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-blue-950/80 border border-blue-400/30 text-xs font-mono font-medium text-sky-300">
             People & Engineering Philosophy
           </div>
 
-          <h1 className="text-3xl sm:text-5xl font-bold theme-text-primary tracking-tight leading-tight">
+          <h1 className="text-3xl sm:text-5xl font-bold text-white tracking-tight leading-tight">
             The Team Behind TimeLogic
           </h1>
 
-          <p className="theme-text-secondary text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
+          <p className="text-slate-200 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
             Software engineers, systems architects, and security researchers dedicated to eliminating attendance fraud and establishing transparent workplace accountability.
           </p>
         </div>
       </section>
 
       {/* ── SECTION 2: ENGINEERING STATEMENT ── */}
-      <section className="py-20 sm:py-24 theme-section-bg border-b border-theme transition-colors">
+      <section className="py-20 sm:py-24 bg-[#091124] border-b border-white/[0.08]">
         <div className="max-w-5xl mx-auto px-6 sm:px-8">
-          <div className="p-8 sm:p-12 rounded-xl theme-card-bg border border-theme text-center space-y-6 shadow-xs">
-            <div className="inline-block px-3 py-1 rounded-md bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-500/20 text-blue-700 dark:text-sky-300 text-xs font-mono font-medium">
+          <div className="p-8 sm:p-12 rounded-xl bg-[#0b142c] border border-white/[0.08] text-center space-y-6 shadow-md">
+            <div className="inline-block px-3 py-1 rounded-md bg-blue-950/80 border border-blue-400/30 text-sky-300 text-xs font-mono font-medium">
               Engineering Dispatch
             </div>
 
-            <h2 className="text-2xl sm:text-3xl font-bold theme-text-primary tracking-tight max-w-xl mx-auto">
+            <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight max-w-xl mx-auto">
               Building Infrastructure For Emerging & Global Enterprises
             </h2>
 
-            <p className="text-xs sm:text-sm theme-text-secondary max-w-2xl mx-auto leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-200 max-w-2xl mx-auto leading-relaxed">
               We are currently scaling our core engineering, product security, and operations teams as we expand our on-premise deployments across commercial hubs in West Africa and international markets.
             </p>
 
@@ -81,7 +81,7 @@ export default function TeamPage() {
                 size="md"
                 href="/"
                 icon={<ArrowLeft size={14} />}
-                className="text-xs sm:text-sm theme-text-primary border-theme hover:bg-slate-100 dark:hover:bg-white/10"
+                className="text-xs sm:text-sm text-white border-white/20 hover:bg-white/10"
               >
                 Return to Overview
               </Button>
@@ -91,13 +91,13 @@ export default function TeamPage() {
       </section>
 
       {/* ── SECTION 3: GUIDING PRINCIPLES ── */}
-      <section className="py-20 sm:py-24 theme-page-bg border-b border-theme transition-colors">
+      <section className="py-20 sm:py-24 bg-[#070d1e] border-b border-white/[0.08]">
         <div className="max-w-5xl mx-auto px-6 sm:px-8 space-y-12">
           <div className="space-y-2 text-center sm:text-left">
-            <div className="text-xs font-mono font-bold text-blue-600 dark:text-sky-400 uppercase tracking-wider">
+            <div className="text-xs font-mono font-bold text-sky-400 uppercase tracking-wider">
               Core Tenets
             </div>
-            <h3 className="text-2xl sm:text-3xl font-bold theme-text-primary tracking-tight">
+            <h3 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
               How our engineering team approaches product development
             </h3>
           </div>
@@ -108,15 +108,15 @@ export default function TeamPage() {
               return (
                 <div
                   key={idx}
-                  className="p-6 rounded-xl theme-card-bg border border-theme space-y-3 shadow-xs"
+                  className="p-6 rounded-xl bg-[#0b142c] border border-white/[0.08] space-y-3 shadow-sm"
                 >
-                  <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-sky-300 flex items-center justify-center">
+                  <div className="w-9 h-9 rounded-lg bg-blue-500/20 text-sky-300 flex items-center justify-center">
                     <Icon size={18} />
                   </div>
-                  <h4 className="text-sm font-bold theme-text-primary tracking-tight">
+                  <h4 className="text-sm font-bold text-white tracking-tight">
                     {item.title}
                   </h4>
-                  <p className="text-xs theme-text-secondary leading-relaxed">
+                  <p className="text-xs text-slate-200 leading-relaxed">
                     {item.description}
                   </p>
                 </div>
