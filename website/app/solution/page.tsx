@@ -2,7 +2,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/Button";
 import {
-  PhoneCall,
+  MessageSquare,
   CheckCircle2,
   XCircle,
 } from "lucide-react";
@@ -389,11 +389,11 @@ export default function SolutionPage() {
             <Button
               variant="primary"
               size="lg"
-              href="tel:09036627043"
-              icon={<PhoneCall size={16} />}
+              href="https://wa.me/2349113380364"
+              icon={<MessageSquare size={16} />}
               className="shadow-md hover:shadow-lg"
             >
-              Call Deployment Team (09036627043)
+              Chat with Deployment Team
             </Button>
             <Button
               variant="outline"

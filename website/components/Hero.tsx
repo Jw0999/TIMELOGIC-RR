@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { motion } from "motion/react";
 import {
-  PhoneCall,
+  MessageSquare,
   ArrowRight,
   ShieldCheck,
   CheckCircle2,
@@ -13,7 +13,6 @@ import {
   Cpu,
   Clock,
   FileSpreadsheet,
-  Building2,
 } from "lucide-react";
 import { Button } from "./ui/Button";
 
@@ -68,11 +67,11 @@ export function Hero() {
               <Button
                 variant="outline"
                 size="lg"
-                href="tel:09036627043"
-                icon={<PhoneCall size={16} />}
+                href="https://wa.me/2349113380364"
+                icon={<MessageSquare size={16} />}
                 className="text-white border-white/20 hover:bg-white/10"
               >
-                Call Deployment Team (09036627043)
+                Chat with Deployment Team
               </Button>
             </div>
 

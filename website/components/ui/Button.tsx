@@ -53,13 +53,20 @@ export function Button({
   );
 
   if (href) {
-    if (external || href.startsWith("tel:") || href.startsWith("mailto:")) {
+    if (
+      external ||
+      href.startsWith("http://") ||
+      href.startsWith("https://") ||
+      href.startsWith("tel:") ||
+      href.startsWith("mailto:")
+    ) {
+      const isExternalLink = external || href.startsWith("http://") || href.startsWith("https://");
       return (
         <a
           href={href}
           className={combinedClasses}
-          target={external ? "_blank" : undefined}
-          rel={external ? "noopener noreferrer" : undefined}
+          target={isExternalLink ? "_blank" : undefined}
+          rel={isExternalLink ? "noopener noreferrer" : undefined}
         >
           {content}
         </a>

@@ -1,7 +1,7 @@
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/Button";
-import { Check, PhoneCall, HelpCircle, Mail } from "lucide-react";
+import { Check, MessageSquare, HelpCircle, Mail } from "lucide-react";
 
 export default function PricingPage() {
   const plans = [
@@ -189,26 +189,26 @@ export default function PricingPage() {
                   </div>
                 </div>
 
-                {/* Action Buttons: Direct Phone Call & Direct Email Deployment */}
+                {/* Action Buttons: WhatsApp & Direct Email Deployment */}
                 <div className="pt-4 border-t border-blue-400/20 space-y-2.5">
                   <Button
                     variant={plan.highlighted ? "primary" : "outline"}
                     size="md"
-                    href="tel:09036627043"
-                    icon={<PhoneCall size={14} />}
+                    href={`https://wa.me/2349113380364?text=${encodeURIComponent(`Hello TimeLogic Team, I would like to deploy TimeLogic on the ${plan.name} plan.`)}`}
+                    icon={<MessageSquare size={14} />}
                     className={`w-full justify-center font-bold transition-all ${
                       plan.highlighted
                         ? "bg-sky-400 hover:bg-sky-300 text-slate-950 shadow-md hover:shadow-lg ring-1 ring-sky-300"
                         : "bg-blue-600 hover:bg-blue-500 text-white border-blue-500 shadow-xs"
                     }`}
                   >
-                    Deploy {plan.name} — Call 09036627043
+                    Deploy {plan.name} on WhatsApp
                   </Button>
 
                   <Button
                     variant="outline"
                     size="sm"
-                    href={`mailto:deployment@timelogics.tech?subject=TimeLogic%20${encodeURIComponent(plan.name)}%20Deployment%20Inquiry&body=Hello%20TimeLogic%20Deployment%20Team%2C%0A%0AWe%20would%20like%20to%20deploy%20TimeLogic%20(${encodeURIComponent(plan.name)}%20Tier).%0A%0AOrganisation%20Name%3A%20...%0AEstimated%20Employees%3A%20...%0APhone%20Number%3A%20...`}
+                    href={`mailto:deployment@timelogics.tech?subject=TimeLogic%20${encodeURIComponent(plan.name)}%20Deployment%20Inquiry&body=Hello%20TimeLogic%20Deployment%20Team%2C%0A%0AWe%20would%20like%20to%20deploy%20TimeLogic%20(${encodeURIComponent(plan.name)}%20Tier).%0A%0AOrganisation%20Name%3A%20...%0AEstimated%20Employees%3A%20...`}
                     icon={<Mail size={13} />}
                     className="w-full justify-center text-xs text-blue-200 border-white/20 hover:bg-white/10"
                   >

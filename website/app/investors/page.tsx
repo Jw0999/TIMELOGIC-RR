@@ -3,7 +3,7 @@ import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/Button";
 import {
   Mail,
-  PhoneCall,
+  MessageSquare,
   Lock,
   Globe2,
   DollarSign,
@@ -77,20 +77,20 @@ export default function InvestorsPage() {
             <Button
               variant="primary"
               size="md"
-              href="mailto:invest@timelogic.app?subject=Investment%20Inquiry%20-%20TimeLogic"
+              href="mailto:invest@timelogics.tech?subject=Investment%20Inquiry%20-%20TimeLogic"
               icon={<Mail size={15} />}
               className="shadow-md hover:shadow-lg"
             >
-              Email Us: invest@timelogic.app
+              Email Us: invest@timelogics.tech
             </Button>
             <Button
               variant="outline"
               size="md"
-              href="tel:09036627043"
-              icon={<PhoneCall size={15} />}
+              href="https://wa.me/2349113380364"
+              icon={<MessageSquare size={15} />}
               className="text-slate-800 border-slate-300 hover:bg-slate-100 hover:text-slate-950"
             >
-              Direct Line: 09036627043
+              Contact on WhatsApp
             </Button>
           </div>
         </div>
@@ -215,20 +215,20 @@ export default function InvestorsPage() {
             <Button
               variant="primary"
               size="lg"
-              href="mailto:invest@timelogic.app?subject=Investment%20Inquiry%20-%20TimeLogic"
+              href="mailto:invest@timelogics.tech?subject=Investment%20Inquiry%20-%20TimeLogic"
               icon={<Mail size={16} />}
               className="shadow-md hover:shadow-lg"
             >
-              Email Us: invest@timelogic.app
+              Email Us: invest@timelogics.tech
             </Button>
             <Button
               variant="outline"
               size="lg"
-              href="tel:09036627043"
-              icon={<PhoneCall size={16} />}
+              href="https://wa.me/2349113380364"
+              icon={<MessageSquare size={16} />}
               className="text-white border-white/30 hover:bg-white/10"
             >
-              Direct Line: 09036627043
+              Contact on WhatsApp
             </Button>
           </div>
           <div className="text-xs text-blue-200/60">

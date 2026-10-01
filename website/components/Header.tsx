@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { PhoneCall, Menu, X, ArrowRight } from "lucide-react";
+import { MessageSquare, Menu, X, ArrowRight } from "lucide-react";
 import { Logo, Wordmark } from "./ui/Logo";
 import { Button } from "./ui/Button";
 
@@ -64,12 +64,11 @@ export function Header({ onCallClick }: HeaderProps) {
           <Button
             variant="outline"
             size="sm"
-            href="tel:09036627043"
-            onClick={onCallClick}
-            icon={<PhoneCall size={13} />}
+            href="https://wa.me/2349113380364"
+            icon={<MessageSquare size={13} />}
             className="text-xs text-white border-white/20 hover:bg-white/10"
           >
-            Call 09036627043
+            Chat on WhatsApp
           </Button>
 
           <Button
@@ -139,15 +138,12 @@ export function Header({ onCallClick }: HeaderProps) {
             <Button
               variant="outline"
               size="md"
-              href="tel:09036627043"
-              onClick={() => {
-                setMobileMenuOpen(false);
-                if (onCallClick) onCallClick();
-              }}
-              icon={<PhoneCall size={15} />}
+              href="https://wa.me/2349113380364"
+              onClick={() => setMobileMenuOpen(false)}
+              icon={<MessageSquare size={15} />}
               className="w-full justify-center py-2.5 text-sm text-white border-white/20 hover:bg-white/10"
             >
-              Call 09036627043
+              Chat on WhatsApp
             </Button>
           </div>
         </div>

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import {
   CheckCircle2,
   Mail,
-  PhoneCall,
+  MessageSquare,
   ShieldCheck,
   ArrowRight,
   Inbox,
@@ -193,11 +193,11 @@ export default function SuccessPage() {
             <Button
               variant="primary"
               size="lg"
-              href="tel:09036627043"
-              icon={<PhoneCall size={16} />}
+              href="https://wa.me/2349113380364"
+              icon={<MessageSquare size={16} />}
               className="shadow-md hover:shadow-lg"
             >
-              Call Deployment Lead: 09036627043
+              Chat with Deployment Lead
             </Button>
 
             <Button

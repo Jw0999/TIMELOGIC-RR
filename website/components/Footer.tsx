@@ -1,6 +1,6 @@
 import React from "react";
 import Link from "next/link";
-import { PhoneCall, Mail, MapPin } from "lucide-react";
+import { MessageSquare, Mail, MapPin } from "lucide-react";
 import { Logo, Wordmark } from "./ui/Logo";
 
 export function Footer() {
@@ -74,11 +74,13 @@ export function Footer() {
             <ul className="space-y-2.5 text-sm">
               <li>
                 <a
-                  href="tel:09036627043"
+                  href="https://wa.me/2349113380364"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 text-sky-400 hover:text-sky-300 font-medium transition-colors"
                 >
-                  <PhoneCall size={13} />
-                  <span>09036627043</span>
+                  <MessageSquare size={13} />
+                  <span>Chat on WhatsApp</span>
                 </a>
               </li>
               <li>

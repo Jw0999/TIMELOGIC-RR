@@ -1,7 +1,7 @@
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/Button";
-import { PhoneCall, ShieldCheck, Cpu, Code2, ArrowLeft } from "lucide-react";
+import { MessageSquare, ShieldCheck, Cpu, Code2, ArrowLeft } from "lucide-react";
 
 export default function TeamPage() {
   const principles = [
@@ -67,11 +67,11 @@ export default function TeamPage() {
               <Button
                 variant="primary"
                 size="md"
-                href="tel:09036627043"
-                icon={<PhoneCall size={15} />}
+                href="https://wa.me/2349113380364"
+                icon={<MessageSquare size={15} />}
                 className="shadow-md hover:shadow-lg"
               >
-                Speak Directly with Leadership (09036627043)
+                Chat Directly with Leadership
               </Button>
               <Button
                 variant="outline"

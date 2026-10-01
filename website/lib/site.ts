@@ -48,7 +48,7 @@ export const DOWNLOADS: Record<DownloadKey, DownloadItem> = {
 
 export const CONTACT = {
   email: "hello@timelogics.tech",
-  phone: "09036627043",
+  whatsapp: "https://wa.me/2349113380364",
   region: "Lagos, Nigeria · Remote-first",
 };
 
