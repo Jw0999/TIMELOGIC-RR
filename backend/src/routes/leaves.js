@@ -4,6 +4,10 @@ const ctrl = require('../controllers/leaveController');
 const { authenticate } = require('../middleware/auth');
 const { isAdmin } = require('../middleware/roleGuard');
 const { validate } = require('../middleware/validate');
+const { checkSubscription } = require('../middleware/subscriptionGuard');
+
+// Enforce active subscription on leave management
+router.use(checkSubscription);
 
 router.post('/', authenticate, [
   body('leaveType').isIn(['ANNUAL', 'SICK', 'CASUAL', 'MATERNITY', 'PATERNITY', 'UNPAID', 'COMPASSIONATE']),

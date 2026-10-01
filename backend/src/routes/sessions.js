@@ -4,6 +4,10 @@ const ctrl = require('../controllers/sessionController');
 const { authenticate } = require('../middleware/auth');
 const { isAdmin } = require('../middleware/roleGuard');
 const { validate } = require('../middleware/validate');
+const { checkSubscription } = require('../middleware/subscriptionGuard');
+
+// Enforce active subscription on all session operations
+router.use(checkSubscription);
 
 router.post('/', authenticate, isAdmin, [
   body('sessionName').notEmpty().withMessage('Session name is required'),

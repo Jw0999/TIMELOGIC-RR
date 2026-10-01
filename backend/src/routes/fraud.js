@@ -4,6 +4,10 @@ const ctrl = require('../controllers/fraudController');
 const { authenticate } = require('../middleware/auth');
 const { isAdmin } = require('../middleware/roleGuard');
 const { validate } = require('../middleware/validate');
+const { checkSubscription } = require('../middleware/subscriptionGuard');
+
+// Enforce active subscription on fraud alert investigation
+router.use(checkSubscription);
 
 router.get('/', authenticate, isAdmin, ctrl.getAlerts);
 

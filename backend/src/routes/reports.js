@@ -2,6 +2,10 @@ const router = require('express').Router();
 const ctrl = require('../controllers/reportController');
 const { authenticate } = require('../middleware/auth');
 const { isAdmin } = require('../middleware/roleGuard');
+const { checkSubscription } = require('../middleware/subscriptionGuard');
+
+// Enforce active subscription on reports and analytics (server-time is exempted in guard)
+router.use(checkSubscription);
 
 router.get('/server-time', authenticate, isAdmin, ctrl.serverTime);
 router.get('/live-stats', authenticate, isAdmin, ctrl.liveStats);

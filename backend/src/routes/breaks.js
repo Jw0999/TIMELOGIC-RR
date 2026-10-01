@@ -3,6 +3,10 @@ const { body } = require('express-validator');
 const ctrl = require('../controllers/breakController');
 const { authenticate } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
+const { checkSubscription } = require('../middleware/subscriptionGuard');
+
+// Enforce active subscription on break tracking
+router.use(checkSubscription);
 
 router.post('/', authenticate, [
   body('breakType').isIn(['LUNCH', 'SHORT_BREAK', 'PRAYER', 'PERSONAL', 'NURSING']),

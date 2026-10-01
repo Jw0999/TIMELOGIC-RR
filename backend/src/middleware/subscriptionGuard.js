@@ -44,15 +44,17 @@ async function checkSubscription(req, res, next) {
     req.subscription = subscription;
 
     if (subscription.isExpired) {
-      // Allow redemption and status endpoints even when expired
+      // Allow redemption, status, and server-time synchronization even when expired
       const path = req.baseUrl + (req.path === '/' ? '' : req.path);
-      const isRedeemOrStatus =
+      const isExempt =
         req.path.includes('/redeem-code') ||
         req.path.includes('/subscription-status') ||
+        req.path.includes('/server-time') ||
         path.includes('/redeem-code') ||
-        path.includes('/subscription-status');
+        path.includes('/subscription-status') ||
+        path.includes('/server-time');
 
-      if (isRedeemOrStatus) {
+      if (isExempt) {
         return next();
       }
 
