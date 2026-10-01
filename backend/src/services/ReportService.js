@@ -2,6 +2,19 @@ const { v4: uuidv4 } = require('uuid');
 const { prisma } = require('../config/database');
 const ExcelJS = require('exceljs');
 const { dateOnly } = require('../utils/attendanceClock');
+const {
+  PALETTE,
+  BORDER_THIN,
+  BORDER_MEDIUM,
+  sanitizeSheetName,
+  renderHeaderBanner,
+  renderKpiCards,
+  renderSectionHeader,
+  renderTableHeader,
+  formatDataRow,
+  autoFitColumns,
+  applySheetSetup,
+} = require('../utils/excelStyler');
 
 function csvEscape(value) {
   const text = value == null ? '' : String(value);
@@ -20,6 +33,16 @@ function isoUtcDateTime(value) {
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) return '';
   return d.toISOString();
+}
+
+function formatTime(d) {
+  if (!d) return '';
+  return new Date(d).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+}
+
+function formatDateTime(d) {
+  if (!d) return '';
+  return new Date(d).toLocaleString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 }
 
 function reportDate(value) {
@@ -71,16 +94,19 @@ class ReportService {
   // ─── Comprehensive export with full database ───────────────────────────────
 
   async buildFullExport(orgId) {
-    const orgFilter = orgId && orgId !== 'platform-org' ? { orgId } : {};
-    const empOrgFilter = orgId && orgId !== 'platform-org' ? { employee: { orgId } } : {};
-    const sessionOrgFilter = orgId && orgId !== 'platform-org' ? { office: { orgId } } : {};
-    const scanOrgFilter = orgId && orgId !== 'platform-org' ? { employee: { orgId } } : {};
-    const scopedOrgId = orgId && orgId !== 'platform-org' ? orgId : null;
+    const isSuperAdminExport = !orgId || orgId === 'platform-org';
+    const targetOrgFilter = isSuperAdminExport ? { id: { not: 'platform-org' } } : { id: orgId };
+    const orgFilter = isSuperAdminExport ? {} : { orgId };
+    const empOrgFilter = isSuperAdminExport ? {} : { employee: { orgId } };
+    const sessionOrgFilter = isSuperAdminExport ? {} : { office: { orgId } };
+    const scanOrgFilter = isSuperAdminExport ? {} : { employee: { orgId } };
+    const scopedOrgId = isSuperAdminExport ? null : orgId;
     const scopedUserIds = scopedOrgId
       ? (await prisma.user.findMany({ where: { orgId: scopedOrgId }, select: { id: true } })).map((user) => user.id)
       : null;
 
     const [
+      organizations,
       employees,
       attendanceRecords,
       leaveRequests,
@@ -96,14 +122,34 @@ class ReportService {
       emergencyControls,
       attendanceReports,
       notificationLogs,
+      manualPenalties,
+      leaveBalances,
     ] = await Promise.all([
+      prisma.organization.findMany({
+        where: targetOrgFilter,
+        include: {
+          offices: {
+            select: {
+              id: true, name: true, address: true, timezone: true,
+              openTime: true, closeTime: true, graceMinutes: true, lateAfterMinutes: true,
+              gracePenalty: true, latePenalty: true, completelyLatePenalty: true,
+              absentPenalty: true, overstayPenalty: true,
+            },
+          },
+          departments: { select: { id: true, name: true } },
+          _count: { select: { users: true, offices: true, departments: true, students: true } },
+        },
+        orderBy: { name: 'asc' },
+      }),
       prisma.user.findMany({
         where: { ...orgFilter, role: { in: ['EMPLOYEE', 'ADMIN', 'SUPER_ADMIN'] } },
         select: {
-          id: true, firstName: true, lastName: true, email: true, employeeCode: true,
-          role: true, shiftType: true, status: true, createdAt: true,
-          organization: { select: { name: true } },
-          department: { select: { name: true } },
+          id: true, orgId: true, firstName: true, lastName: true, email: true, employeeCode: true,
+          role: true, shiftType: true, status: true, checkInMethod: true, phone: true,
+          officeId: true, office: { select: { name: true } },
+          createdAt: true,
+          organization: { select: { id: true, name: true } },
+          department: { select: { id: true, name: true } },
           profileImageUrl: true, lastLoginAt: true,
         },
         orderBy: [{ organization: { name: 'asc' } }, { firstName: 'asc' }],
@@ -113,12 +159,14 @@ class ReportService {
         include: {
           employee: {
             select: {
-              firstName: true, lastName: true, email: true, employeeCode: true, status: true,
-              organization: { select: { name: true } },
+              id: true, firstName: true, lastName: true, email: true, employeeCode: true, status: true,
+              orgId: true,
+              organization: { select: { id: true, name: true } },
               department: { select: { name: true } },
+              office: { select: { name: true } },
             },
           },
-          session: { select: { sessionName: true, startTime: true, endTime: true } },
+          session: { select: { sessionName: true, startTime: true, endTime: true, officeName: true } },
           checkInRecorder: { select: { firstName: true, lastName: true, email: true } },
           checkOutRecorder: { select: { firstName: true, lastName: true, email: true } },
         },
@@ -129,8 +177,9 @@ class ReportService {
         include: {
           employee: {
             select: {
-              firstName: true, lastName: true, employeeCode: true,
-              organization: { select: { name: true } },
+              id: true, firstName: true, lastName: true, employeeCode: true,
+              orgId: true,
+              organization: { select: { id: true, name: true } },
             },
           },
           approver: { select: { firstName: true, lastName: true, email: true } },
@@ -142,8 +191,9 @@ class ReportService {
         include: {
           employee: {
             select: {
-              firstName: true, lastName: true, employeeCode: true,
-              organization: { select: { name: true } },
+              id: true, firstName: true, lastName: true, employeeCode: true,
+              orgId: true,
+              organization: { select: { id: true, name: true } },
             },
           },
           attendanceRecord: { select: { date: true, session: { select: { sessionName: true } } } },
@@ -155,8 +205,9 @@ class ReportService {
         include: {
           employee: {
             select: {
-              firstName: true, lastName: true, employeeCode: true,
-              organization: { select: { name: true } },
+              id: true, firstName: true, lastName: true, employeeCode: true,
+              orgId: true,
+              organization: { select: { id: true, name: true } },
             },
           },
           session: { select: { sessionName: true, startTime: true } },
@@ -169,7 +220,7 @@ class ReportService {
         select: {
           id: true, sessionName: true, officeName: true, orgName: true, status: true,
           startTime: true, endTime: true, createdAt: true,
-          office: { select: { name: true, organization: { select: { name: true } } } },
+          office: { select: { name: true, orgId: true, organization: { select: { id: true, name: true } } } },
           _count: { select: { attendanceRecords: true, scanAttempts: true, fraudAlerts: true } },
         },
         orderBy: { startTime: 'desc' },
@@ -177,20 +228,20 @@ class ReportService {
       prisma.scanAttempt.findMany({
         where: scanOrgFilter,
         include: {
-          employee: { select: { firstName: true, lastName: true, employeeCode: true, organization: { select: { name: true } } } },
+          employee: { select: { firstName: true, lastName: true, employeeCode: true, orgId: true, organization: { select: { id: true, name: true } } } },
           session: { select: { sessionName: true, startTime: true } },
         },
         orderBy: { timestamp: 'desc' },
       }),
       prisma.student.findMany({
         where: orgFilter,
-        include: { organization: { select: { name: true } } },
+        include: { organization: { select: { id: true, name: true } } },
         orderBy: { createdAt: 'desc' },
       }),
       prisma.studentAttendance.findMany({
         where: scopedOrgId ? { student: { orgId: scopedOrgId } } : {},
         include: {
-          student: { select: { studentCode: true, firstName: true, lastName: true, organization: { select: { name: true } } } },
+          student: { select: { studentCode: true, firstName: true, lastName: true, orgId: true, organization: { select: { id: true, name: true } } } },
           checkedInBy: { select: { firstName: true, lastName: true, email: true } },
           checkedOutBy: { select: { firstName: true, lastName: true, email: true } },
         },
@@ -199,8 +250,8 @@ class ReportService {
       prisma.adminLoginEvent.findMany({
         where: orgFilter,
         include: {
-          admin: { select: { firstName: true, lastName: true, email: true, organization: { select: { name: true } } } },
-          organization: { select: { name: true } },
+          admin: { select: { firstName: true, lastName: true, email: true, organization: { select: { id: true, name: true } } } },
+          organization: { select: { id: true, name: true } },
         },
         orderBy: { loggedInAt: 'desc' },
       }),
@@ -210,13 +261,13 @@ class ReportService {
       }),
       prisma.securitySettings.findMany({
         where: scopedOrgId ? { office: { orgId: scopedOrgId } } : {},
-        include: { office: { select: { name: true, organization: { select: { name: true } } } }, updater: { select: { firstName: true, lastName: true, email: true } } },
+        include: { office: { select: { name: true, orgId: true, organization: { select: { id: true, name: true } } } }, updater: { select: { firstName: true, lastName: true, email: true } } },
         orderBy: { updatedAt: 'desc' },
       }),
       prisma.emergencyControl.findMany({
         where: scopedOrgId ? { admin: { orgId: scopedOrgId } } : {},
         include: {
-          admin: { select: { firstName: true, lastName: true, email: true } },
+          admin: { select: { firstName: true, lastName: true, email: true, orgId: true } },
           sessions: { select: { session: { select: { sessionName: true, officeName: true } } } },
         },
         orderBy: { timestamp: 'desc' },
@@ -230,9 +281,26 @@ class ReportService {
         where: scopedUserIds ? { userId: { in: scopedUserIds } } : {},
         orderBy: { sentAt: 'desc' },
       }),
+      prisma.manualPenalty.findMany({
+        where: orgFilter,
+        include: {
+          employee: { select: { id: true, firstName: true, lastName: true, employeeCode: true, orgId: true, organization: { select: { id: true, name: true } } } },
+          createdBy: { select: { firstName: true, lastName: true, email: true } },
+          organization: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.leaveBalance.findMany({
+        where: empOrgFilter,
+        include: {
+          employee: { select: { id: true, firstName: true, lastName: true, employeeCode: true, orgId: true, organization: { select: { id: true, name: true } } } },
+        },
+        orderBy: [{ year: 'desc' }, { leaveType: 'asc' }],
+      }),
     ]);
 
     return {
+      organizations,
       employees,
       attendanceRecords,
       leaveRequests,
@@ -248,6 +316,8 @@ class ReportService {
       emergencyControls,
       attendanceReports,
       notificationLogs,
+      manualPenalties,
+      leaveBalances,
     };
   }
 
@@ -256,438 +326,1184 @@ class ReportService {
     return this._buildExcelFromAttendance(records);
   }
 
+  /**
+   * Main Excel Export Gateway
+   * Dispatches between Super Admin (Multi-Org Sheets) and Org Admin (Multi-Tab Scoped Workbook)
+   */
   async exportFullToExcel(orgId) {
     const data = await this.buildFullExport(orgId);
     const workbook = new ExcelJS.Workbook();
-    const employeeById = new Map(data.employees.map((employee) => [employee.id, employee]));
+    workbook.creator = 'TimeLogic Enterprise';
+    workbook.created = new Date();
 
-    const sheets = [
-      ['Attendance', data.attendanceRecords.map((r) => ({
-        Organization: r.employee?.organization?.name ?? '',
-        Date: isoDate(r.date),
-        Day: r.date ? new Date(r.date).toLocaleDateString('en-GB', { weekday: 'long' }) : '',
-        Month: r.date ? new Date(r.date).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : '',
-        'Employee Code': r.employee?.employeeCode ?? '',
-        'Employee Name': `${r.employee?.firstName ?? ''} ${r.employee?.lastName ?? ''}`.trim(),
-        'Emp Status': r.employee?.status ?? '',
-        Department: r.employee?.department?.name ?? '',
-        Session: r.session?.sessionName ?? '',
-        'Clock In': r.clockInTime ? this._fmtTime(r.clockInTime) : '',
-        'Check-In Source': r.checkInSource ?? '',
-        'Check-In Recorded By': r.checkInRecorder ? `${r.checkInRecorder.firstName} ${r.checkInRecorder.lastName}`.trim() : '',
-        'Clock Out': r.clockOutTime ? this._fmtTime(r.clockOutTime) : '',
-        'Check-Out Source': r.checkOutSource ?? '',
-        'Check-Out Recorded By': r.checkOutRecorder ? `${r.checkOutRecorder.firstName} ${r.checkOutRecorder.lastName}`.trim() : '',
-        Status: r.status ?? '',
-        'Penalty (NGN)': r.penalty ?? 0,
-        'Work Hours': r.totalWorkHours?.toFixed(2) ?? '',
-        'Break (min)': r.totalBreakMinutes ?? 0,
-        'WiFi Verified': r.wifiVerified ? 'Yes' : 'No',
-        'Device Verified': r.deviceVerified ? 'Yes' : 'No',
-        Flagged: r.flagged ? 'Yes' : 'No',
-        'Flag Reason': r.flagReason ?? '',
-      })), 'No attendance records'],
-      ['Employees', data.employees.map((e) => ({
-        Organization: e.organization?.name ?? '',
-        'Employee Code': e.employeeCode ?? '',
-        'First Name': e.firstName ?? '',
-        'Last Name': e.lastName ?? '',
-        Email: e.email ?? '',
-        Department: e.department?.name ?? '',
-        Role: e.role ?? '',
-        'Shift Type': e.shiftType ?? '',
-        'Employment Status': e.status ?? '',
-        'Face Registered': e.profileImageUrl ? 'Yes' : 'No',
-        'Last Login': e.lastLoginAt ? isoUtcDateTime(e.lastLoginAt) : '',
-        Joined: isoDate(e.createdAt),
-      })), 'No employees'],
-      ['Leave Requests', data.leaveRequests.map((l) => ({
-        Organization: l.employee?.organization?.name ?? '',
-        'Employee Code': l.employee?.employeeCode ?? '',
-        'Employee Name': `${l.employee?.firstName ?? ''} ${l.employee?.lastName ?? ''}`.trim(),
-        'Leave Type': l.leaveType ?? '',
-        'Start Date': isoDate(l.startDate),
-        'End Date': isoDate(l.endDate),
-        'Total Days': l.totalDays ?? '',
-        Status: l.status ?? '',
-        Reason: l.reason ?? '',
-        'Submitted': isoDate(l.createdAt),
-        'Approved By': l.approver ? `${l.approver.firstName} ${l.approver.lastName}`.trim() : '',
-      })), 'No leave requests'],
-      ['Break Records', data.breakRecords.map((b) => ({
-        Organization: b.employee?.organization?.name ?? '',
-        'Employee Code': b.employee?.employeeCode ?? '',
-        'Employee Name': `${b.employee?.firstName ?? ''} ${b.employee?.lastName ?? ''}`.trim(),
-        'Break Type': b.breakType ?? '',
-        Start: b.startTime ? this._fmtTime(b.startTime) : '',
-        End: b.endTime ? this._fmtTime(b.endTime) : 'Active',
-        'Duration (min)': b.durationMinutes ?? '',
-        'Penalty (NGN)': b.penalty ?? 0,
-        'Auto-Ended': b.isAutoEnded ? 'Yes' : 'No',
-        'Session': b.attendanceRecord?.session?.sessionName ?? '',
-        'Attendance Date': isoDate(b.attendanceRecord?.date),
-      })), 'No break records'],
-      ['Fraud Alerts', data.fraudAlerts.map((f) => ({
-        Organization: f.employee?.organization?.name ?? '',
-        'Employee Code': f.employee?.employeeCode ?? '',
-        'Employee Name': `${f.employee?.firstName ?? ''} ${f.employee?.lastName ?? ''}`.trim(),
-        'Fraud Type': f.fraudType ?? '',
-        Severity: f.severity ?? '',
-        Description: f.description ?? '',
-        Status: f.status ?? '',
-        'Session': f.session?.sessionName ?? '',
-        Date: isoDate(f.createdAt),
-        'Resolved By': f.resolver ? `${f.resolver.firstName} ${f.resolver.lastName}`.trim() : '',
-      })), 'No fraud alerts'],
-      ['Sessions', (data.sessions ?? []).map((s) => ({
-        Organization: s.office?.organization?.name ?? s.orgName ?? '',
-        Office: s.office?.name ?? s.officeName ?? '',
-        Session: s.sessionName ?? '',
-        Status: s.status ?? '',
-        Date: isoDate(s.startTime),
-        'Start Time': s.startTime ? this._fmtTime(s.startTime) : '',
-        'End Time': s.endTime ? this._fmtTime(s.endTime) : '',
-        'Check-ins': s._count?.attendanceRecords ?? 0,
-        'Scan Attempts': s._count?.scanAttempts ?? 0,
-        'Fraud Alerts': s._count?.fraudAlerts ?? 0,
-      })), 'No sessions'],
-      ['Scan Attempts', data.scanAttempts.map((s) => ({
-        Organization: s.employee?.organization?.name ?? '',
-        'Employee Code': s.employee?.employeeCode ?? '',
-        'Employee Name': `${s.employee?.firstName ?? ''} ${s.employee?.lastName ?? ''}`.trim(),
-        Session: s.session?.sessionName ?? '',
-        Timestamp: isoUtcDateTime(s.timestamp),
-        'Scan Result': s.result ?? '',
-        'Device ID': s.deviceId ?? '',
-        'WiFi SSID': s.wifiSSID ?? '',
-        'IP Address': s.ipAddress ?? '',
-      })), 'No scan attempts'],
-      ['Students', data.studentRecords.map((s) => ({
-        Organization: s.organization?.name ?? '',
-        'Student Code': s.studentCode ?? '',
-        'First Name': s.firstName ?? '',
-        'Last Name': s.lastName ?? '',
-        Class: s.className ?? '',
-        Status: s.status ?? '',
-        Created: isoDate(s.createdAt),
-      })), 'No students'],
-      ['Student Attendance', data.studentAttendance.map((s) => ({
-        Organization: s.student?.organization?.name ?? '',
-        'Student Code': s.student?.studentCode ?? '',
-        'Student Name': `${s.student?.firstName ?? ''} ${s.student?.lastName ?? ''}`.trim(),
-        Date: isoDate(s.date),
-        'Check In': s.checkInTime ? this._fmtTime(s.checkInTime) : '',
-        'Check Out': s.checkOutTime ? this._fmtTime(s.checkOutTime) : '',
-        'Checked In By': s.checkedInBy ? `${s.checkedInBy.firstName} ${s.checkedInBy.lastName}`.trim() : '',
-        'Checked Out By': s.checkedOutBy ? `${s.checkedOutBy.firstName} ${s.checkedOutBy.lastName}`.trim() : '',
-      })), 'No student attendance'],
-      ['Admin Login Events', data.adminLoginEvents.map((e) => ({
-        Organization: e.organization?.name ?? '',
-        'Admin Name': e.admin ? `${e.admin.firstName} ${e.admin.lastName}`.trim() : '',
-        Email: e.admin?.email ?? '',
-        'Attendance Status': e.attendanceStatus ?? '',
-        'Minutes Late': e.minutesLate ?? 0,
-        Penalty: e.penalty ?? 0,
-        'Logged In At': isoUtcDateTime(e.loggedInAt),
-        'IP Address': e.ipAddress ?? '',
-      })), 'No admin login events'],
-      ['Screenshot Logs', data.screenshotLogs.map((s) => ({
-        Organization: employeeById.get(s.employeeId)?.organization?.name ?? '',
-        'Employee Code': employeeById.get(s.employeeId)?.employeeCode ?? '',
-        'Employee Name': `${employeeById.get(s.employeeId)?.firstName ?? ''} ${employeeById.get(s.employeeId)?.lastName ?? ''}`.trim(),
-        Platform: s.platform ?? '',
-        'Device ID': s.deviceId ?? '',
-        Timestamp: isoUtcDateTime(s.timestamp),
-        'Session ID': s.sessionId ?? '',
-      })), 'No screenshot logs'],
-      ['Security Settings', data.securitySettings.map((s) => ({
-        Organization: s.office?.organization?.name ?? '',
-        Office: s.office?.name ?? '',
-        'WiFi Required': s.wifiRequired ? 'Yes' : 'No',
-        'Device Binding': s.deviceBindingEnabled ? 'Yes' : 'No',
-        'Screenshot Protection': s.screenshotProtection ? 'Yes' : 'No',
-        'Late Threshold (min)': s.lateThresholdMinutes ?? 0,
-        'Max Failed Attempts': s.maxFailedAttempts ?? 0,
-        'Updated By': s.updater ? `${s.updater.firstName} ${s.updater.lastName}`.trim() : '',
-        'Updated At': isoUtcDateTime(s.updatedAt),
-      })), 'No security settings'],
-      ['Emergency Controls', data.emergencyControls.map((e) => ({
-        Organization: e.admin?.organization?.name ?? '',
-        'Triggered By': e.admin ? `${e.admin.firstName} ${e.admin.lastName}`.trim() : '',
-        Action: e.action ?? '',
-        Reason: e.reason ?? '',
-        'Triggered At': isoUtcDateTime(e.timestamp),
-        'Is Reverted': e.isReverted ? 'Yes' : 'No',
-        'Reverted At': isoUtcDateTime(e.revertedAt),
-        'Sessions': e.sessions?.map((s) => s.session?.sessionName ?? '').filter(Boolean).join('; ') ?? '',
-      })), 'No emergency controls'],
-      ['Report History', data.attendanceReports.map((r) => ({
-        Type: r.reportType ?? '',
-        'Generated By': r.generator ? `${r.generator.firstName} ${r.generator.lastName}`.trim() : '',
-        'Generated At': isoUtcDateTime(r.generatedAt),
-        'Range Start': isoDate(r.dateRangeStart),
-        'Range End': isoDate(r.dateRangeEnd),
-        'Present': r.totalPresent ?? 0,
-        'Late': r.totalLate ?? 0,
-        'Absent': r.totalAbsent ?? 0,
-        'On Leave': r.totalOnLeave ?? 0,
-        'Flagged': r.totalFlagged ?? 0,
-        'Average Work Hours': r.averageWorkHours ?? '',
-        'Average Break (min)': r.averageBreakMinutes ?? '',
-      })), 'No report history'],
-      ['Notifications', data.notificationLogs.map((n) => ({
-        'User ID': n.userId ?? '',
-        Channel: n.channel ?? '',
-        Subject: n.subject ?? '',
-        Status: n.status ?? '',
-        'Sent At': isoUtcDateTime(n.sentAt),
-        Body: n.body ?? '',
-      })), 'No notification logs'],
-    ];
+    const isSuperAdmin = !orgId || orgId === 'platform-org';
 
-    sheets.forEach(([name, rows, emptyMessage]) => this._appendWorksheet(workbook, name, rows, emptyMessage));
+    if (isSuperAdmin) {
+      await this._renderSuperAdminExcel(workbook, data);
+    } else {
+      const targetOrg = data.organizations.find((o) => o.id === orgId) || { id: orgId, name: 'Organization' };
+      await this._renderOrganizationExcel(workbook, data, targetOrg);
+    }
+
     return this._writeExcelBuffer(workbook);
   }
 
-  async exportFullToCSV(orgId) {
-    const data = await this.buildFullExport(orgId);
-    const employeeById = new Map(data.employees.map((employee) => [employee.id, employee]));
-    const sections = [];
+  /**
+   * Super Admin Excel Builder
+   * Sheet 1 = System Overview (Cross-org performance with Excel formulas)
+   * Sheet 2..N = One sheet per organization containing full organizational records
+   */
+  async _renderSuperAdminExcel(workbook, data) {
+    const nowStr = formatDateTime(new Date());
+    const usedSheetNames = new Set();
 
-    const addSection = (title, headers, rows) => {
-      sections.push(title);
-      sections.push(headers.join(','));
-      rows.forEach((row) => sections.push(row.map((value) => csvEscape(value)).join(',')));
-      sections.push('');
-    };
+    // ──────────────────────────────────────────────────────────────────────────
+    // Sheet 1: Master System Overview
+    // ──────────────────────────────────────────────────────────────────────────
+    const overviewSheet = workbook.addWorksheet('System Overview');
+    usedSheetNames.add('system overview');
 
-    addSection('ATTENDANCE RECORDS (ALL)',
-      ['Organization', 'Date', 'Day', 'Month', 'Employee Code', 'Employee Name', 'Emp Status', 'Department', 'Session', 'Clock In', 'Check-In Source', 'Check-In Recorded By', 'Clock Out', 'Check-Out Source', 'Check-Out Recorded By', 'Status', 'Penalty (NGN)', 'Work Hours', 'Break (min)', 'WiFi Verified', 'Device Verified', 'Flagged', 'Flag Reason'],
-      data.attendanceRecords.map((r) => [
-        r.employee?.organization?.name ?? '',
+    renderHeaderBanner(overviewSheet, {
+      title: 'TIMELOGIC ENTERPRISE — GLOBAL SYSTEM AUDIT REPORT',
+      organizationName: 'All Registered Organizations',
+      period: 'Comprehensive Historical Database',
+      generatedAt: nowStr,
+      totalCols: 14,
+    });
+
+    const totalOrgs = data.organizations.length;
+    const totalStaff = data.employees.filter((e) => e.role === 'EMPLOYEE').length;
+    const totalAdmins = data.employees.filter((e) => e.role === 'ADMIN').length;
+    const totalRecords = data.attendanceRecords.length;
+    const totalAutoPenalties = data.attendanceRecords.reduce((s, r) => s + (r.penalty || 0), 0) +
+      data.breakRecords.reduce((s, b) => s + (b.penalty || 0), 0);
+    const totalManualPenalties = data.manualPenalties.reduce((s, m) => s + (m.amount || 0), 0);
+    const totalCombinedPenalties = totalAutoPenalties + totalManualPenalties;
+    const totalHours = data.attendanceRecords.reduce((s, r) => s + (r.totalWorkHours || 0), 0);
+
+    renderKpiCards(overviewSheet, [
+      { label: 'Registered Orgs', value: totalOrgs, color: PALETTE.PRIMARY },
+      { label: 'Active Workforce', value: totalStaff, color: 'FF166534' },
+      { label: 'Admin Accounts', value: totalAdmins, color: 'FF5B21B6' },
+      { label: 'Total Attendance Logs', value: totalRecords, color: PALETTE.PRIMARY },
+      { label: 'Total Hours Worked', value: parseFloat(totalHours.toFixed(1)), numFmt: '#,##0.0" hrs"', color: 'FF0369A1' },
+      { label: 'Combined Penalties', value: totalCombinedPenalties, numFmt: '"₦"#,##0.00', color: 'FF991B1B' },
+    ], 14);
+
+    renderSectionHeader(overviewSheet, 'CROSS-ORGANIZATION PERFORMANCE AUDIT', 14);
+
+    const overviewHeaders = [
+      'Organization Name', 'Industry', 'Timezone', 'Offices', 'Staff Count', 'Admins',
+      'Total Records', 'Total Hours', 'Break (min)', 'Auto Penalty (NGN)', 'Manual Penalty (NGN)',
+      'Total Penalties (NGN)', 'Open Alerts', 'Status',
+    ];
+    renderTableHeader(overviewSheet, overviewHeaders);
+
+    const startRow = overviewSheet.lastRow.number + 1;
+
+    data.organizations.forEach((org, idx) => {
+      const orgStaff = data.employees.filter((e) => e.orgId === org.id && e.role === 'EMPLOYEE').length;
+      const orgAdmins = data.employees.filter((e) => e.orgId === org.id && e.role === 'ADMIN').length;
+      const orgAtt = data.attendanceRecords.filter((a) => a.employee?.orgId === org.id);
+      const orgBreaks = data.breakRecords.filter((b) => b.employee?.orgId === org.id);
+      const orgManuals = data.manualPenalties.filter((m) => m.orgId === org.id || m.employee?.orgId === org.id);
+      const orgAlerts = data.fraudAlerts.filter((f) => f.employee?.orgId === org.id && (f.status === 'NEW' || f.status === 'INVESTIGATING')).length;
+
+      const hours = orgAtt.reduce((s, r) => s + (r.totalWorkHours || 0), 0);
+      const breakMins = orgAtt.reduce((s, r) => s + (r.totalBreakMinutes || 0), 0);
+      const autoPen = orgAtt.reduce((s, r) => s + (r.penalty || 0), 0) + orgBreaks.reduce((s, b) => s + (b.penalty || 0), 0);
+      const manPen = orgManuals.reduce((s, m) => s + (m.amount || 0), 0);
+      const totalPen = autoPen + manPen;
+
+      const row = overviewSheet.addRow([
+        org.name || 'Unnamed',
+        org.industry || 'General',
+        org.timezone || 'Africa/Lagos',
+        org.offices?.length || 1,
+        orgStaff,
+        orgAdmins,
+        orgAtt.length,
+        parseFloat(hours.toFixed(2)),
+        breakMins,
+        autoPen,
+        manPen,
+        totalPen,
+        orgAlerts,
+        'ACTIVE',
+      ]);
+
+      row.getCell(8).numFmt = '0.00" hrs"';
+      row.getCell(9).numFmt = '#,##0';
+      row.getCell(10).numFmt = '"₦"#,##0.00';
+      row.getCell(11).numFmt = '"₦"#,##0.00';
+      row.getCell(12).numFmt = '"₦"#,##0.00';
+
+      formatDataRow(row, idx % 2 === 1, 14);
+    });
+
+    const endRow = overviewSheet.lastRow.number;
+
+    if (data.organizations.length > 0) {
+      const summaryRow = overviewSheet.addRow([
+        'TOTALS & AVERAGES', '', '', '',
+        { formula: `SUM(E${startRow}:E${endRow})` },
+        { formula: `SUM(F${startRow}:F${endRow})` },
+        { formula: `SUM(G${startRow}:G${endRow})` },
+        { formula: `SUM(H${startRow}:H${endRow})` },
+        { formula: `SUM(I${startRow}:I${endRow})` },
+        { formula: `SUM(J${startRow}:J${endRow})` },
+        { formula: `SUM(K${startRow}:K${endRow})` },
+        { formula: `SUM(L${startRow}:L${endRow})` },
+        { formula: `SUM(M${startRow}:M${endRow})` },
+        '',
+      ]);
+      summaryRow.height = 24;
+      summaryRow.eachCell({ includeEmpty: true }, (cell) => {
+        cell.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: PALETTE.PRIMARY } };
+        cell.border = {
+          top: { style: 'thin', color: { argb: PALETTE.PRIMARY } },
+          bottom: { style: 'double', color: { argb: PALETTE.PRIMARY } },
+        };
+      });
+      summaryRow.getCell(8).numFmt = '0.00" hrs"';
+      summaryRow.getCell(10).numFmt = '"₦"#,##0.00';
+      summaryRow.getCell(11).numFmt = '"₦"#,##0.00';
+      summaryRow.getCell(12).numFmt = '"₦"#,##0.00';
+    }
+
+    autoFitColumns(overviewSheet, 13, 38);
+    applySheetSetup(overviewSheet, { freezeY: 6, landscape: true });
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Sheets 2..N: One Dedicated Sheet per Organization
+    // ──────────────────────────────────────────────────────────────────────────
+    for (const org of data.organizations) {
+      const sheetName = sanitizeSheetName(org.name, usedSheetNames);
+      const ws = workbook.addWorksheet(sheetName);
+
+      this._renderSingleOrganizationSheet(ws, data, org, nowStr);
+    }
+  }
+
+  /**
+   * Renders the complete organizational lifecycle dataset into one master sheet (for Super Admin export)
+   */
+  _renderSingleOrganizationSheet(ws, data, org, nowStr) {
+    const TOTAL_COLS = 18;
+
+    renderHeaderBanner(ws, {
+      title: `ORGANIZATION AUDIT REPORT: ${org.name.toUpperCase()}`,
+      organizationName: org.name,
+      period: 'Complete Historical Database',
+      generatedAt: nowStr,
+      totalCols: TOTAL_COLS,
+    });
+
+    const orgEmployees = data.employees.filter((e) => e.orgId === org.id);
+    const orgAttendance = data.attendanceRecords.filter((a) => a.employee?.orgId === org.id);
+    const orgBreaks = data.breakRecords.filter((b) => b.employee?.orgId === org.id);
+    const orgManualPenalties = data.manualPenalties.filter((m) => m.orgId === org.id || m.employee?.orgId === org.id);
+    const orgLeaves = data.leaveRequests.filter((l) => l.employee?.orgId === org.id);
+    const orgFraud = data.fraudAlerts.filter((f) => f.employee?.orgId === org.id);
+    const orgSessions = data.sessions.filter((s) => s.office?.orgId === org.id);
+    const orgStudents = data.studentRecords.filter((s) => s.organization?.id === org.id || s.orgId === org.id);
+    const orgStudentAttendance = data.studentAttendance.filter((s) => s.student?.orgId === org.id);
+
+    const staffCount = orgEmployees.filter((e) => e.role === 'EMPLOYEE').length;
+    const adminCount = orgEmployees.filter((e) => e.role === 'ADMIN').length;
+    const presentCount = orgAttendance.filter((r) => r.status === 'PRESENT').length;
+    const lateCount = orgAttendance.filter((r) => r.status === 'LATE' || r.status === 'COMPLETELY_LATE').length;
+    const absentCount = orgAttendance.filter((r) => r.status === 'ABSENT').length;
+    const hoursTotal = orgAttendance.reduce((s, r) => s + (r.totalWorkHours || 0), 0);
+    const autoPenTotal = orgAttendance.reduce((s, r) => s + (r.penalty || 0), 0) + orgBreaks.reduce((s, b) => s + (b.penalty || 0), 0);
+    const manualPenTotal = orgManualPenalties.reduce((s, m) => s + (m.amount || 0), 0);
+    const totalPenalties = autoPenTotal + manualPenTotal;
+
+    renderKpiCards(ws, [
+      { label: 'Staff Count', value: staffCount, color: PALETTE.PRIMARY },
+      { label: 'Total Logs', value: orgAttendance.length, color: PALETTE.PRIMARY },
+      { label: 'Present Logs', value: presentCount, color: 'FF166534' },
+      { label: 'Late Logs', value: lateCount, color: 'FF92400E' },
+      { label: 'Absent Logs', value: absentCount, color: 'FF991B1B' },
+      { label: 'Work Hours', value: parseFloat(hoursTotal.toFixed(1)), numFmt: '#,##0.0" hrs"', color: 'FF0369A1' },
+      { label: 'Total Penalties', value: totalPenalties, numFmt: '"₦"#,##0.00', color: 'FF991B1B' },
+    ], TOTAL_COLS);
+
+    // ── Table 1: Attendance Records ──────────────────────────────────────────
+    renderSectionHeader(ws, '1. ATTENDANCE RECORDS (ALL HISTORICAL LOGS)', TOTAL_COLS);
+    const attHeaders = [
+      'Date', 'Day', 'Employee Code', 'Employee Name', 'Department', 'Office', 'Shift',
+      'Clock In', 'In Source', 'In Recorder', 'Clock Out', 'Out Source', 'Out Recorder',
+      'Status', 'Work Hours', 'Break (min)', 'Penalty (NGN)', 'Flagged',
+    ];
+    renderTableHeader(ws, attHeaders);
+
+    if (orgAttendance.length === 0) {
+      const emptyRow = ws.addRow(['No attendance records found for this organization.']);
+      formatDataRow(emptyRow, false);
+    } else {
+      orgAttendance.forEach((r, idx) => {
+        const row = ws.addRow([
+          isoDate(r.date),
+          r.date ? new Date(r.date).toLocaleDateString('en-GB', { weekday: 'short' }) : '',
+          r.employee?.employeeCode || '—',
+          `${r.employee?.firstName || ''} ${r.employee?.lastName || ''}`.trim() || 'Unknown',
+          r.employee?.department?.name || 'Unassigned',
+          r.employee?.office?.name || r.session?.officeName || 'Main',
+          r.employee?.shiftType || 'FULL_TIME',
+          r.clockInTime ? formatTime(r.clockInTime) : '—',
+          r.checkInSource || '—',
+          r.checkInRecorder ? `${r.checkInRecorder.firstName} ${r.checkInRecorder.lastName}`.trim() : 'Self',
+          r.clockOutTime ? formatTime(r.clockOutTime) : '—',
+          r.checkOutSource || '—',
+          r.checkOutRecorder ? `${r.checkOutRecorder.firstName} ${r.checkOutRecorder.lastName}`.trim() : 'Self',
+          r.status || 'ABSENT',
+          r.totalWorkHours != null ? parseFloat(r.totalWorkHours.toFixed(2)) : 0,
+          r.totalBreakMinutes || 0,
+          r.penalty || 0,
+          r.flagged ? 'YES' : 'NO',
+        ]);
+
+        row.getCell(15).numFmt = '0.00" hrs"';
+        row.getCell(16).numFmt = '#,##0';
+        row.getCell(17).numFmt = '"₦"#,##0.00';
+        formatDataRow(row, idx % 2 === 1, 14);
+      });
+    }
+
+    ws.addRow([]); // Spacer
+
+    // ── Table 2: Break Records ───────────────────────────────────────────────
+    renderSectionHeader(ws, '2. BREAK & OVERSTAY RECORDS', TOTAL_COLS);
+    const breakHeaders = [
+      'Date', 'Employee Code', 'Employee Name', 'Break Type', 'Start Time', 'End Time',
+      'Duration (min)', 'Overstay Penalty (NGN)', 'Auto-Ended', 'Session Name',
+    ];
+    renderTableHeader(ws, breakHeaders);
+
+    if (orgBreaks.length === 0) {
+      const emptyRow = ws.addRow(['No break records logged for this organization.']);
+      formatDataRow(emptyRow, false);
+    } else {
+      orgBreaks.forEach((b, idx) => {
+        const row = ws.addRow([
+          isoDate(b.attendanceRecord?.date || b.startTime),
+          b.employee?.employeeCode || '—',
+          `${b.employee?.firstName || ''} ${b.employee?.lastName || ''}`.trim() || 'Unknown',
+          b.breakType || 'LUNCH',
+          b.startTime ? formatTime(b.startTime) : '—',
+          b.endTime ? formatTime(b.endTime) : 'ACTIVE',
+          b.durationMinutes || 0,
+          b.penalty || 0,
+          b.isAutoEnded ? 'YES' : 'NO',
+          b.attendanceRecord?.session?.sessionName || 'Standard',
+        ]);
+        row.getCell(7).numFmt = '#,##0';
+        row.getCell(8).numFmt = '"₦"#,##0.00';
+        formatDataRow(row, idx % 2 === 1);
+      });
+    }
+
+    ws.addRow([]); // Spacer
+
+    // ── Table 3: Consolidated Penalties Ledger ────────────────────────────────
+    renderSectionHeader(ws, '3. CONSOLIDATED DISCIPLINARY & PENALTIES LEDGER (AUTO + MANUAL)', TOTAL_COLS);
+    const penHeaders = [
+      'Date', 'Employee Code', 'Employee Name', 'Penalty Category', 'Amount (NGN)', 'Violation / Reason', 'Recorded By / Origin',
+    ];
+    renderTableHeader(ws, penHeaders);
+
+    const combinedPenalties = [];
+
+    // Auto penalties from attendance
+    orgAttendance.filter((r) => (r.penalty || 0) > 0).forEach((r) => {
+      combinedPenalties.push({
+        date: isoDate(r.date),
+        code: r.employee?.employeeCode || '—',
+        name: `${r.employee?.firstName || ''} ${r.employee?.lastName || ''}`.trim(),
+        category: r.status === 'COMPLETELY_LATE' ? 'Completely Late' : (r.status === 'ABSENT' ? 'Absence Fine' : 'Late Arrival'),
+        amount: r.penalty,
+        reason: r.reviewNotes || `Automated fine for ${r.status.toLowerCase().replace('_', ' ')}`,
+        origin: 'Automated Attendance Engine',
+      });
+    });
+
+    // Auto penalties from breaks
+    orgBreaks.filter((b) => (b.penalty || 0) > 0).forEach((b) => {
+      combinedPenalties.push({
+        date: isoDate(b.attendanceRecord?.date || b.startTime),
+        code: b.employee?.employeeCode || '—',
+        name: `${b.employee?.firstName || ''} ${b.employee?.lastName || ''}`.trim(),
+        category: 'Break Overstay',
+        amount: b.penalty,
+        reason: `Overstayed allowed break window by ${b.durationMinutes || 0} minutes`,
+        origin: 'Automated Break Monitor',
+      });
+    });
+
+    // Manual penalties from admin
+    orgManualPenalties.forEach((m) => {
+      combinedPenalties.push({
+        date: isoDate(m.createdAt),
+        code: m.employee?.employeeCode || '—',
+        name: `${m.employee?.firstName || ''} ${m.employee?.lastName || ''}`.trim(),
+        category: 'Manual Penalty',
+        amount: m.amount || 0,
+        reason: m.reason || 'Manual disciplinary deduction',
+        origin: m.createdBy ? `Admin: ${m.createdBy.firstName} ${m.createdBy.lastName}` : 'Administrator',
+      });
+    });
+
+    if (combinedPenalties.length === 0) {
+      const emptyRow = ws.addRow(['No disciplinary penalties or deductions recorded for this organization.']);
+      formatDataRow(emptyRow, false);
+    } else {
+      const penStart = ws.lastRow.number + 1;
+      combinedPenalties.forEach((p, idx) => {
+        const row = ws.addRow([
+          p.date, p.code, p.name, p.category, p.amount, p.reason, p.origin,
+        ]);
+        row.getCell(5).numFmt = '"₦"#,##0.00';
+        formatDataRow(row, idx % 2 === 1);
+      });
+      const penEnd = ws.lastRow.number;
+
+      const subtotalRow = ws.addRow([
+        'SUBTOTAL', '', '', '',
+        { formula: `SUM(E${penStart}:E${penEnd})` },
+        '', '',
+      ]);
+      subtotalRow.height = 22;
+      subtotalRow.eachCell({ includeEmpty: true }, (cell) => {
+        cell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: PALETTE.PRIMARY } };
+        cell.border = { top: { style: 'thin' }, bottom: { style: 'double' } };
+      });
+      subtotalRow.getCell(5).numFmt = '"₦"#,##0.00';
+    }
+
+    ws.addRow([]); // Spacer
+
+    // ── Table 4: Leave Records ───────────────────────────────────────────────
+    renderSectionHeader(ws, '4. LEAVE REQUESTS & EMPLOYEE BALANCES', TOTAL_COLS);
+    const leaveHeaders = [
+      'Employee Code', 'Employee Name', 'Leave Type', 'Start Date', 'End Date', 'Days', 'Status', 'Reason', 'Approved By', 'Submitted At',
+    ];
+    renderTableHeader(ws, leaveHeaders);
+
+    if (orgLeaves.length === 0) {
+      const emptyRow = ws.addRow(['No leave requests submitted for this organization.']);
+      formatDataRow(emptyRow, false);
+    } else {
+      orgLeaves.forEach((l, idx) => {
+        const row = ws.addRow([
+          l.employee?.employeeCode || '—',
+          `${l.employee?.firstName || ''} ${l.employee?.lastName || ''}`.trim() || 'Unknown',
+          l.leaveType || 'ANNUAL',
+          isoDate(l.startDate),
+          isoDate(l.endDate),
+          l.totalDays || 0,
+          l.status || 'PENDING',
+          l.reason || '—',
+          l.approver ? `${l.approver.firstName} ${l.approver.lastName}`.trim() : 'Pending Approval',
+          isoDate(l.createdAt),
+        ]);
+        row.getCell(6).numFmt = '#,##0';
+        formatDataRow(row, idx % 2 === 1, 7);
+      });
+    }
+
+    ws.addRow([]); // Spacer
+
+    // ── Table 5: Employee Directory ──────────────────────────────────────────
+    renderSectionHeader(ws, '5. EMPLOYEE & ADMINISTRATOR DIRECTORY', TOTAL_COLS);
+    const empHeaders = [
+      'Employee Code', 'Full Name', 'Email', 'Phone', 'Role', 'Department', 'Office', 'Shift Type', 'Check-In Method', 'Face Registered', 'Status', 'Date Joined', 'Last Login',
+    ];
+    renderTableHeader(ws, empHeaders);
+
+    if (orgEmployees.length === 0) {
+      const emptyRow = ws.addRow(['No employee profiles registered under this organization.']);
+      formatDataRow(emptyRow, false);
+    } else {
+      orgEmployees.forEach((e, idx) => {
+        const row = ws.addRow([
+          e.employeeCode || '—',
+          `${e.firstName || ''} ${e.lastName || ''}`.trim() || 'Unknown',
+          e.email || '—',
+          e.phone || '—',
+          e.role || 'EMPLOYEE',
+          e.department?.name || 'Unassigned',
+          e.office?.name || 'Main Office',
+          e.shiftType || 'FULL_TIME',
+          e.checkInMethod || 'PHONE',
+          e.profileImageUrl ? 'YES' : 'NO',
+          e.status || 'ACTIVE',
+          isoDate(e.createdAt),
+          e.lastLoginAt ? formatDateTime(e.lastLoginAt) : 'Never',
+        ]);
+        formatDataRow(row, idx % 2 === 1, 11);
+      });
+    }
+
+    ws.addRow([]); // Spacer
+
+    // ── Table 6: Fraud Alerts ────────────────────────────────────────────────
+    renderSectionHeader(ws, '6. FRAUD ALERTS & SECURITY AUDIT', TOTAL_COLS);
+    const fraudHeaders = [
+      'Date', 'Employee Code', 'Employee Name', 'Fraud Type', 'Severity', 'Description', 'Status', 'Session', 'Resolved By',
+    ];
+    renderTableHeader(ws, fraudHeaders);
+
+    if (orgFraud.length === 0) {
+      const emptyRow = ws.addRow(['No fraud alerts or suspicious security incidents recorded.']);
+      formatDataRow(emptyRow, false);
+    } else {
+      orgFraud.forEach((f, idx) => {
+        const row = ws.addRow([
+          isoDate(f.createdAt),
+          f.employee?.employeeCode || '—',
+          `${f.employee?.firstName || ''} ${f.employee?.lastName || ''}`.trim() || 'Unknown',
+          f.fraudType || 'SUSPICIOUS_SCAN',
+          f.severity || 'MEDIUM',
+          f.description || '—',
+          f.status || 'NEW',
+          f.session?.sessionName || '—',
+          f.resolver ? `${f.resolver.firstName} ${f.resolver.lastName}`.trim() : 'Unresolved',
+        ]);
+        formatDataRow(row, idx % 2 === 1, 7);
+      });
+    }
+
+    ws.addRow([]); // Spacer
+
+    // ── Table 7: Sessions & Stations ─────────────────────────────────────────
+    renderSectionHeader(ws, '7. ATTENDANCE SESSIONS & KIOSK STATIONS', TOTAL_COLS);
+    const sessionHeaders = [
+      'Session Name', 'Office', 'Status', 'Date', 'Start Time', 'End Time', 'Total Check-ins', 'Scan Attempts', 'Fraud Alerts',
+    ];
+    renderTableHeader(ws, sessionHeaders);
+
+    if (orgSessions.length === 0) {
+      const emptyRow = ws.addRow(['No attendance sessions found for this organization.']);
+      formatDataRow(emptyRow, false);
+    } else {
+      orgSessions.forEach((s, idx) => {
+        const row = ws.addRow([
+          s.sessionName || 'Main Station',
+          s.office?.name || s.officeName || 'Main Office',
+          s.status || 'ENDED',
+          isoDate(s.startTime),
+          s.startTime ? formatTime(s.startTime) : '—',
+          s.endTime ? formatTime(s.endTime) : '—',
+          s._count?.attendanceRecords || 0,
+          s._count?.scanAttempts || 0,
+          s._count?.fraudAlerts || 0,
+        ]);
+        formatDataRow(row, idx % 2 === 1, 3);
+      });
+    }
+
+    // ── Optional Table 8: Students (if educational org) ──────────────────────
+    if (orgStudents.length > 0 || org.hasStudents) {
+      ws.addRow([]); // Spacer
+      renderSectionHeader(ws, '8. STUDENT ATTENDANCE & ROSTER', TOTAL_COLS);
+      const studentHeaders = [
+        'Student Code', 'First Name', 'Last Name', 'Class', 'Date', 'Check In', 'Check Out', 'Checked In By',
+      ];
+      renderTableHeader(ws, studentHeaders);
+
+      if (orgStudentAttendance.length === 0) {
+        const emptyRow = ws.addRow(['No student attendance records found.']);
+        formatDataRow(emptyRow, false);
+      } else {
+        orgStudentAttendance.forEach((sa, idx) => {
+          const row = ws.addRow([
+            sa.student?.studentCode || '—',
+            sa.student?.firstName || '—',
+            sa.student?.lastName || '—',
+            sa.student?.className || '—',
+            isoDate(sa.date),
+            sa.checkInTime ? formatTime(sa.checkInTime) : '—',
+            sa.checkOutTime ? formatTime(sa.checkOutTime) : '—',
+            sa.checkedInBy ? `${sa.checkedInBy.firstName} ${sa.checkedInBy.lastName}`.trim() : 'Admin',
+          ]);
+          formatDataRow(row, idx % 2 === 1);
+        });
+      }
+    }
+
+    autoFitColumns(ws, 13, 38);
+    applySheetSetup(ws, { freezeY: 6, landscape: true });
+  }
+
+  /**
+   * Organization Admin Excel Builder
+   * Scoped strictly to one organization with dedicated tabs for executive reporting:
+   * Tab 1 = Executive Dashboard
+   * Tab 2 = Attendance Log
+   * Tab 3 = Breaks & Overstays
+   * Tab 4 = Penalties & Deductions Ledger (Auto + Manual)
+   * Tab 5 = Staff Directory
+   * Tab 6 = Leave Management
+   * Tab 7 = Fraud & Security
+   * Tab 8 = Sessions & Kiosks
+   * (Tab 9 = Students if applicable)
+   */
+  async _renderOrganizationExcel(workbook, data, targetOrg) {
+    const nowStr = formatDateTime(new Date());
+
+    const orgEmployees = data.employees.filter((e) => e.orgId === targetOrg.id);
+    const orgAttendance = data.attendanceRecords.filter((a) => a.employee?.orgId === targetOrg.id);
+    const orgBreaks = data.breakRecords.filter((b) => b.employee?.orgId === targetOrg.id);
+    const orgManualPenalties = data.manualPenalties.filter((m) => m.orgId === targetOrg.id || m.employee?.orgId === targetOrg.id);
+    const orgLeaves = data.leaveRequests.filter((l) => l.employee?.orgId === targetOrg.id);
+    const orgFraud = data.fraudAlerts.filter((f) => f.employee?.orgId === targetOrg.id);
+    const orgSessions = data.sessions.filter((s) => s.office?.orgId === targetOrg.id);
+    const orgStudents = data.studentRecords.filter((s) => s.organization?.id === targetOrg.id || s.orgId === targetOrg.id);
+    const orgStudentAttendance = data.studentAttendance.filter((s) => s.student?.orgId === targetOrg.id);
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Tab 1: Executive Dashboard
+    // ──────────────────────────────────────────────────────────────────────────
+    const dashSheet = workbook.addWorksheet('Dashboard');
+    renderHeaderBanner(dashSheet, {
+      title: `${targetOrg.name.toUpperCase()} — ATTENDANCE & WORKFORCE REPORT`,
+      organizationName: targetOrg.name,
+      period: 'Complete Historical Summary',
+      generatedAt: nowStr,
+      totalCols: 10,
+    });
+
+    const staffCount = orgEmployees.filter((e) => e.role === 'EMPLOYEE').length;
+    const presentCount = orgAttendance.filter((r) => r.status === 'PRESENT').length;
+    const lateCount = orgAttendance.filter((r) => r.status === 'LATE' || r.status === 'COMPLETELY_LATE').length;
+    const absentCount = orgAttendance.filter((r) => r.status === 'ABSENT').length;
+    const hoursTotal = orgAttendance.reduce((s, r) => s + (r.totalWorkHours || 0), 0);
+    const autoPenTotal = orgAttendance.reduce((s, r) => s + (r.penalty || 0), 0) + orgBreaks.reduce((s, b) => s + (b.penalty || 0), 0);
+    const manualPenTotal = orgManualPenalties.reduce((s, m) => s + (m.amount || 0), 0);
+    const totalPenalties = autoPenTotal + manualPenTotal;
+
+    renderKpiCards(dashSheet, [
+      { label: 'Active Staff', value: staffCount, color: PALETTE.PRIMARY },
+      { label: 'Total Logs', value: orgAttendance.length, color: PALETTE.PRIMARY },
+      { label: 'On-Time', value: presentCount, color: 'FF166534' },
+      { label: 'Lateness', value: lateCount, color: 'FF92400E' },
+      { label: 'Absences', value: absentCount, color: 'FF991B1B' },
+      { label: 'Total Work Hours', value: parseFloat(hoursTotal.toFixed(1)), numFmt: '#,##0.0" hrs"', color: 'FF0369A1' },
+      { label: 'Combined Penalties', value: totalPenalties, numFmt: '"₦"#,##0.00', color: 'FF991B1B' },
+    ], 10);
+
+    // Department Performance Breakdown
+    renderSectionHeader(dashSheet, 'DEPARTMENT WORKFORCE BREAKDOWN', 10);
+    renderTableHeader(dashSheet, ['Department', 'Assigned Staff', 'Attendance Logs', 'Hours Worked', 'Late Logs', 'Total Penalties (NGN)']);
+
+    const deptMap = new Map();
+    orgEmployees.forEach((e) => {
+      const dName = e.department?.name || 'General / Unassigned';
+      if (!deptMap.has(dName)) deptMap.set(dName, { staff: 0, logs: 0, hours: 0, late: 0, penalties: 0 });
+      deptMap.get(dName).staff++;
+    });
+
+    orgAttendance.forEach((a) => {
+      const dName = a.employee?.department?.name || 'General / Unassigned';
+      if (!deptMap.has(dName)) deptMap.set(dName, { staff: 0, logs: 0, hours: 0, late: 0, penalties: 0 });
+      const stats = deptMap.get(dName);
+      stats.logs++;
+      stats.hours += a.totalWorkHours || 0;
+      if (a.status === 'LATE' || a.status === 'COMPLETELY_LATE') stats.late++;
+      stats.penalties += a.penalty || 0;
+    });
+
+    Array.from(deptMap.entries()).forEach(([deptName, stats], idx) => {
+      const row = dashSheet.addRow([
+        deptName, stats.staff, stats.logs, parseFloat(stats.hours.toFixed(2)), stats.late, stats.penalties,
+      ]);
+      row.getCell(4).numFmt = '0.00" hrs"';
+      row.getCell(6).numFmt = '"₦"#,##0.00';
+      formatDataRow(row, idx % 2 === 1);
+    });
+
+    autoFitColumns(dashSheet, 14, 38);
+    applySheetSetup(dashSheet, { freezeY: 6, landscape: true });
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Tab 2: Attendance Records
+    // ──────────────────────────────────────────────────────────────────────────
+    const attSheet = workbook.addWorksheet('Attendance');
+    renderHeaderBanner(attSheet, {
+      title: 'ATTENDANCE LOG',
+      organizationName: targetOrg.name,
+      period: 'Complete Historical Database',
+      generatedAt: nowStr,
+      totalCols: 18,
+    });
+    const attHeaders = [
+      'Date', 'Day', 'Employee Code', 'Employee Name', 'Department', 'Office', 'Shift',
+      'Clock In', 'In Source', 'In Recorder', 'Clock Out', 'Out Source', 'Out Recorder',
+      'Status', 'Work Hours', 'Break (min)', 'Penalty (NGN)', 'Flagged',
+    ];
+    renderTableHeader(attSheet, attHeaders);
+
+    orgAttendance.forEach((r, idx) => {
+      const row = attSheet.addRow([
         isoDate(r.date),
-        r.date ? new Date(r.date).toLocaleDateString('en-GB', { weekday: 'long' }) : '',
-        r.date ? new Date(r.date).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : '',
-        r.employee?.employeeCode ?? '',
-        `${r.employee?.firstName ?? ''} ${r.employee?.lastName ?? ''}`.trim(),
-        r.employee?.status ?? '',
-        r.employee?.department?.name ?? '',
-        r.session?.sessionName ?? '',
-        r.clockInTime ? this._fmtTime(r.clockInTime) : '',
-        r.checkInSource ?? '',
-        r.checkInRecorder ? `${r.checkInRecorder.firstName} ${r.checkInRecorder.lastName}`.trim() : '',
-        r.clockOutTime ? this._fmtTime(r.clockOutTime) : '',
-        r.checkOutSource ?? '',
-        r.checkOutRecorder ? `${r.checkOutRecorder.firstName} ${r.checkOutRecorder.lastName}`.trim() : '',
-        r.status ?? '',
-        r.penalty ?? 0,
-        r.totalWorkHours?.toFixed(2) ?? '',
-        r.totalBreakMinutes ?? 0,
-        r.wifiVerified ? 'Yes' : 'No',
-        r.deviceVerified ? 'Yes' : 'No',
-        r.flagged ? 'Yes' : 'No',
-        r.flagReason ?? '',
-      ]));
+        r.date ? new Date(r.date).toLocaleDateString('en-GB', { weekday: 'short' }) : '',
+        r.employee?.employeeCode || '—',
+        `${r.employee?.firstName || ''} ${r.employee?.lastName || ''}`.trim() || 'Unknown',
+        r.employee?.department?.name || 'Unassigned',
+        r.employee?.office?.name || r.session?.officeName || 'Main',
+        r.employee?.shiftType || 'FULL_TIME',
+        r.clockInTime ? formatTime(r.clockInTime) : '—',
+        r.checkInSource || '—',
+        r.checkInRecorder ? `${r.checkInRecorder.firstName} ${r.checkInRecorder.lastName}`.trim() : 'Self',
+        r.clockOutTime ? formatTime(r.clockOutTime) : '—',
+        r.checkOutSource || '—',
+        r.checkOutRecorder ? `${r.checkOutRecorder.firstName} ${r.checkOutRecorder.lastName}`.trim() : 'Self',
+        r.status || 'ABSENT',
+        r.totalWorkHours != null ? parseFloat(r.totalWorkHours.toFixed(2)) : 0,
+        r.totalBreakMinutes || 0,
+        r.penalty || 0,
+        r.flagged ? 'YES' : 'NO',
+      ]);
+      row.getCell(15).numFmt = '0.00" hrs"';
+      row.getCell(16).numFmt = '#,##0';
+      row.getCell(17).numFmt = '"₦"#,##0.00';
+      formatDataRow(row, idx % 2 === 1, 14);
+    });
 
-    addSection('EMPLOYEES (ALL)',
-      ['Organization', 'Employee Code', 'First Name', 'Last Name', 'Email', 'Department', 'Role', 'Shift Type', 'Employment Status', 'Face Registered', 'Last Login', 'Joined'],
-      data.employees.map((e) => [
-        e.organization?.name ?? '',
-        e.employeeCode ?? '',
-        e.firstName ?? '',
-        e.lastName ?? '',
-        e.email ?? '',
-        e.department?.name ?? '',
-        e.role ?? '',
-        e.shiftType ?? '',
-        e.status ?? '',
-        e.profileImageUrl ? 'Yes' : 'No',
-        e.lastLoginAt ? isoUtcDateTime(e.lastLoginAt) : '',
+    autoFitColumns(attSheet, 12, 36);
+    applySheetSetup(attSheet, { freezeY: 4, landscape: true });
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Tab 3: Breaks & Overstays
+    // ──────────────────────────────────────────────────────────────────────────
+    const breakSheet = workbook.addWorksheet('Breaks');
+    renderHeaderBanner(breakSheet, {
+      title: 'BREAKS & OVERSTAYS LOG',
+      organizationName: targetOrg.name,
+      period: 'Complete Historical Database',
+      generatedAt: nowStr,
+      totalCols: 10,
+    });
+    renderTableHeader(breakSheet, [
+      'Date', 'Employee Code', 'Employee Name', 'Break Type', 'Start Time', 'End Time',
+      'Duration (min)', 'Overstay Penalty (NGN)', 'Auto-Ended', 'Session Name',
+    ]);
+
+    orgBreaks.forEach((b, idx) => {
+      const row = breakSheet.addRow([
+        isoDate(b.attendanceRecord?.date || b.startTime),
+        b.employee?.employeeCode || '—',
+        `${b.employee?.firstName || ''} ${b.employee?.lastName || ''}`.trim() || 'Unknown',
+        b.breakType || 'LUNCH',
+        b.startTime ? formatTime(b.startTime) : '—',
+        b.endTime ? formatTime(b.endTime) : 'ACTIVE',
+        b.durationMinutes || 0,
+        b.penalty || 0,
+        b.isAutoEnded ? 'YES' : 'NO',
+        b.attendanceRecord?.session?.sessionName || 'Standard',
+      ]);
+      row.getCell(7).numFmt = '#,##0';
+      row.getCell(8).numFmt = '"₦"#,##0.00';
+      formatDataRow(row, idx % 2 === 1);
+    });
+
+    autoFitColumns(breakSheet, 13, 36);
+    applySheetSetup(breakSheet, { freezeY: 4, landscape: true });
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Tab 4: Penalties Ledger (Auto + Manual)
+    // ──────────────────────────────────────────────────────────────────────────
+    const penSheet = workbook.addWorksheet('Penalties Ledger');
+    renderHeaderBanner(penSheet, {
+      title: 'CONSOLIDATED DISCIPLINARY & PENALTIES LEDGER',
+      organizationName: targetOrg.name,
+      period: 'Automated Fines & Manual Administrative Penalties',
+      generatedAt: nowStr,
+      totalCols: 8,
+    });
+    renderTableHeader(penSheet, [
+      'Date', 'Employee Code', 'Employee Name', 'Category', 'Amount (NGN)', 'Reason / Violation', 'Recorded By / System',
+    ]);
+
+    const penStart = penSheet.lastRow.number + 1;
+    const orgCombinedPenalties = [];
+
+    // Auto penalties from attendance
+    orgAttendance.filter((r) => (r.penalty || 0) > 0).forEach((r) => {
+      orgCombinedPenalties.push({
+        date: isoDate(r.date),
+        code: r.employee?.employeeCode || '—',
+        name: `${r.employee?.firstName || ''} ${r.employee?.lastName || ''}`.trim(),
+        category: r.status === 'COMPLETELY_LATE' ? 'Completely Late' : (r.status === 'ABSENT' ? 'Absence Fine' : 'Late Arrival'),
+        amount: r.penalty,
+        reason: r.reviewNotes || `Automated fine for ${r.status.toLowerCase().replace('_', ' ')}`,
+        origin: 'Automated Attendance Engine',
+      });
+    });
+
+    // Auto penalties from breaks
+    orgBreaks.filter((b) => (b.penalty || 0) > 0).forEach((b) => {
+      orgCombinedPenalties.push({
+        date: isoDate(b.attendanceRecord?.date || b.startTime),
+        code: b.employee?.employeeCode || '—',
+        name: `${b.employee?.firstName || ''} ${b.employee?.lastName || ''}`.trim(),
+        category: 'Break Overstay',
+        amount: b.penalty,
+        reason: `Overstayed allowed break window by ${b.durationMinutes || 0} minutes`,
+        origin: 'Automated Break Monitor',
+      });
+    });
+
+    // Manual penalties from admin
+    orgManualPenalties.forEach((m) => {
+      orgCombinedPenalties.push({
+        date: isoDate(m.createdAt),
+        code: m.employee?.employeeCode || '—',
+        name: `${m.employee?.firstName || ''} ${m.employee?.lastName || ''}`.trim(),
+        category: 'Manual Penalty',
+        amount: m.amount || 0,
+        reason: m.reason || 'Manual disciplinary deduction',
+        origin: m.createdBy ? `Admin: ${m.createdBy.firstName} ${m.createdBy.lastName}` : 'Administrator',
+      });
+    });
+
+    if (orgCombinedPenalties.length === 0) {
+      const emptyRow = penSheet.addRow(['No disciplinary penalties or deductions recorded for this organization.']);
+      formatDataRow(emptyRow, false);
+    } else {
+      orgCombinedPenalties.forEach((p, idx) => {
+        const row = penSheet.addRow([
+          p.date, p.code, p.name, p.category, p.amount, p.reason, p.origin,
+        ]);
+        row.getCell(5).numFmt = '"₦"#,##0.00';
+        formatDataRow(row, idx % 2 === 1);
+      });
+      const penEnd = penSheet.lastRow.number;
+
+      const subtotalRow = penSheet.addRow([
+        'TOTAL PENALTIES', '', '', '',
+        { formula: `SUM(E${penStart}:E${penEnd})` },
+        '', '',
+      ]);
+      subtotalRow.height = 24;
+      subtotalRow.eachCell({ includeEmpty: true }, (cell) => {
+        cell.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: PALETTE.PRIMARY } };
+        cell.border = { top: { style: 'thin' }, bottom: { style: 'double' } };
+      });
+      subtotalRow.getCell(5).numFmt = '"₦"#,##0.00';
+    }
+
+    autoFitColumns(penSheet, 14, 38);
+    applySheetSetup(penSheet, { freezeY: 4, landscape: true });
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Tab 5: Staff Directory
+    // ──────────────────────────────────────────────────────────────────────────
+    const staffSheet = workbook.addWorksheet('Staff Directory');
+    renderHeaderBanner(staffSheet, {
+      title: 'EMPLOYEE & ADMINISTRATOR DIRECTORY',
+      organizationName: targetOrg.name,
+      period: 'Complete Staff Roster',
+      generatedAt: nowStr,
+      totalCols: 13,
+    });
+    renderTableHeader(staffSheet, [
+      'Employee Code', 'Full Name', 'Email', 'Phone', 'Role', 'Department', 'Office',
+      'Shift Type', 'Check-In Method', 'Face Registered', 'Status', 'Date Joined', 'Last Login',
+    ]);
+
+    orgEmployees.forEach((e, idx) => {
+      const row = staffSheet.addRow([
+        e.employeeCode || '—',
+        `${e.firstName || ''} ${e.lastName || ''}`.trim() || 'Unknown',
+        e.email || '—',
+        e.phone || '—',
+        e.role || 'EMPLOYEE',
+        e.department?.name || 'Unassigned',
+        e.office?.name || 'Main Office',
+        e.shiftType || 'FULL_TIME',
+        e.checkInMethod || 'PHONE',
+        e.profileImageUrl ? 'YES' : 'NO',
+        e.status || 'ACTIVE',
         isoDate(e.createdAt),
-      ]));
+        e.lastLoginAt ? formatDateTime(e.lastLoginAt) : 'Never',
+      ]);
+      formatDataRow(row, idx % 2 === 1, 11);
+    });
 
-    addSection('LEAVE REQUESTS',
-      ['Organization', 'Employee Code', 'Employee Name', 'Leave Type', 'Start Date', 'End Date', 'Total Days', 'Status', 'Reason', 'Submitted', 'Approved By'],
-      data.leaveRequests.map((l) => [
-        l.employee?.organization?.name ?? '',
-        l.employee?.employeeCode ?? '',
-        `${l.employee?.firstName ?? ''} ${l.employee?.lastName ?? ''}`.trim(),
-        l.leaveType ?? '',
+    autoFitColumns(staffSheet, 13, 36);
+    applySheetSetup(staffSheet, { freezeY: 4, landscape: true });
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Tab 6: Leave Management
+    // ──────────────────────────────────────────────────────────────────────────
+    const leaveSheet = workbook.addWorksheet('Leave Management');
+    renderHeaderBanner(leaveSheet, {
+      title: 'LEAVE APPLICATIONS & BALANCES',
+      organizationName: targetOrg.name,
+      period: 'Historical Leave Records',
+      generatedAt: nowStr,
+      totalCols: 10,
+    });
+    renderTableHeader(leaveSheet, [
+      'Employee Code', 'Employee Name', 'Leave Type', 'Start Date', 'End Date', 'Days', 'Status', 'Reason', 'Approved By', 'Submitted At',
+    ]);
+
+    orgLeaves.forEach((l, idx) => {
+      const row = leaveSheet.addRow([
+        l.employee?.employeeCode || '—',
+        `${l.employee?.firstName || ''} ${l.employee?.lastName || ''}`.trim() || 'Unknown',
+        l.leaveType || 'ANNUAL',
         isoDate(l.startDate),
         isoDate(l.endDate),
-        l.totalDays ?? '',
-        l.status ?? '',
-        l.reason ?? '',
+        l.totalDays || 0,
+        l.status || 'PENDING',
+        l.reason || '—',
+        l.approver ? `${l.approver.firstName} ${l.approver.lastName}`.trim() : 'Pending Approval',
         isoDate(l.createdAt),
-        l.approver ? `${l.approver.firstName} ${l.approver.lastName}`.trim() : '',
-      ]));
+      ]);
+      row.getCell(6).numFmt = '#,##0';
+      formatDataRow(row, idx % 2 === 1, 7);
+    });
 
-    addSection('BREAK RECORDS',
-      ['Organization', 'Employee Code', 'Employee Name', 'Break Type', 'Start', 'End', 'Duration (min)', 'Penalty (NGN)', 'Auto-Ended', 'Session', 'Attendance Date'],
-      data.breakRecords.map((b) => [
-        b.employee?.organization?.name ?? '',
-        b.employee?.employeeCode ?? '',
-        `${b.employee?.firstName ?? ''} ${b.employee?.lastName ?? ''}`.trim(),
-        b.breakType ?? '',
-        b.startTime ? this._fmtTime(b.startTime) : '',
-        b.endTime ? this._fmtTime(b.endTime) : 'Active',
-        b.durationMinutes ?? '',
-        b.penalty ?? 0,
-        b.isAutoEnded ? 'Yes' : 'No',
-        b.attendanceRecord?.session?.sessionName ?? '',
-        isoDate(b.attendanceRecord?.date),
-      ]));
+    autoFitColumns(leaveSheet, 13, 36);
+    applySheetSetup(leaveSheet, { freezeY: 4, landscape: true });
 
-    addSection('FRAUD ALERTS',
-      ['Organization', 'Employee Code', 'Employee Name', 'Fraud Type', 'Severity', 'Description', 'Status', 'Session', 'Date', 'Resolved By'],
-      data.fraudAlerts.map((f) => [
-        f.employee?.organization?.name ?? '',
-        f.employee?.employeeCode ?? '',
-        `${f.employee?.firstName ?? ''} ${f.employee?.lastName ?? ''}`.trim(),
-        f.fraudType ?? '',
-        f.severity ?? '',
-        f.description ?? '',
-        f.status ?? '',
-        f.session?.sessionName ?? '',
+    // ──────────────────────────────────────────────────────────────────────────
+    // Tab 7: Fraud & Security
+    // ──────────────────────────────────────────────────────────────────────────
+    const fraudSheet = workbook.addWorksheet('Fraud & Security');
+    renderHeaderBanner(fraudSheet, {
+      title: 'FRAUD ALERTS & SECURITY AUDIT LOGS',
+      organizationName: targetOrg.name,
+      period: 'Security Events Log',
+      generatedAt: nowStr,
+      totalCols: 9,
+    });
+    renderTableHeader(fraudSheet, [
+      'Date', 'Employee Code', 'Employee Name', 'Fraud Type', 'Severity', 'Description', 'Status', 'Session', 'Resolved By',
+    ]);
+
+    orgFraud.forEach((f, idx) => {
+      const row = fraudSheet.addRow([
         isoDate(f.createdAt),
-        f.resolver ? `${f.resolver.firstName} ${f.resolver.lastName}`.trim() : '',
-      ]));
+        f.employee?.employeeCode || '—',
+        `${f.employee?.firstName || ''} ${f.employee?.lastName || ''}`.trim() || 'Unknown',
+        f.fraudType || 'SUSPICIOUS_SCAN',
+        f.severity || 'MEDIUM',
+        f.description || '—',
+        f.status || 'NEW',
+        f.session?.sessionName || '—',
+        f.resolver ? `${f.resolver.firstName} ${f.resolver.lastName}`.trim() : 'Unresolved',
+      ]);
+      formatDataRow(row, idx % 2 === 1, 7);
+    });
 
-    addSection('ATTENDANCE SESSIONS',
-      ['Organization', 'Office', 'Session', 'Status', 'Date', 'Start Time', 'End Time', 'Check-ins', 'Scan Attempts', 'Fraud Alerts'],
-      (data.sessions ?? []).map((s) => [
-        s.office?.organization?.name ?? s.orgName ?? '',
-        s.office?.name ?? s.officeName ?? '',
-        s.sessionName ?? '',
-        s.status ?? '',
+    autoFitColumns(fraudSheet, 13, 36);
+    applySheetSetup(fraudSheet, { freezeY: 4, landscape: true });
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Tab 8: Sessions & Kiosks
+    // ──────────────────────────────────────────────────────────────────────────
+    const sessSheet = workbook.addWorksheet('Sessions & Kiosks');
+    renderHeaderBanner(sessSheet, {
+      title: 'ATTENDANCE SESSIONS & KIOSK STATIONS',
+      organizationName: targetOrg.name,
+      period: 'Station Lifecycle History',
+      generatedAt: nowStr,
+      totalCols: 9,
+    });
+    renderTableHeader(sessSheet, [
+      'Session Name', 'Office', 'Status', 'Date', 'Start Time', 'End Time', 'Total Check-ins', 'Scan Attempts', 'Fraud Alerts',
+    ]);
+
+    orgSessions.forEach((s, idx) => {
+      const row = sessSheet.addRow([
+        s.sessionName || 'Main Station',
+        s.office?.name || s.officeName || 'Main Office',
+        s.status || 'ENDED',
         isoDate(s.startTime),
-        s.startTime ? this._fmtTime(s.startTime) : '',
-        s.endTime ? this._fmtTime(s.endTime) : '',
-        s._count?.attendanceRecords ?? 0,
-        s._count?.scanAttempts ?? 0,
-        s._count?.fraudAlerts ?? 0,
-      ]));
+        s.startTime ? formatTime(s.startTime) : '—',
+        s.endTime ? formatTime(s.endTime) : '—',
+        s._count?.attendanceRecords || 0,
+        s._count?.scanAttempts || 0,
+        s._count?.fraudAlerts || 0,
+      ]);
+      formatDataRow(row, idx % 2 === 1, 3);
+    });
 
-    addSection('SCAN ATTEMPTS',
-      ['Organization', 'Employee Code', 'Employee Name', 'Session', 'Timestamp', 'Scan Result', 'Device ID', 'WiFi SSID', 'IP Address'],
-      data.scanAttempts.map((s) => [
-        s.employee?.organization?.name ?? '',
-        s.employee?.employeeCode ?? '',
-        `${s.employee?.firstName ?? ''} ${s.employee?.lastName ?? ''}`.trim(),
-        s.session?.sessionName ?? '',
-        isoUtcDateTime(s.timestamp),
-        s.result ?? '',
-        s.deviceId ?? '',
-        s.wifiSSID ?? '',
-        s.ipAddress ?? '',
-      ]));
+    autoFitColumns(sessSheet, 13, 36);
+    applySheetSetup(sessSheet, { freezeY: 4, landscape: true });
 
-    addSection('STUDENTS',
-      ['Organization', 'Student Code', 'First Name', 'Last Name', 'Class', 'Status', 'Created'],
-      data.studentRecords.map((s) => [
-        s.organization?.name ?? '',
-        s.studentCode ?? '',
-        s.firstName ?? '',
-        s.lastName ?? '',
-        s.className ?? '',
-        s.status ?? '',
-        isoDate(s.createdAt),
-      ]));
+    // Optional Tab 9: Students
+    if (orgStudents.length > 0 || targetOrg.hasStudents) {
+      const studentSheet = workbook.addWorksheet('Student Attendance');
+      renderHeaderBanner(studentSheet, {
+        title: 'STUDENT ATTENDANCE & ACADEMIC LOG',
+        organizationName: targetOrg.name,
+        period: 'Academic Session History',
+        generatedAt: nowStr,
+        totalCols: 8,
+      });
+      renderTableHeader(studentSheet, [
+        'Student Code', 'First Name', 'Last Name', 'Class', 'Date', 'Check In', 'Check Out', 'Recorded By',
+      ]);
 
-    addSection('STUDENT ATTENDANCE',
-      ['Organization', 'Student Code', 'Student Name', 'Date', 'Check In', 'Check Out', 'Checked In By', 'Checked Out By'],
-      data.studentAttendance.map((s) => [
-        s.student?.organization?.name ?? '',
-        s.student?.studentCode ?? '',
-        `${s.student?.firstName ?? ''} ${s.student?.lastName ?? ''}`.trim(),
-        isoDate(s.date),
-        s.checkInTime ? this._fmtTime(s.checkInTime) : '',
-        s.checkOutTime ? this._fmtTime(s.checkOutTime) : '',
-        s.checkedInBy ? `${s.checkedInBy.firstName} ${s.checkedInBy.lastName}`.trim() : '',
-        s.checkedOutBy ? `${s.checkedOutBy.firstName} ${s.checkedOutBy.lastName}`.trim() : '',
-      ]));
+      orgStudentAttendance.forEach((sa, idx) => {
+        const row = studentSheet.addRow([
+          sa.student?.studentCode || '—',
+          sa.student?.firstName || '—',
+          sa.student?.lastName || '—',
+          sa.student?.className || '—',
+          isoDate(sa.date),
+          sa.checkInTime ? formatTime(sa.checkInTime) : '—',
+          sa.checkOutTime ? formatTime(sa.checkOutTime) : '—',
+          sa.checkedInBy ? `${sa.checkedInBy.firstName} ${sa.checkedInBy.lastName}`.trim() : 'Admin',
+        ]);
+        formatDataRow(row, idx % 2 === 1);
+      });
 
-    addSection('ADMIN LOGIN EVENTS',
-      ['Organization', 'Admin Name', 'Email', 'Attendance Status', 'Minutes Late', 'Penalty', 'Logged In At', 'IP Address'],
-      data.adminLoginEvents.map((e) => [
-        e.organization?.name ?? '',
-        e.admin ? `${e.admin.firstName} ${e.admin.lastName}`.trim() : '',
-        e.admin?.email ?? '',
-        e.attendanceStatus ?? '',
-        e.minutesLate ?? 0,
-        e.penalty ?? 0,
-        isoUtcDateTime(e.loggedInAt),
-        e.ipAddress ?? '',
-      ]));
+      autoFitColumns(studentSheet, 13, 36);
+      applySheetSetup(studentSheet, { freezeY: 4, landscape: true });
+    }
+  }
 
-    addSection('SCREENSHOT LOGS',
-      ['Organization', 'Employee Code', 'Employee Name', 'Platform', 'Device ID', 'Timestamp', 'Session ID'],
-      data.screenshotLogs.map((s) => [
-        employeeById.get(s.employeeId)?.organization?.name ?? '',
-        employeeById.get(s.employeeId)?.employeeCode ?? '',
-        `${employeeById.get(s.employeeId)?.firstName ?? ''} ${employeeById.get(s.employeeId)?.lastName ?? ''}`.trim(),
-        s.platform ?? '',
-        s.deviceId ?? '',
-        isoUtcDateTime(s.timestamp),
-        s.sessionId ?? '',
-      ]));
+  /**
+   * Generates complete CSV report with zero missing fields
+   * Super Admin: Separated by organization blocks
+   * Org Admin: Scoped to the organization
+   */
+  async exportFullToCSV(orgId) {
+    const data = await this.buildFullExport(orgId);
+    const isSuperAdmin = !orgId || orgId === 'platform-org';
+    const lines = [];
 
-    addSection('SECURITY SETTINGS',
-      ['Organization', 'Office', 'WiFi Required', 'Device Binding', 'Screenshot Protection', 'Late Threshold (min)', 'Max Failed Attempts', 'Updated By', 'Updated At'],
-      data.securitySettings.map((s) => [
-        s.office?.organization?.name ?? '',
-        s.office?.name ?? '',
-        s.wifiRequired ? 'Yes' : 'No',
-        s.deviceBindingEnabled ? 'Yes' : 'No',
-        s.screenshotProtection ? 'Yes' : 'No',
-        s.lateThresholdMinutes ?? 0,
-        s.maxFailedAttempts ?? 0,
-        s.updater ? `${s.updater.firstName} ${s.updater.lastName}`.trim() : '',
-        isoUtcDateTime(s.updatedAt),
-      ]));
+    const addSection = (title, headers, rows) => {
+      lines.push(title);
+      lines.push(headers.map(csvEscape).join(','));
+      rows.forEach((r) => lines.push(r.map(csvEscape).join(',')));
+      lines.push('');
+    };
 
-    addSection('EMERGENCY CONTROLS',
-      ['Organization', 'Triggered By', 'Action', 'Reason', 'Triggered At', 'Is Reverted', 'Reverted At', 'Sessions'],
-      data.emergencyControls.map((e) => [
-        e.admin?.organization?.name ?? '',
-        e.admin ? `${e.admin.firstName} ${e.admin.lastName}`.trim() : '',
-        e.action ?? '',
-        e.reason ?? '',
-        isoUtcDateTime(e.timestamp),
-        e.isReverted ? 'Yes' : 'No',
-        isoUtcDateTime(e.revertedAt),
-        e.sessions?.map((s) => s.session?.sessionName ?? '').filter(Boolean).join('; ') ?? '',
-      ]));
+    if (isSuperAdmin) {
+      lines.push('================================================================================');
+      lines.push('TIMELOGIC ENTERPRISE ATTENDANCE SYSTEM — GLOBAL AUDIT REPORT (CSV)');
+      lines.push(`Generated: ${formatDateTime(new Date())}`);
+      lines.push(`Total Organizations: ${data.organizations.length}`);
+      lines.push('================================================================================\n');
 
-    addSection('REPORT HISTORY',
-      ['Type', 'Generated By', 'Generated At', 'Range Start', 'Range End', 'Present', 'Late', 'Absent', 'On Leave', 'Flagged', 'Average Work Hours', 'Average Break (min)'],
-      data.attendanceReports.map((r) => [
-        r.reportType ?? '',
-        r.generator ? `${r.generator.firstName} ${r.generator.lastName}`.trim() : '',
-        isoUtcDateTime(r.generatedAt),
-        isoDate(r.dateRangeStart),
-        isoDate(r.dateRangeEnd),
-        r.totalPresent ?? 0,
-        r.totalLate ?? 0,
-        r.totalAbsent ?? 0,
-        r.totalOnLeave ?? 0,
-        r.totalFlagged ?? 0,
-        r.averageWorkHours ?? '',
-        r.averageBreakMinutes ?? '',
-      ]));
+      // Master Cross-Org Summary
+      addSection('MASTER ORGANIZATIONS SUMMARY',
+        ['Organization Name', 'Industry', 'Timezone', 'Offices', 'Staff Count', 'Admins Count', 'Total Records', 'Total Hours', 'Break (min)', 'Auto Penalty (NGN)', 'Manual Penalty (NGN)', 'Total Penalties (NGN)', 'Open Alerts'],
+        data.organizations.map((org) => {
+          const orgStaff = data.employees.filter((e) => e.orgId === org.id && e.role === 'EMPLOYEE').length;
+          const orgAdmins = data.employees.filter((e) => e.orgId === org.id && e.role === 'ADMIN').length;
+          const orgAtt = data.attendanceRecords.filter((a) => a.employee?.orgId === org.id);
+          const orgBreaks = data.breakRecords.filter((b) => b.employee?.orgId === org.id);
+          const orgManuals = data.manualPenalties.filter((m) => m.orgId === org.id || m.employee?.orgId === org.id);
+          const orgAlerts = data.fraudAlerts.filter((f) => f.employee?.orgId === org.id && (f.status === 'NEW' || f.status === 'INVESTIGATING')).length;
 
-    addSection('NOTIFICATIONS',
-      ['User ID', 'Channel', 'Subject', 'Status', 'Sent At', 'Body'],
-      data.notificationLogs.map((n) => [
-        n.userId ?? '',
-        n.channel ?? '',
-        n.subject ?? '',
-        n.status ?? '',
-        isoUtcDateTime(n.sentAt),
-        n.body ?? '',
-      ]));
+          const hours = orgAtt.reduce((s, r) => s + (r.totalWorkHours || 0), 0);
+          const breakMins = orgAtt.reduce((s, r) => s + (r.totalBreakMinutes || 0), 0);
+          const autoPen = orgAtt.reduce((s, r) => s + (r.penalty || 0), 0) + orgBreaks.reduce((s, b) => s + (b.penalty || 0), 0);
+          const manPen = orgManuals.reduce((s, m) => s + (m.amount || 0), 0);
 
-    return sections.join('\n');
+          return [
+            org.name, org.industry || 'General', org.timezone || 'Africa/Lagos', org.offices?.length || 1,
+            orgStaff, orgAdmins, orgAtt.length, hours.toFixed(2), breakMins, autoPen, manPen, autoPen + manPen, orgAlerts,
+          ];
+        })
+      );
+
+      // Section per organization
+      for (const org of data.organizations) {
+        lines.push('================================================================================');
+        lines.push(`ORGANIZATION: ${org.name.toUpperCase()} (ID: ${org.id})`);
+        lines.push('================================================================================\n');
+
+        const orgAttendance = data.attendanceRecords.filter((a) => a.employee?.orgId === org.id);
+        const orgBreaks = data.breakRecords.filter((b) => b.employee?.orgId === org.id);
+        const orgManuals = data.manualPenalties.filter((m) => m.orgId === org.id || m.employee?.orgId === org.id);
+        const orgLeaves = data.leaveRequests.filter((l) => l.employee?.orgId === org.id);
+        const orgEmployees = data.employees.filter((e) => e.orgId === org.id);
+        const orgFraud = data.fraudAlerts.filter((f) => f.employee?.orgId === org.id);
+
+        addSection(`--- ATTENDANCE RECORDS: ${org.name} ---`,
+          ['Date', 'Day', 'Employee Code', 'Employee Name', 'Department', 'Office', 'Shift', 'Clock In', 'In Source', 'Clock Out', 'Out Source', 'Status', 'Work Hours', 'Break (min)', 'Penalty (NGN)', 'Flagged'],
+          orgAttendance.map((r) => [
+            isoDate(r.date),
+            r.date ? new Date(r.date).toLocaleDateString('en-GB', { weekday: 'short' }) : '',
+            r.employee?.employeeCode || '',
+            `${r.employee?.firstName || ''} ${r.employee?.lastName || ''}`.trim(),
+            r.employee?.department?.name || '',
+            r.employee?.office?.name || '',
+            r.employee?.shiftType || '',
+            r.clockInTime ? formatTime(r.clockInTime) : '',
+            r.checkInSource || '',
+            r.clockOutTime ? formatTime(r.clockOutTime) : '',
+            r.checkOutSource || '',
+            r.status || '',
+            r.totalWorkHours != null ? r.totalWorkHours.toFixed(2) : '0.00',
+            r.totalBreakMinutes || 0,
+            r.penalty || 0,
+            r.flagged ? 'YES' : 'NO',
+          ])
+        );
+
+        addSection(`--- BREAK RECORDS: ${org.name} ---`,
+          ['Date', 'Employee Code', 'Employee Name', 'Break Type', 'Start Time', 'End Time', 'Duration (min)', 'Overstay Penalty (NGN)', 'Auto-Ended'],
+          orgBreaks.map((b) => [
+            isoDate(b.attendanceRecord?.date || b.startTime),
+            b.employee?.employeeCode || '',
+            `${b.employee?.firstName || ''} ${b.employee?.lastName || ''}`.trim(),
+            b.breakType || '',
+            b.startTime ? formatTime(b.startTime) : '',
+            b.endTime ? formatTime(b.endTime) : 'ACTIVE',
+            b.durationMinutes || 0,
+            b.penalty || 0,
+            b.isAutoEnded ? 'YES' : 'NO',
+          ])
+        );
+
+        addSection(`--- PENALTIES & DEDUCTIONS (AUTO + MANUAL): ${org.name} ---`,
+          ['Date', 'Employee Code', 'Employee Name', 'Category', 'Amount (NGN)', 'Reason', 'Origin / Author'],
+          [
+            ...orgAttendance.filter((r) => (r.penalty || 0) > 0).map((r) => [
+              isoDate(r.date), r.employee?.employeeCode || '', `${r.employee?.firstName || ''} ${r.employee?.lastName || ''}`.trim(),
+              r.status, r.penalty, r.reviewNotes || 'Late / Absence Fine', 'Automated Attendance Engine',
+            ]),
+            ...orgBreaks.filter((b) => (b.penalty || 0) > 0).map((b) => [
+              isoDate(b.attendanceRecord?.date || b.startTime), b.employee?.employeeCode || '', `${b.employee?.firstName || ''} ${b.employee?.lastName || ''}`.trim(),
+              'Break Overstay', b.penalty, 'Overstayed allowed window', 'Automated Break Engine',
+            ]),
+            ...orgManuals.map((m) => [
+              isoDate(m.createdAt), m.employee?.employeeCode || '', `${m.employee?.firstName || ''} ${m.employee?.lastName || ''}`.trim(),
+              'Manual Penalty', m.amount || 0, m.reason || 'Admin disciplinary fine', m.createdBy ? `${m.createdBy.firstName} ${m.createdBy.lastName}` : 'Admin',
+            ]),
+          ]
+        );
+
+        addSection(`--- EMPLOYEES & STAFF: ${org.name} ---`,
+          ['Employee Code', 'Full Name', 'Email', 'Phone', 'Role', 'Department', 'Office', 'Shift Type', 'Check-In Method', 'Face Registered', 'Status', 'Joined Date'],
+          orgEmployees.map((e) => [
+            e.employeeCode || '', `${e.firstName || ''} ${e.lastName || ''}`.trim(), e.email || '', e.phone || '',
+            e.role || '', e.department?.name || '', e.office?.name || '', e.shiftType || '', e.checkInMethod || '',
+            e.profileImageUrl ? 'YES' : 'NO', e.status || '', isoDate(e.createdAt),
+          ])
+        );
+
+        addSection(`--- LEAVE REQUESTS: ${org.name} ---`,
+          ['Employee Code', 'Employee Name', 'Leave Type', 'Start Date', 'End Date', 'Days', 'Status', 'Reason', 'Approved By'],
+          orgLeaves.map((l) => [
+            l.employee?.employeeCode || '', `${l.employee?.firstName || ''} ${l.employee?.lastName || ''}`.trim(),
+            l.leaveType || '', isoDate(l.startDate), isoDate(l.endDate), l.totalDays || 0, l.status || '', l.reason || '',
+            l.approver ? `${l.approver.firstName} ${l.approver.lastName}`.trim() : 'Pending',
+          ])
+        );
+
+        addSection(`--- FRAUD ALERTS: ${org.name} ---`,
+          ['Date', 'Employee Code', 'Employee Name', 'Fraud Type', 'Severity', 'Description', 'Status', 'Resolved By'],
+          orgFraud.map((f) => [
+            isoDate(f.createdAt), f.employee?.employeeCode || '', `${f.employee?.firstName || ''} ${f.employee?.lastName || ''}`.trim(),
+            f.fraudType || '', f.severity || '', f.description || '', f.status || '',
+            f.resolver ? `${f.resolver.firstName} ${f.resolver.lastName}`.trim() : 'Unresolved',
+          ])
+        );
+      }
+    } else {
+      // Organization-scoped CSV export
+      const org = data.organizations[0] || { name: 'Organization' };
+
+      lines.push('================================================================================');
+      lines.push(`TIMELOGIC REPORT: ${org.name.toUpperCase()}`);
+      lines.push(`Generated: ${formatDateTime(new Date())}`);
+      lines.push('================================================================================\n');
+
+      addSection('ATTENDANCE RECORDS',
+        ['Date', 'Day', 'Employee Code', 'Employee Name', 'Department', 'Office', 'Shift', 'Clock In', 'In Source', 'Clock Out', 'Out Source', 'Status', 'Work Hours', 'Break (min)', 'Penalty (NGN)', 'Flagged'],
+        data.attendanceRecords.map((r) => [
+          isoDate(r.date),
+          r.date ? new Date(r.date).toLocaleDateString('en-GB', { weekday: 'short' }) : '',
+          r.employee?.employeeCode || '',
+          `${r.employee?.firstName || ''} ${r.employee?.lastName || ''}`.trim(),
+          r.employee?.department?.name || '',
+          r.employee?.office?.name || '',
+          r.employee?.shiftType || '',
+          r.clockInTime ? formatTime(r.clockInTime) : '',
+          r.checkInSource || '',
+          r.clockOutTime ? formatTime(r.clockOutTime) : '',
+          r.checkOutSource || '',
+          r.status || '',
+          r.totalWorkHours != null ? r.totalWorkHours.toFixed(2) : '0.00',
+          r.totalBreakMinutes || 0,
+          r.penalty || 0,
+          r.flagged ? 'YES' : 'NO',
+        ])
+      );
+
+      addSection('BREAK RECORDS',
+        ['Date', 'Employee Code', 'Employee Name', 'Break Type', 'Start Time', 'End Time', 'Duration (min)', 'Overstay Penalty (NGN)', 'Auto-Ended'],
+        data.breakRecords.map((b) => [
+          isoDate(b.attendanceRecord?.date || b.startTime),
+          b.employee?.employeeCode || '',
+          `${b.employee?.firstName || ''} ${b.employee?.lastName || ''}`.trim(),
+          b.breakType || '',
+          b.startTime ? formatTime(b.startTime) : '',
+          b.endTime ? formatTime(b.endTime) : 'ACTIVE',
+          b.durationMinutes || 0,
+          b.penalty || 0,
+          b.isAutoEnded ? 'YES' : 'NO',
+        ])
+      );
+
+      addSection('PENALTIES & DEDUCTIONS (AUTO + MANUAL)',
+        ['Date', 'Employee Code', 'Employee Name', 'Category', 'Amount (NGN)', 'Reason', 'Origin / Author'],
+        [
+          ...data.attendanceRecords.filter((r) => (r.penalty || 0) > 0).map((r) => [
+            isoDate(r.date), r.employee?.employeeCode || '', `${r.employee?.firstName || ''} ${r.employee?.lastName || ''}`.trim(),
+            r.status, r.penalty, r.reviewNotes || 'Late / Absence Fine', 'Automated Attendance Engine',
+          ]),
+          ...data.breakRecords.filter((b) => (b.penalty || 0) > 0).map((b) => [
+            isoDate(b.attendanceRecord?.date || b.startTime), b.employee?.employeeCode || '', `${b.employee?.firstName || ''} ${b.employee?.lastName || ''}`.trim(),
+            'Break Overstay', b.penalty, 'Overstayed allowed window', 'Automated Break Engine',
+          ]),
+          ...data.manualPenalties.map((m) => [
+            isoDate(m.createdAt), m.employee?.employeeCode || '', `${m.employee?.firstName || ''} ${m.employee?.lastName || ''}`.trim(),
+            'Manual Penalty', m.amount || 0, m.reason || 'Admin disciplinary fine', m.createdBy ? `${m.createdBy.firstName} ${m.createdBy.lastName}` : 'Admin',
+          ]),
+        ]
+      );
+
+      addSection('EMPLOYEES & STAFF',
+        ['Employee Code', 'Full Name', 'Email', 'Phone', 'Role', 'Department', 'Office', 'Shift Type', 'Check-In Method', 'Face Registered', 'Status', 'Joined Date'],
+        data.employees.map((e) => [
+          e.employeeCode || '', `${e.firstName || ''} ${e.lastName || ''}`.trim(), e.email || '', e.phone || '',
+          e.role || '', e.department?.name || '', e.office?.name || '', e.shiftType || '', e.checkInMethod || '',
+          e.profileImageUrl ? 'YES' : 'NO', e.status || '', isoDate(e.createdAt),
+        ])
+      );
+
+      addSection('LEAVE REQUESTS',
+        ['Employee Code', 'Employee Name', 'Leave Type', 'Start Date', 'End Date', 'Days', 'Status', 'Reason', 'Approved By'],
+        data.leaveRequests.map((l) => [
+          l.employee?.employeeCode || '', `${l.employee?.firstName || ''} ${l.employee?.lastName || ''}`.trim(),
+          l.leaveType || '', isoDate(l.startDate), isoDate(l.endDate), l.totalDays || 0, l.status || '', l.reason || '',
+          l.approver ? `${l.approver.firstName} ${l.approver.lastName}`.trim() : 'Pending',
+        ])
+      );
+
+      addSection('FRAUD ALERTS & SECURITY',
+        ['Date', 'Employee Code', 'Employee Name', 'Fraud Type', 'Severity', 'Description', 'Status', 'Resolved By'],
+        data.fraudAlerts.map((f) => [
+          isoDate(f.createdAt), f.employee?.employeeCode || '', `${f.employee?.firstName || ''} ${f.employee?.lastName || ''}`.trim(),
+          f.fraudType || '', f.severity || '', f.description || '', f.status || '',
+          f.resolver ? `${f.resolver.firstName} ${f.resolver.lastName}`.trim() : 'Unresolved',
+        ])
+      );
+    }
+
+    return lines.join('\n');
   }
 
   exportToCSV(records) {
@@ -696,9 +1512,9 @@ class ReportService {
       date: r.date?.toISOString().split('T')[0],
       employee: `${r.employee?.firstName ?? r.employeeId} ${r.employee?.lastName ?? ''}`.trim(),
       status: r.status,
-      clockIn: r.clockInTime ? this._fmtTime(r.clockInTime) : '',
+      clockIn: r.clockInTime ? formatTime(r.clockInTime) : '',
       checkInSource: r.checkInSource ?? '',
-      clockOut: r.clockOutTime ? this._fmtTime(r.clockOutTime) : '',
+      clockOut: r.clockOutTime ? formatTime(r.clockOutTime) : '',
       checkOutSource: r.checkOutSource ?? '',
       workHours: r.totalWorkHours?.toFixed(2) ?? '',
       breakMinutes: r.totalBreakMinutes ?? 0,
@@ -711,19 +1527,14 @@ class ReportService {
     return [headers, ...lines].join('\n');
   }
 
-  _fmtTime(d) {
-    if (!d) return '';
-    return new Date(d).toLocaleString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-  }
-
   async _buildExcelFromAttendance(records) {
     const rows = records.map((r) => ({
       Date: r.date?.toISOString().split('T')[0],
       Employee: `${r.employee?.firstName ?? r.employeeId} ${r.employee?.lastName ?? ''}`.trim(),
       Status: r.status,
-      'Clock In': r.clockInTime ? this._fmtTime(r.clockInTime) : '',
+      'Clock In': r.clockInTime ? formatTime(r.clockInTime) : '',
       'Check-In Source': r.checkInSource ?? '',
-      'Clock Out': r.clockOutTime ? this._fmtTime(r.clockOutTime) : '',
+      'Clock Out': r.clockOutTime ? formatTime(r.clockOutTime) : '',
       'Check-Out Source': r.checkOutSource ?? '',
       'Work Hours': r.totalWorkHours?.toFixed(2) ?? '',
       'Break (min)': r.totalBreakMinutes ?? 0,
@@ -731,19 +1542,11 @@ class ReportService {
       Flagged: r.flagged ? 'Yes' : 'No',
     }));
     const workbook = new ExcelJS.Workbook();
-    this._appendWorksheet(workbook, 'Attendance', rows, 'No attendance records');
+    const ws = workbook.addWorksheet('Attendance');
+    renderTableHeader(ws, Object.keys(rows[0] || {}));
+    rows.forEach((r, idx) => formatDataRow(ws.addRow(Object.values(r)), idx % 2 === 1));
+    autoFitColumns(ws);
     return this._writeExcelBuffer(workbook);
-  }
-
-  _appendWorksheet(workbook, name, rows, emptyMessage) {
-    const worksheet = workbook.addWorksheet(name);
-    const exportRows = rows.length ? rows : [{ Note: emptyMessage }];
-    const headers = Object.keys(exportRows[0]);
-
-    worksheet.addRow(headers);
-    for (const row of exportRows) {
-      worksheet.addRow(headers.map((header) => row[header]));
-    }
   }
 
   async _writeExcelBuffer(workbook) {
