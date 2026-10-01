@@ -763,7 +763,11 @@ const redeemCode = async (req, res, next) => {
     });
 
     if (!result.success) {
-      return res.status(400).json(result);
+      return res.status(400).json({
+        success: false,
+        message: result.error || 'Invalid or expired activation code.',
+        error: result.error,
+      });
     }
 
     await AuditService.log({
@@ -774,7 +778,12 @@ const redeemCode = async (req, res, next) => {
       details: { code: String(code).trim().slice(-4), newExpiresAt: result.subscriptionExpiresAt },
     });
 
-    res.json(result);
+    res.json({
+      success: true,
+      message: result.message,
+      data: result,
+      ...result,
+    });
   } catch (err) { next(err); }
 };
 

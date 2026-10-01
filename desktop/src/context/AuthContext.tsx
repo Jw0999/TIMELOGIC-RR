@@ -88,10 +88,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshSubscription = async () => {
     try {
-      const res = await api.get<{ success: boolean; data: any }>('/admin/subscription-status');
-      if (res?.data) {
-        const sub = res.data;
-        setIsSubscriptionExpired(!!sub.isExpired);
+      const res = await api.get<any>('/admin/subscription-status');
+      const sub = res?.data || res;
+      if (sub && typeof sub.isExpired === 'boolean') {
+        setIsSubscriptionExpired(sub.isExpired);
         setUser((prev) => {
           if (!prev) return null;
           return {

@@ -119,7 +119,7 @@ async function request<T>(method: Method, path: string, body?: unknown, allowRef
     throw new Error(data?.message || 'Organization subscription has expired. Please enter activation code to continue.');
   }
 
-  if (!res.ok) throw new Error(data?.message ?? `Request failed (${res.status})`);
+  if (!res.ok) throw new Error(data?.message ?? data?.error ?? `Request failed (${res.status})`);
   return data as T;
 }
 

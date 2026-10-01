@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Lock, KeyRound, MessageCircle, AlertTriangle, CheckCircle2, LogOut, ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { redeemActivationCode } from '../services';
@@ -11,6 +11,14 @@ export default function SubscriptionLockModal() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Always reset modal form state when switching orgs or re-entering locked state
+  useEffect(() => {
+    setCode('');
+    setError('');
+    setSuccess('');
+    setLoading(false);
+  }, [organization?.id, isSubscriptionExpired]);
 
   if (!isSubscriptionExpired) {
     return null;
@@ -39,9 +47,11 @@ export default function SubscriptionLockModal() {
     try {
       const res = await redeemActivationCode(code);
       setSuccess(res?.message || 'Subscription successfully activated! Unlocking TimeLogic...');
+      // Refresh context subscription state immediately
+      await refreshSubscription();
       setTimeout(async () => {
         await refreshSubscription();
-      }, 1200);
+      }, 600);
     } catch (err: any) {
       setError(err?.message || 'Invalid or expired activation code. Please check and try again.');
     } finally {
