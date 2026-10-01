@@ -109,7 +109,7 @@ const createOrg = async (req, res, next) => {
           industry: industry || 'General',
           subscriptionTier: 'enterprise',
           subscriptionStatus: 'EXPIRED',
-          subscriptionStart: null,
+          subscriptionStart: new Date(),
           subscriptionExpiresAt: new Date(Date.now() - 1000),
           lastActivatedAt: null,
           allowDeviceCheckIn: Boolean(allowDeviceCheckIn),
