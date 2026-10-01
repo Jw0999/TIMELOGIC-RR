@@ -7,13 +7,6 @@ import { Button } from "@/components/ui/Button";
 import {
   MessageSquare,
   CheckCircle2,
-  Cpu,
-  Clock,
-  ShieldCheck,
-  FileSpreadsheet,
-  Users,
-  AlertTriangle,
-  ArrowRight,
 } from "lucide-react";
 
 export default function SolutionPage() {
@@ -141,40 +134,40 @@ export default function SolutionPage() {
   ];
 
   return (
-    <div className="min-h-screen w-full bg-[#070d1e] text-white flex flex-col justify-between">
+    <div className="min-h-screen w-full theme-page-bg transition-colors flex flex-col justify-between">
       {/* Header */}
       <Header />
 
       {/* ── SECTION 1: HERO HEADER ── */}
-      <section className="pt-16 sm:pt-20 pb-16 bg-[#070d1e] border-b border-white/[0.08] bg-grid-pattern">
+      <section className="pt-16 sm:pt-20 pb-16 theme-page-bg border-b border-theme bg-grid-pattern transition-colors">
         <div className="max-w-4xl mx-auto px-6 sm:px-8 text-center space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-blue-950/60 border border-blue-500/20 text-xs font-mono font-medium text-sky-300">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-500/20 text-xs font-mono font-medium text-blue-700 dark:text-sky-300">
             System Architecture
           </div>
 
-          <h1 className="text-3xl sm:text-5xl font-bold text-white tracking-tight leading-tight">
+          <h1 className="text-3xl sm:text-5xl font-bold theme-text-primary tracking-tight leading-tight">
             How TimeLogic Solves Workplace Attendance Fraud
           </h1>
 
-          <p className="text-slate-300 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
+          <p className="theme-text-secondary text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
             A comprehensive architectural breakdown of our hardware-bound kiosk terminals, facial biometric locks, live executive command center, automated fraud engine, and instant payroll analytics.
           </p>
         </div>
       </section>
 
       {/* ── SECTION 2: TECHNICAL PARAMETERS STRIP ── */}
-      <section className="py-8 bg-[#091124] border-b border-white/[0.08]">
+      <section className="py-8 theme-section-bg border-b border-theme transition-colors">
         <div className="max-w-7xl mx-auto px-6 sm:px-8">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
             {technicalSpecs.map((spec) => (
-              <div key={spec.label} className="p-4 rounded-lg bg-[#0b142c] border border-white/[0.08]">
-                <div className="text-xl sm:text-2xl font-mono font-bold text-white">
+              <div key={spec.label} className="p-4 rounded-lg theme-card-bg border border-theme shadow-xs">
+                <div className="text-xl sm:text-2xl font-mono font-bold theme-text-primary">
                   {spec.value}
                 </div>
-                <div className="text-xs font-semibold text-sky-400 mt-1">
+                <div className="text-xs font-semibold text-blue-600 dark:text-sky-400 mt-1">
                   {spec.label}
                 </div>
-                <div className="text-[11px] text-slate-400 mt-0.5">
+                <div className="text-[11px] theme-text-muted mt-0.5">
                   {spec.note}
                 </div>
               </div>
@@ -184,35 +177,35 @@ export default function SolutionPage() {
       </section>
 
       {/* ── SECTION 3: ARCHITECTURAL PROTOCOLS ── */}
-      <section className="py-20 sm:py-24 bg-[#070d1e] border-b border-white/[0.08]">
+      <section className="py-20 sm:py-24 theme-page-bg border-b border-theme transition-colors">
         <div className="max-w-6xl mx-auto px-6 sm:px-8 space-y-24">
-          {architectures.map((arch, idx) => (
+          {architectures.map((arch) => (
             <div
               key={arch.id}
               className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-start"
             >
               <div className="lg:col-span-5 space-y-5">
-                <div className="flex items-center gap-2 text-xs font-mono font-bold text-sky-400">
+                <div className="flex items-center gap-2 text-xs font-mono font-bold text-blue-600 dark:text-sky-400">
                   <span>{arch.number}</span>
                   <span>•</span>
                   <span>{arch.category}</span>
                 </div>
 
-                <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+                <h2 className="text-2xl sm:text-3xl font-bold theme-text-primary tracking-tight">
                   {arch.title}
                 </h2>
 
-                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                <p className="text-xs sm:text-sm theme-text-secondary leading-relaxed">
                   {arch.lead}
                 </p>
 
                 <div className="pt-2 space-y-2.5">
-                  <div className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                  <div className="text-xs font-bold theme-text-primary uppercase tracking-wider">
                     Key Architectural Guarantees:
                   </div>
                   {arch.points.map((pt, pIdx) => (
-                    <div key={pIdx} className="flex items-start gap-2.5 text-xs text-slate-300">
-                      <CheckCircle2 size={14} className="text-sky-400 flex-shrink-0 mt-0.5" />
+                    <div key={pIdx} className="flex items-start gap-2.5 text-xs theme-text-secondary">
+                      <CheckCircle2 size={14} className="text-blue-600 dark:text-sky-400 flex-shrink-0 mt-0.5" />
                       <span>{pt}</span>
                     </div>
                   ))}
@@ -220,10 +213,10 @@ export default function SolutionPage() {
               </div>
 
               <div className="lg:col-span-7 space-y-3">
-                <div className="rounded-xl border border-white/[0.12] bg-[#0b142c] shadow-xl overflow-hidden">
-                  <div className="h-8 px-4 bg-[#080d1e] border-b border-white/[0.08] flex items-center justify-between text-xs text-slate-400">
+                <div className="rounded-xl border border-theme theme-card-bg shadow-xl overflow-hidden">
+                  <div className="h-8 px-4 bg-slate-100 dark:bg-[#080d1e] border-b border-theme flex items-center justify-between text-xs theme-text-secondary">
                     <span className="font-mono text-[11px]">timelogic.app / {arch.id}</span>
-                    <span className="text-[11px] text-emerald-400 font-mono font-medium">Verified Capture</span>
+                    <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono font-medium">Verified Capture</span>
                   </div>
                   <img
                     src={arch.image}
@@ -232,7 +225,7 @@ export default function SolutionPage() {
                   />
                 </div>
                 {arch.secondaryImage && (
-                  <div className="rounded-xl border border-white/[0.1] bg-[#0b142c] overflow-hidden shadow-md">
+                  <div className="rounded-xl border border-theme theme-card-bg overflow-hidden shadow-md">
                     <img
                       src={arch.secondaryImage}
                       alt={`${arch.caption} supplementary view`}
@@ -240,7 +233,7 @@ export default function SolutionPage() {
                     />
                   </div>
                 )}
-                <div className="text-[11px] text-slate-400 italic">
+                <div className="text-[11px] theme-text-muted italic">
                   {arch.caption}
                 </div>
               </div>
@@ -250,12 +243,12 @@ export default function SolutionPage() {
       </section>
 
       {/* ── SECTION 4: BOTTOM CTA ── */}
-      <section className="py-20 sm:py-24 bg-[#091124]">
+      <section className="py-20 sm:py-24 theme-section-bg transition-colors">
         <div className="max-w-4xl mx-auto px-6 sm:px-8 text-center space-y-6">
-          <h2 className="text-2xl sm:text-4xl font-bold text-white tracking-tight">
+          <h2 className="text-2xl sm:text-4xl font-bold theme-text-primary tracking-tight">
             Ready to deploy TimeLogic in your facility?
           </h2>
-          <p className="text-slate-300 text-sm sm:text-base max-w-lg mx-auto leading-relaxed">
+          <p className="theme-text-secondary text-sm sm:text-base max-w-lg mx-auto leading-relaxed">
             Contact our engineering team today to review your on-premise network setup and launch your first kiosk station within 24 hours.
           </p>
           <div className="pt-2 flex items-center justify-center gap-4 flex-wrap">
@@ -264,7 +257,7 @@ export default function SolutionPage() {
               size="md"
               href="https://wa.me/2349113380364"
               icon={<MessageSquare size={15} />}
-              className="font-semibold shadow-sm text-xs sm:text-sm"
+              className="font-semibold shadow-xs text-xs sm:text-sm"
             >
               Chat with Deployment Team
             </Button>
@@ -272,7 +265,7 @@ export default function SolutionPage() {
               variant="outline"
               size="md"
               href="/pricing"
-              className="text-xs sm:text-sm text-slate-200 border-white/15 hover:bg-white/10"
+              className="text-xs sm:text-sm theme-text-primary border-theme hover:bg-slate-100 dark:hover:bg-white/10"
             >
               View Monthly Plans
             </Button>

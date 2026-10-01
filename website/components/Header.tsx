@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { MessageSquare, Menu, X, ArrowRight } from "lucide-react";
 import { Logo, Wordmark } from "./ui/Logo";
 import { Button } from "./ui/Button";
+import { ThemeToggle } from "./ThemeToggle";
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -26,13 +27,13 @@ export function Header() {
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-white/[0.08] bg-[#070d1e]/90 backdrop-blur-md transition-colors">
+    <header className="sticky top-0 z-50 w-full border-b border-theme transition-colors bg-[var(--header-bg)] backdrop-blur-md">
       <div className="max-w-7xl mx-auto px-6 sm:px-8 h-16 flex items-center justify-between">
         {/* Left: Brand Logo + Primary Nav */}
         <div className="flex items-center gap-8 lg:gap-10">
           <Link href="/" className="flex items-center gap-3 group select-none">
             <Logo size={32} />
-            <Wordmark className="text-lg font-bold tracking-tight text-white" />
+            <Wordmark className="text-lg font-bold tracking-tight theme-text-primary" />
           </Link>
 
           {/* Desktop Navigation Links */}
@@ -45,8 +46,8 @@ export function Header() {
                   href={item.href}
                   className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors ${
                     isActive
-                      ? "text-white bg-white/[0.08] font-semibold"
-                      : "text-slate-300 hover:text-white hover:bg-white/[0.04]"
+                      ? "theme-text-primary bg-slate-200/60 dark:bg-white/[0.08] font-semibold"
+                      : "theme-text-secondary hover:theme-text-primary hover:bg-slate-100 dark:hover:bg-white/[0.04]"
                   }`}
                 >
                   {item.label}
@@ -56,14 +57,17 @@ export function Header() {
           </nav>
         </div>
 
-        {/* Right: Direct Action Buttons */}
+        {/* Right: Theme Toggle & Direct Action Buttons */}
         <div className="hidden sm:flex items-center gap-3">
+          {/* Theme Toggle Button */}
+          <ThemeToggle />
+
           <Button
             variant="outline"
             size="sm"
             href="https://wa.me/2349113380364"
             icon={<MessageSquare size={13} />}
-            className="text-xs text-slate-200 border-white/15 hover:bg-white/10 hover:text-white"
+            className="text-xs theme-text-primary border-theme hover:bg-slate-100 dark:hover:bg-white/10"
           >
             Chat on WhatsApp
           </Button>
@@ -73,18 +77,20 @@ export function Header() {
             size="sm"
             href="/pricing"
             icon={<ArrowRight size={13} />}
-            className="text-xs font-semibold shadow-sm hover:shadow-md"
+            className="text-xs font-semibold shadow-xs"
           >
             Deploy Plans
           </Button>
         </div>
 
-        {/* Mobile Hamburger Toggle Button */}
-        <div className="flex sm:hidden">
+        {/* Mobile: Theme Toggle + Hamburger Toggle Button */}
+        <div className="flex sm:hidden items-center gap-2">
+          <ThemeToggle />
+
           <button
             type="button"
             onClick={() => setMobileMenuOpen((prev) => !prev)}
-            className="p-2 text-slate-300 hover:text-white hover:bg-white/[0.08] rounded-lg focus:outline-none transition-colors"
+            className="p-2 theme-text-secondary hover:theme-text-primary hover:bg-slate-100 dark:hover:bg-white/[0.08] rounded-lg focus:outline-none transition-colors"
             aria-expanded={mobileMenuOpen}
             aria-controls="mobile-navigation-menu"
             aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
@@ -98,7 +104,7 @@ export function Header() {
       {mobileMenuOpen && (
         <div
           id="mobile-navigation-menu"
-          className="border-b border-white/[0.08] bg-[#070d1e] px-6 py-5 sm:hidden space-y-4 shadow-2xl relative z-50 animate-in fade-in duration-150"
+          className="border-b border-theme theme-page-bg px-6 py-5 sm:hidden space-y-4 shadow-2xl relative z-50 animate-in fade-in duration-150"
         >
           <nav className="flex flex-col gap-1">
             {navLinks.map((item) => {
@@ -110,8 +116,8 @@ export function Header() {
                   onClick={() => setMobileMenuOpen(false)}
                   className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                     isActive
-                      ? "text-white bg-blue-600/25 border border-blue-500/30 font-semibold"
-                      : "text-slate-300 hover:text-white hover:bg-white/[0.04]"
+                      ? "theme-text-primary bg-blue-600/15 border border-blue-500/30 font-semibold"
+                      : "theme-text-secondary hover:theme-text-primary hover:bg-slate-100 dark:hover:bg-white/[0.04]"
                   }`}
                 >
                   {item.label}
@@ -120,14 +126,14 @@ export function Header() {
             })}
           </nav>
 
-          <div className="pt-4 border-t border-white/[0.08] flex flex-col gap-2.5">
+          <div className="pt-4 border-t border-theme flex flex-col gap-2.5">
             <Button
               variant="primary"
               size="md"
               href="/pricing"
               onClick={() => setMobileMenuOpen(false)}
               icon={<ArrowRight size={14} />}
-              className="w-full justify-center py-2 text-xs font-semibold shadow-sm"
+              className="w-full justify-center py-2 text-xs font-semibold shadow-xs"
             >
               View Monthly Plans
             </Button>
@@ -138,7 +144,7 @@ export function Header() {
               href="https://wa.me/2349113380364"
               onClick={() => setMobileMenuOpen(false)}
               icon={<MessageSquare size={14} />}
-              className="w-full justify-center py-2 text-xs text-slate-200 border-white/15 hover:bg-white/10"
+              className="w-full justify-center py-2 text-xs theme-text-primary border-theme hover:bg-slate-100 dark:hover:bg-white/10"
             >
               Chat on WhatsApp (+2349113380364)
             </Button>

@@ -2,10 +2,11 @@ import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 const TITLE = "TimeLogic — Attendance you can actually trust";
 const DESCRIPTION =
-  "TimeLogic verifies every workforce check-in by Wi-Fi, registered device, and authorized time. Secure, real-time attendance for offices, schools, clinics, factories, and multi-branch teams.";
+  "TimeLogic verifies every workforce check-in by physical kiosk hardware, facial biometrics, and authorized time. Secure, real-time attendance for offices, schools, clinics, factories, and multi-branch teams.";
 const SITE_URL = "https://timelogics.tech";
 
 export const metadata: Metadata = {
@@ -20,7 +21,7 @@ export const metadata: Metadata = {
     "attendance software",
     "workforce attendance",
     "employee check-in",
-    "Wi-Fi attendance verification",
+    "biometric attendance kiosk",
     "anti-buddy-punching",
     "time and attendance",
     "fraud detection attendance",
@@ -52,8 +53,8 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#060b18",
-  colorScheme: "dark",
+  themeColor: "#070d1e",
+  colorScheme: "dark light",
   width: "device-width",
   initialScale: 1,
 };
@@ -62,15 +63,44 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`dark ${GeistSans.variable} ${GeistMono.variable}`}
+    >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var saved = localStorage.getItem('timelogic_theme');
+                  var root = document.documentElement;
+                  if (saved === 'light') {
+                    root.classList.remove('dark');
+                    root.classList.add('light');
+                    root.style.colorScheme = 'light';
+                  } else {
+                    root.classList.remove('light');
+                    root.classList.add('dark');
+                    root.style.colorScheme = 'dark';
+                  }
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
+      </head>
       <body>
         <a
           href="#main"
-          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-brand focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-blue-600 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
         >
           Skip to content
         </a>
-        {children}
+        <ThemeProvider>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );
