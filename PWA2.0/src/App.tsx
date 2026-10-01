@@ -106,8 +106,12 @@ function LoginScreen({ onLogin }: { onLogin: (user: AdminUser) => void }) {
     try {
       const user = await login(identifier.trim(), password);
       onLogin(user);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unable to sign in.');
+    } catch (e: any) {
+      if (e?.code === 'SUBSCRIPTION_EXPIRED' || e?.message?.includes('subscription has expired')) {
+        setError('Subscription expired. Please contact your organization administrator.');
+      } else {
+        setError(e instanceof Error ? e.message : 'Unable to sign in.');
+      }
     } finally {
       setBusy(false);
     }
@@ -184,6 +188,170 @@ function LoginScreen({ onLogin }: { onLogin: (user: AdminUser) => void }) {
 }
 
 /* ==========================================================================
+   Kiosk Suspended Screen (Subscription Expired)
+   NO activation code input - instructs user to contact organization admin
+   ========================================================================== */
+function KioskSuspendedScreen({
+  orgName,
+  onRetry,
+  busy,
+}: {
+  orgName?: string;
+  onRetry: () => void;
+  busy: boolean;
+}) {
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        backgroundColor: '#0f172a',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '1.5rem',
+        color: '#f8fafc',
+        fontFamily: 'Inter, system-ui, sans-serif',
+      }}
+    >
+      <div
+        style={{
+          maxWidth: '540px',
+          width: '100%',
+          backgroundColor: '#1e293b',
+          borderRadius: '1.5rem',
+          border: '1px solid #334155',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+          overflow: 'hidden',
+          textAlign: 'center',
+        }}
+      >
+        <div
+          style={{
+            background: 'linear-gradient(135deg, #b91c1c, #dc2626, #ea580c)',
+            padding: '2.5rem 1.5rem',
+          }}
+        >
+          <div
+            style={{
+              width: '68px',
+              height: '68px',
+              borderRadius: '1.25rem',
+              backgroundColor: 'rgba(255, 255, 255, 0.2)',
+              backdropFilter: 'blur(6px)',
+              margin: '0 auto 1.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Lock size={36} color="#ffffff" strokeWidth={2.5} />
+          </div>
+          <span
+            style={{
+              fontSize: '0.75rem',
+              fontWeight: 800,
+              textTransform: 'uppercase',
+              letterSpacing: '0.12em',
+              backgroundColor: 'rgba(255, 255, 255, 0.22)',
+              padding: '0.35rem 0.85rem',
+              borderRadius: '9999px',
+              display: 'inline-block',
+              marginBottom: '0.75rem',
+            }}
+          >
+            Terminal Suspended
+          </span>
+          <h1 style={{ fontSize: '1.65rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em' }}>
+            Subscription Expired
+          </h1>
+          {orgName && (
+            <p style={{ fontSize: '0.9rem', opacity: 0.95, marginTop: '0.35rem', fontWeight: 600 }}>
+              {orgName}
+            </p>
+          )}
+        </div>
+
+        <div style={{ padding: '2rem 1.75rem' }}>
+          <div
+            style={{
+              backgroundColor: '#0f172a',
+              borderRadius: '1rem',
+              border: '1px solid #334155',
+              padding: '1.5rem 1.25rem',
+              marginBottom: '1.75rem',
+            }}
+          >
+            <AlertTriangle
+              size={32}
+              color="#f59e0b"
+              style={{ margin: '0 auto 0.85rem' }}
+            />
+            <p
+              style={{
+                fontSize: '1.05rem',
+                fontWeight: 700,
+                color: '#ffffff',
+                lineHeight: 1.4,
+                margin: 0,
+              }}
+            >
+              Please contact your organization administrator.
+            </p>
+            <p
+              style={{
+                fontSize: '0.85rem',
+                color: '#94a3b8',
+                marginTop: '0.75rem',
+                lineHeight: 1.6,
+              }}
+            >
+              This kiosk is temporarily unavailable because the organization's monthly subscription has ended. Once the administrator enters the monthly activation code in the TimeLogic Desktop application, this terminal will automatically resume operations.
+            </p>
+          </div>
+
+          <button
+            onClick={onRetry}
+            disabled={busy}
+            style={{
+              width: '100%',
+              padding: '0.9rem',
+              borderRadius: '0.85rem',
+              border: 'none',
+              backgroundColor: '#0284c7',
+              color: '#ffffff',
+              fontWeight: 700,
+              fontSize: '0.9rem',
+              cursor: busy ? 'not-allowed' : 'pointer',
+              opacity: busy ? 0.7 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem',
+              transition: 'background-color 0.2s',
+            }}
+          >
+            <RefreshCw size={17} className={busy ? 'spin' : ''} />
+            <span>{busy ? 'Checking subscription status…' : 'Check Status'}</span>
+          </button>
+        </div>
+
+        <div
+          style={{
+            padding: '1rem',
+            backgroundColor: '#0f172a',
+            borderTop: '1px solid #334155',
+            fontSize: '0.75rem',
+            color: '#64748b',
+          }}
+        >
+          TimeLogic Secure Attendance Kiosk Station
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ==========================================================================
    Main Attendance Station Application
    ========================================================================== */
 function App() {
@@ -250,6 +418,47 @@ function App() {
   const [kioskError, setKioskError] = useState('');
   const [showAdminRoster, setShowAdminRoster] = useState(false);
   const [resetCountdown, setResetCountdown] = useState<number | null>(null);
+
+  // Subscription Lockout States
+  const [subscriptionExpired, setSubscriptionExpired] = useState(false);
+  const [checkingSubscription, setCheckingSubscription] = useState(false);
+
+  useEffect(() => {
+    const handleSubExpired = () => {
+      setSubscriptionExpired(true);
+    };
+    window.addEventListener('kiosk:subscription_expired', handleSubExpired);
+    return () => window.removeEventListener('kiosk:subscription_expired', handleSubExpired);
+  }, []);
+
+  const handleCheckSubscription = async () => {
+    setCheckingSubscription(true);
+    try {
+      await getMe();
+      setSubscriptionExpired(false);
+      await load(false, true);
+    } catch (e: any) {
+      if (e?.code === 'SUBSCRIPTION_EXPIRED' || e?.message?.includes('subscription has expired')) {
+        setSubscriptionExpired(true);
+      }
+    } finally {
+      setCheckingSubscription(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!subscriptionExpired) return;
+    const interval = setInterval(async () => {
+      try {
+        await getMe();
+        setSubscriptionExpired(false);
+        void load(true);
+      } catch {
+        // still expired
+      }
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [subscriptionExpired]);
 
   // Auto-reset countdown timer for privacy kiosk
   useEffect(() => {
@@ -345,8 +554,12 @@ function App() {
         );
         setBreaks(Object.fromEntries(breakResults));
       }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not refresh attendance data.');
+    } catch (e: any) {
+      if (e?.code === 'SUBSCRIPTION_EXPIRED' || e?.message?.includes('subscription has expired')) {
+        setSubscriptionExpired(true);
+      } else {
+        setError(e instanceof Error ? e.message : 'Could not refresh attendance data.');
+      }
     } finally {
       setLoading(false);
     }
@@ -600,6 +813,17 @@ function App() {
   // Unauthenticated -> Login Screen
   if (!user) {
     return <LoginScreen onLogin={setUser} />;
+  }
+
+  // Subscription Expired -> Lockout Screen (No code entry, contact admin only)
+  if (subscriptionExpired) {
+    return (
+      <KioskSuspendedScreen
+        orgName={user.organization?.name}
+        onRetry={handleCheckSubscription}
+        busy={checkingSubscription}
+      />
+    );
   }
 
   // Check if manual check-in is allowed for this organization

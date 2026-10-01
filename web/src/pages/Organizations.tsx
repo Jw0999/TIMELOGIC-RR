@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, X, ChevronRight, ChevronsUpDown, Pencil, CalendarDays, KeyRound } from 'lucide-react';
+import { Plus, Trash2, X, ChevronRight, ChevronsUpDown, Pencil, CalendarDays, KeyRound, Copy, Check, MessageSquare, Sparkles } from 'lucide-react';
 import PageShell from '../components/PageShell';
-import { fetchAllOrgs, createOrg, updateOrg, deleteOrg, fetchOrgUsers, fetchLeavePolicy, saveLeavePolicy, resetAdminPassword, reassignUserOffice } from '../services';
+import { fetchAllOrgs, createOrg, updateOrg, deleteOrg, fetchOrgUsers, fetchLeavePolicy, saveLeavePolicy, resetAdminPassword, reassignUserOffice, generateOrgActivationCode, fetchOrgActivationCodes, manualRenewOrgSubscription } from '../services';
 import { downloadCSV } from '../utils/csv';
 
 const INDUSTRIES = ['Technology','Finance','Healthcare','Education','Logistics','Retail','Manufacturing','Non-profit','Government','Other'];
@@ -726,6 +726,7 @@ export default function Organizations() {
   const [viewOrg, setViewOrg] = useState<any>(null);
   const [editOrg, setEditOrg] = useState<any>(null);
   const [leaveOrg, setLeaveOrg] = useState<any>(null);
+  const [licenseOrg, setLicenseOrg] = useState<any>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [search,  setSearch]  = useState('');
   const [tab,     setTab]     = useState(0);
@@ -776,16 +777,17 @@ export default function Organizations() {
                 <TH className="min-w-[210px]">Capabilities</TH>
                 <TH>Users</TH>
                 <TH>Offices</TH>
+                <TH className="min-w-[150px]">Subscription</TH>
                 <th className="text-left text-xs font-semibold text-[var(--text-muted)] px-4 py-3">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border)]">
               {loading ? (
-                <tr><td colSpan={7} className="text-center py-14 text-[var(--text-muted)]">
+                <tr><td colSpan={8} className="text-center py-14 text-[var(--text-muted)]">
                   <div className="flex justify-center"><div className="animate-spin rounded-full h-6 w-6 border-2 border-primary-600 border-t-transparent"/></div>
                 </td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={7} className="text-center py-14">
+                <tr><td colSpan={8} className="text-center py-14">
                   <p className="text-sm font-semibold text-[var(--text-muted)]">No organizations found</p>
                 </td></tr>
               ) : filtered.map((o, idx) => {
@@ -793,6 +795,9 @@ export default function Organizations() {
                 const deviceEnabled = o.allowDeviceCheckIn ?? true;
                 const manualEnabled = o.allowManualCheckIn ?? false;
                 const studentsEnabled = o.hasStudents ?? false;
+                const sub = o.subscription || {};
+                const isExpired = sub.isExpired;
+                const days = sub.daysRemaining ?? 0;
                 return (
                   <tr key={o.id} className="hover:bg-[var(--hover-bg)] transition-colors">
                     <td className="px-4 py-3 text-xs font-mono text-[var(--text-muted)]">{String(idx + 1).padStart(5,'0')}</td>
@@ -820,6 +825,31 @@ export default function Organizations() {
                     <td className="px-4 py-3 font-semibold text-[var(--text-main)]">{o._count?.users ?? 0}</td>
                     <td className="px-4 py-3 text-[var(--text-muted)]">{o._count?.offices ?? 0}</td>
                     <td className="px-4 py-3">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-1.5">
+                          {isExpired ? (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-red-500" /> Expired
+                            </span>
+                          ) : days <= 5 ? (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" /> Due ({days}d)
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Active ({days}d)
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => setLicenseOrg(o)}
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-primary-700 hover:text-primary-900 transition-colors w-fit"
+                        >
+                          <KeyRound size={11} /> Manage Code
+                        </button>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <button onClick={() => setViewOrg(o)} className="text-sm font-semibold text-primary-700 hover:text-primary-900 transition-colors">View</button>
                         <button onClick={() => setLeaveOrg(o)} title="Leave days" className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-[var(--hover-bg)] text-[var(--text-muted)] hover:text-primary-700 transition-colors"><CalendarDays size={13}/></button>
@@ -843,6 +873,7 @@ export default function Organizations() {
       {viewOrg  && <UsersModal org={viewOrg} onClose={() => setViewOrg(null)}/>}
       {editOrg  && <EditOrgModal org={editOrg} onClose={() => setEditOrg(null)} onSaved={load}/>}
       {leaveOrg && <LeavePolicyModal org={leaveOrg} onClose={() => setLeaveOrg(null)}/>}
+      {licenseOrg && <ActivationCodeModal org={licenseOrg} onClose={() => { setLicenseOrg(null); load(); }}/>}
     </>
   );
 }
@@ -912,3 +943,236 @@ function LeavePolicyModal({ org, onClose }: { org: any; onClose: () => void }) {
     </div>
   );
 }
+
+function ActivationCodeModal({ org, onClose }: { org: any; onClose: () => void }) {
+  const [codes, setCodes] = useState<any[]>([]);
+  const [latestCode, setLatestCode] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [renewing, setRenewing] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const loadCodes = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchOrgActivationCodes(org.id);
+      setCodes(data ?? []);
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to load codes');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCodes();
+  }, [org.id]);
+
+  const handleGenerate = async () => {
+    setGenerating(true);
+    setError('');
+    setSuccess('');
+    try {
+      const res = await generateOrgActivationCode(org.id, 30);
+      setLatestCode(res.activationCode?.code || null);
+      setSuccess('New 8-digit activation code generated successfully!');
+      loadCodes();
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to generate code');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleManualRenew = async () => {
+    if (!window.confirm(`Manually extend subscription for "${org.name}" by 30 days?`)) return;
+    setRenewing(true);
+    setError('');
+    setSuccess('');
+    try {
+      const res = await manualRenewOrgSubscription(org.id, 30);
+      setSuccess(res.message || 'Subscription extended successfully!');
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to renew');
+    } finally {
+      setRenewing(false);
+    }
+  };
+
+  const copyCode = (code: string) => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const sub = org.subscription || {};
+  const isExpired = sub.isExpired;
+  const days = sub.daysRemaining ?? 0;
+  const expiresAt = sub.subscriptionExpiresAt ? new Date(sub.subscriptionExpiresAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Not set';
+
+  const waMessage = latestCode 
+    ? encodeURIComponent(`Hello ${org.name},\nHere is your TimeLogic 30-day activation code: *${latestCode}*.\n\nPlease enter this code in your TimeLogic Desktop Application to activate/renew your subscription.\nThank you!`)
+    : '';
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-[var(--card-bg)] rounded-3xl w-full max-w-xl shadow-2xl max-h-[90vh] overflow-hidden flex flex-col border border-[var(--border)]">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border)]">
+          <div className="min-w-0">
+            <h2 className="text-lg font-bold text-[var(--text-main)] truncate flex items-center gap-2">
+              <KeyRound size={20} className="text-primary-600" />
+              Subscription & License · {org.name}
+            </h2>
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">Manage 30-day activation codes and lockout status</p>
+          </div>
+          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-main)] flex-shrink-0"><X size={20}/></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+          {error && <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-sm text-red-700">{error}</div>}
+          {success && <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-sm text-emerald-700">{success}</div>}
+
+          {/* Status summary banner */}
+          <div className={`p-4 rounded-2xl border flex items-center justify-between ${
+            isExpired ? 'bg-red-50/70 border-red-200 text-red-800' :
+            days <= 5 ? 'bg-amber-50/70 border-amber-200 text-amber-800' :
+            'bg-emerald-50/70 border-emerald-200 text-emerald-800'
+          }`}>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className={`w-2.5 h-2.5 rounded-full ${isExpired ? 'bg-red-500' : days <= 5 ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
+                <span className="font-bold text-sm tracking-wide uppercase">
+                  {isExpired ? 'Locked Out / Expired' : days <= 5 ? 'Renewal Due Soon' : 'Subscription Active'}
+                </span>
+              </div>
+              <p className="text-xs mt-1 text-[var(--text-muted)]">
+                Expires on: <span className="font-semibold text-[var(--text-main)]">{expiresAt}</span> · {isExpired ? <span className="text-red-600 font-semibold">Locked</span> : <span>{days} days remaining</span>}
+              </p>
+            </div>
+            <button
+              onClick={handleManualRenew}
+              disabled={renewing}
+              className="text-xs font-bold px-3 py-1.5 rounded-xl border bg-white hover:bg-gray-50 text-gray-700 shadow-sm transition disabled:opacity-50"
+              title="Directly extend subscription by 30 days without code"
+            >
+              {renewing ? 'Extending…' : '+ 30 Days Override'}
+            </button>
+          </div>
+
+          {/* Generator card */}
+          <div className="p-5 bg-gradient-to-br from-[var(--hover-bg)] to-[var(--card-bg)] rounded-2xl border border-[var(--border)] space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-sm text-[var(--text-main)] flex items-center gap-1.5">
+                  <Sparkles size={16} className="text-amber-500" /> Generate Monthly Code
+                </h3>
+                <p className="text-xs text-[var(--text-muted)] mt-0.5">Generate a single-use 8-digit PIN for client to unlock Desktop app.</p>
+              </div>
+              <button
+                onClick={handleGenerate}
+                disabled={generating}
+                className="px-4 py-2 bg-primary-700 hover:bg-primary-800 text-white text-xs font-bold rounded-xl transition shadow-sm disabled:opacity-60"
+              >
+                {generating ? 'Generating…' : 'Generate Code'}
+              </button>
+            </div>
+
+            {latestCode && (
+              <div className="mt-3 p-4 bg-primary-50/70 border border-primary-200 rounded-2xl">
+                <p className="text-xs font-semibold text-primary-800 uppercase tracking-wider mb-1">Generated 8-Digit Activation Code:</p>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <span className="font-mono text-2xl font-black text-primary-900 tracking-[0.25em]">
+                    {latestCode.slice(0, 4)} {latestCode.slice(4)}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => copyCode(latestCode)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-primary-300 text-primary-800 hover:bg-primary-100 rounded-xl text-xs font-bold transition shadow-sm"
+                    >
+                      {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                      {copied ? 'Copied' : 'Copy'}
+                    </button>
+                    <a
+                      href={`https://wa.me/?text=${waMessage}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-sm"
+                    >
+                      <MessageSquare size={14} /> Send WhatsApp
+                    </a>
+                  </div>
+                </div>
+                <p className="text-[11px] text-primary-700 mt-2">
+                  Client inputs this code in their TimeLogic Desktop app. Once redeemed, it unlocks the app and extends the organization's subscription by 30 days.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Past Codes Table */}
+          <div>
+            <h4 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2">Past Activation Codes</h4>
+            {loading ? (
+              <p className="text-xs text-[var(--text-muted)] py-4 text-center">Loading code history…</p>
+            ) : codes.length === 0 ? (
+              <p className="text-xs text-[var(--text-muted)] py-4 text-center bg-[var(--hover-bg)] rounded-xl border border-[var(--border)]">No codes generated yet.</p>
+            ) : (
+              <div className="border border-[var(--border)] rounded-xl overflow-hidden max-h-48 overflow-y-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-[var(--hover-bg)] text-[var(--text-muted)] sticky top-0">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-semibold">Code</th>
+                      <th className="px-3 py-2 text-left font-semibold">Status</th>
+                      <th className="px-3 py-2 text-left font-semibold">Duration</th>
+                      <th className="px-3 py-2 text-left font-semibold">Created</th>
+                      <th className="px-3 py-2 text-right font-semibold">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border)] text-[var(--text-main)]">
+                    {codes.map((c) => (
+                      <tr key={c.id} className="hover:bg-[var(--hover-bg)]">
+                        <td className="px-3 py-2 font-mono font-bold tracking-wider">{c.code}</td>
+                        <td className="px-3 py-2">
+                          {c.isUsed ? (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                              Redeemed {c.usedAt ? new Date(c.usedAt).toLocaleDateString('en-GB') : ''}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                              Available
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-[var(--text-muted)]">{c.durationDays || 30} days</td>
+                        <td className="px-3 py-2 text-[var(--text-muted)]">{new Date(c.createdAt).toLocaleDateString('en-GB')}</td>
+                        <td className="px-3 py-2 text-right">
+                          {!c.isUsed && (
+                            <button
+                              onClick={() => copyCode(c.code)}
+                              className="text-primary-700 hover:text-primary-900 font-bold hover:underline"
+                            >
+                              Copy
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex justify-end px-6 py-4 border-t border-[var(--border)]">
+          <button onClick={onClose} className="px-5 py-2 border border-[var(--border)] text-[var(--text-main)] text-sm font-semibold rounded-xl hover:bg-[var(--hover-bg)] transition">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+

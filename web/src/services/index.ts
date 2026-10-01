@@ -14,6 +14,9 @@ export const addOrgDepartment       = (orgId: string, name: string, policy: Reco
 export const updateOrgDepartmentBreakPolicy = (departmentId: string, body: any) => api.put<any>(`/super/departments/${departmentId}/break-policy`, body).then((r) => r.data);
 export const fetchEmployeeRecords   = (userId: string) => api.get<any>(`/super/employees/${userId}/records`).then((r) => r.data);
 export const reemployEmployee       = (userId: string) => api.put<any>(`/super/employees/${userId}/reemploy`, {});
+export const generateOrgActivationCode = (orgId: string, durationDays = 30) => api.post<any>(`/super/organizations/${orgId}/generate-code`, { durationDays }).then((r) => r.data);
+export const fetchOrgActivationCodes   = (orgId: string) => api.get<any>(`/super/organizations/${orgId}/activation-codes`).then((r) => r.data ?? []);
+export const manualRenewOrgSubscription = (orgId: string, durationDays = 30) => api.post<any>(`/super/organizations/${orgId}/manual-renew`, { durationDays }).then((r) => r.data);
 
 // ─── Existing ────────────────────────────────────────────────────────────────
 export const fetchOrg         = () => api.get<any>('/admin/org').then((r) => r.data);

@@ -17,6 +17,7 @@ import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import Students from './pages/Students';
 import Penalties from './pages/Penalties';
+import SubscriptionLockModal from './components/SubscriptionLockModal';
 
 function Guard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -57,7 +58,9 @@ function AppRoutes() {
   }
 
   return (
-    <Routes>
+    <>
+      <SubscriptionLockModal />
+      <Routes>
       <Route path="/login"      element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
       <Route path="/"           element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
       <Route path="/dashboard"  element={<Guard><Layout><Dashboard /></Layout></Guard>} />
@@ -74,6 +77,7 @@ function AppRoutes() {
       <Route path="/reports"    element={<Guard><Layout><Reports /></Layout></Guard>} />
       <Route path="/settings"   element={<Guard><Layout><Settings /></Layout></Guard>} />
     </Routes>
+    </>
   );
 }
 

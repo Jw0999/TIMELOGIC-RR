@@ -5,6 +5,7 @@ const AttendanceService = require('../services/AttendanceService');
 const EmployeePolicy = require('../services/EmployeePolicyService');
 const AuditService = require('../services/AuditService');
 const { hasValidEnrolledFace } = require('../utils/faceVerify');
+const { getOrgSubscriptionStatus, redeemActivationCode } = require('../utils/subscription');
 
 // ── Organization / Office / Department ────────────────────────────────────────
 
@@ -36,11 +37,13 @@ const getOrg = async (req, res, next) => {
     });
     if (!org) return res.status(404).json({ success: false, message: 'Organization not found' });
     const { kioskPasswordHash, ...safeOrg } = org;
+    const subscription = getOrgSubscriptionStatus(org);
     res.json({
       success: true,
       data: {
         ...safeOrg,
         hasStationPassword: Boolean(kioskPasswordHash),
+        subscription,
       },
     });
   } catch (err) { next(err); }
@@ -732,6 +735,49 @@ const waiveEmployeeAutoPenalties = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+const getSubscriptionStatus = async (req, res, next) => {
+  try {
+    const orgId = await resolveAdminOrgId(req);
+    const org = await prisma.organization.findUnique({
+      where: { id: orgId },
+    });
+    if (!org) return res.status(404).json({ success: false, error: 'Organization not found' });
+    const status = getOrgSubscriptionStatus(org);
+    res.json({ success: true, data: status });
+  } catch (err) { next(err); }
+};
+
+const redeemCode = async (req, res, next) => {
+  try {
+    const orgId = await resolveAdminOrgId(req);
+    const { code } = req.body;
+    if (!code) {
+      return res.status(400).json({ success: false, error: 'Activation code is required.' });
+    }
+
+    const result = await redeemActivationCode({
+      orgId,
+      code,
+      adminId: req.user?.id,
+      adminIp: req.ip,
+    });
+
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    await AuditService.log({
+      req,
+      action: 'REDEEM_ACTIVATION_CODE',
+      targetId: orgId,
+      targetType: 'Organization',
+      details: { code: String(code).trim().slice(-4), newExpiresAt: result.subscriptionExpiresAt },
+    });
+
+    res.json(result);
+  } catch (err) { next(err); }
+};
+
 module.exports = {
   getOrg, updateOrg,
   createOffice,
@@ -745,4 +791,5 @@ module.exports = {
   listPenalties, createPenalty, deletePenalty, waiveEmployeeAutoPenalties,
   setStationPassword, getStationPasswordStatus,
   resolveAdminOrgId,
+  getSubscriptionStatus, redeemCode,
 };

@@ -150,3 +150,7 @@ export const stopAllAttendance = (officeId: string, reason: string) => api.post<
 export const lockSystem        = (reason: string) => api.post<any>('/admin/emergency/lock-system', { reason });
 export const invalidateQR      = (officeId: string, reason: string) => api.post<any>('/admin/emergency/invalidate-qr', { officeId, reason });
 export const revertEmergency   = (controlId: string) => api.post<any>(`/admin/emergency/${controlId}/revert`, {});
+ 
+// ─── Subscription & Activation ─────────────────────────────────────────────
+export const fetchSubscriptionStatus = () => api.get<any>('/admin/subscription-status').then((r) => r.data);
+export const redeemActivationCode = (code: string) => api.post<any>('/admin/redeem-code', { code }).then((r) => r.data);

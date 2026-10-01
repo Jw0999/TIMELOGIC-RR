@@ -1,5 +1,14 @@
 export type EmployeeCheckInMethod = 'PHONE' | 'MANUAL' | 'BOTH';
 
+export interface SubscriptionStatus {
+  status: string;
+  isExpired: boolean;
+  daysRemaining: number;
+  subscriptionExpiresAt: string | null;
+  subscriptionStart?: string | null;
+  lastActivatedAt?: string | null;
+}
+
 export interface AdminOrganization {
   id: string;
   name: string;
@@ -10,6 +19,7 @@ export interface AdminOrganization {
   timezone?: string | null;
   shiftSchedules?: Record<string, { openTime: string; closeTime: string; label?: string }> | null;
   hasStationPassword?: boolean;
+  subscription?: SubscriptionStatus | null;
 }
 
 export interface AdminUser {
@@ -27,6 +37,7 @@ export interface AdminUser {
   office?: { id: string; name: string } | null;
   shiftType?: string;
   organization: AdminOrganization;
+  subscription?: SubscriptionStatus | null;
 }
 
 export interface AttendanceSummary {

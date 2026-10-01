@@ -12,6 +12,10 @@ model Organization {
   name               String
   industry           String?
   subscriptionTier   String            @default("basic")
+  subscriptionStatus String            @default("ACTIVE")
+  subscriptionStart  DateTime          @default(now())
+  subscriptionExpiresAt DateTime?
+  lastActivatedAt    DateTime?
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
   leavePolicy        Json?
@@ -29,6 +33,7 @@ model Organization {
   students           Student[]
   users              User[]
   manualPenalties    ManualPenalty[]
+  activationCodes    ActivationCode[]
 
   @@map("organizations")
 }
@@ -684,3 +689,23 @@ model AuditLog {
   @@index([createdAt])
   @@map("audit_logs")
 }
+
+model ActivationCode {
+  id            String       @id @default(uuid())
+  orgId         String
+  code          String
+  durationDays  Int          @default(30)
+  isUsed        Boolean      @default(false)
+  usedAt        DateTime?
+  usedByAdminId String?
+  usedByAdminIp String?
+  createdAt     DateTime     @default(now())
+  createdById   String?
+  expiresAt     DateTime?
+  organization  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, code])
+  @@index([code])
+  @@map("activation_codes")
+}
+

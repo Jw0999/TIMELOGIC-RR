@@ -5,6 +5,10 @@ const { authenticate } = require('../middleware/auth');
 const { isAdmin } = require('../middleware/roleGuard');
 const { scanLimiter } = require('../middleware/rateLimiter');
 const { validate } = require('../middleware/validate');
+const { checkSubscription } = require('../middleware/subscriptionGuard');
+
+// Enforce active subscription on all attendance operations
+router.use(checkSubscription);
 
 // Step 1 — validate Wi-Fi, then issue a one-time verification code
 router.post('/check-in/challenge', authenticate, scanLimiter, [

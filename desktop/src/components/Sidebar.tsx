@@ -58,6 +58,24 @@ export default function Sidebar() {
         ))}
       </nav>
       <div className="px-4 py-4 border-t border-primary-800 dark:border-slate-800">
+        {!isSuperAdmin && (
+          <div className="mb-3 px-2.5 py-2 rounded-xl bg-primary-800/60 dark:bg-slate-900 border border-primary-700/50 dark:border-slate-800">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="text-primary-300 font-medium">Subscription</span>
+              <span className={`font-bold px-1.5 py-0.5 rounded text-[10px] ${
+                organization?.subscription?.isExpired
+                  ? 'bg-red-500/30 text-red-200'
+                  : (organization?.subscription?.daysRemaining ?? 30) <= 5
+                  ? 'bg-amber-500/30 text-amber-200'
+                  : 'bg-emerald-500/30 text-emerald-200'
+              }`}>
+                {organization?.subscription?.isExpired
+                  ? 'Expired'
+                  : `${organization?.subscription?.daysRemaining ?? 0}d left`}
+              </span>
+            </div>
+          </div>
+        )}
         <div className="flex items-center gap-3 mb-3">
           <div className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center flex-shrink-0">
             <span className="text-white text-xs font-bold">{user?.firstName?.[0]}{user?.lastName?.[0]}</span>

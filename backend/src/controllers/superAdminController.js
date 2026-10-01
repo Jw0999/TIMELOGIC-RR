@@ -6,6 +6,7 @@ const logger = require('../config/logger');
 const { redis, PREFIXES } = require('../config/redis');
 const EmployeePolicy = require('../services/EmployeePolicyService');
 const AuditService = require('../services/AuditService');
+const { generate8DigitCode, getOrgSubscriptionStatus } = require('../utils/subscription');
 
 const defaultWeeklySchedule = (openTime = '08:00', closeTime = '17:00') => ({
   monday: { openTime, closeTime },
@@ -50,9 +51,20 @@ const listOrgs = async (req, res, next) => {
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
     });
-    res.json({ success: true, data: orgs });
+
+    const enrichedOrgs = orgs.map((org) => {
+      const sub = getOrgSubscriptionStatus(org);
+      return {
+        ...org,
+        subscriptionStatus: sub.status,
+        subscriptionExpiresAt: sub.subscriptionExpiresAt,
+        daysRemaining: sub.daysRemaining,
+        isExpired: sub.isExpired,
+      };
+    });
+
+    res.json({ success: true, data: enrichedOrgs });
   } catch (err) { next(err); }
 };
 
@@ -96,6 +108,9 @@ const createOrg = async (req, res, next) => {
           name: String(name).trim(),
           industry: industry || 'General',
           subscriptionTier: 'enterprise',
+          subscriptionStatus: 'ACTIVE',
+          subscriptionStart: new Date(),
+          subscriptionExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
           allowDeviceCheckIn: Boolean(allowDeviceCheckIn),
           allowManualCheckIn: Boolean(allowManualCheckIn),
           hasStudents: Boolean(hasStudents),
@@ -1002,6 +1017,119 @@ const reassignUserOffice = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// POST /api/super/organizations/:id/generate-code
+const generateOrgActivationCode = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { durationDays = 30 } = req.body;
+    const org = await prisma.organization.findUnique({ where: { id } });
+    if (!org) {
+      return res.status(404).json({ success: false, error: 'Organization not found.' });
+    }
+
+    // Generate unique 8-digit numeric code
+    let code;
+    let collision = true;
+    while (collision) {
+      code = generate8DigitCode();
+      const existing = await prisma.activationCode.findFirst({
+        where: { orgId: id, code, isUsed: false },
+      });
+      if (!existing) collision = false;
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000); // Code valid for redemption for 60 days
+
+    const record = await prisma.activationCode.create({
+      data: {
+        orgId: id,
+        code,
+        durationDays: Number(durationDays) || 30,
+        isUsed: false,
+        createdById: req.user?.id || null,
+        expiresAt,
+      },
+    });
+
+    await AuditService.log({
+      req,
+      action: 'GENERATE_ACTIVATION_CODE',
+      targetId: id,
+      targetType: 'Organization',
+      details: { orgName: org.name, code, durationDays },
+    });
+
+    res.json({
+      success: true,
+      message: '8-digit activation code generated successfully.',
+      data: {
+        id: record.id,
+        code: record.code,
+        durationDays: record.durationDays,
+        expiresAt: record.expiresAt,
+        createdAt: record.createdAt,
+        isUsed: record.isUsed,
+      },
+    });
+  } catch (err) { next(err); }
+};
+
+// GET /api/super/organizations/:id/activation-codes
+const getOrgActivationCodes = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const codes = await prisma.activationCode.findMany({
+      where: { orgId: id },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+    res.json({ success: true, data: codes });
+  } catch (err) { next(err); }
+};
+
+// POST /api/super/organizations/:id/manual-renew
+const manualRenewOrgSubscription = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { durationDays = 30 } = req.body;
+    const org = await prisma.organization.findUnique({ where: { id } });
+    if (!org) {
+      return res.status(404).json({ success: false, error: 'Organization not found.' });
+    }
+
+    const now = new Date();
+    const currentExpiry = org.subscriptionExpiresAt ? new Date(org.subscriptionExpiresAt) : null;
+    const baseDate = currentExpiry && currentExpiry.getTime() > now.getTime() ? currentExpiry : now;
+    const newExpiry = new Date(baseDate.getTime() + (Number(durationDays) || 30) * 24 * 60 * 60 * 1000);
+
+    const updated = await prisma.organization.update({
+      where: { id },
+      data: {
+        subscriptionStatus: 'ACTIVE',
+        subscriptionExpiresAt: newExpiry,
+        lastActivatedAt: now,
+      },
+    });
+
+    await AuditService.log({
+      req,
+      action: 'MANUAL_RENEW_SUBSCRIPTION',
+      targetId: id,
+      targetType: 'Organization',
+      details: { orgName: org.name, newExpiry, durationDays },
+    });
+
+    const status = getOrgSubscriptionStatus(updated);
+
+    res.json({
+      success: true,
+      message: `Organization subscription extended to ${newExpiry.toISOString()}`,
+      data: status,
+    });
+  } catch (err) { next(err); }
+};
+
 module.exports = {
   listOrgs, createOrg, updateOrg, deleteOrg, orgUsers, renameAdmin,
   resetAdminPassword, reassignUserOffice,
@@ -1009,4 +1137,5 @@ module.exports = {
   systemReport, addDepartment, getDepartmentBreakPolicy, updateDepartmentBreakPolicy,
   employeeFullRecord, reemployEmployee, suspendAdmin, activateAdmin, reassignEmployee,
   updateProfile, resetSystem, getLeavePolicy, setLeavePolicy, getAuditLogs,
+  generateOrgActivationCode, getOrgActivationCodes, manualRenewOrgSubscription,
 };

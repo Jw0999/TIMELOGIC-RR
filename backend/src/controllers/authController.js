@@ -1,6 +1,7 @@
 const AuthService = require('../services/AuthenticationService');
 const AuditService = require('../services/AuditService');
 const { prisma } = require('../config/database');
+const { getOrgSubscriptionStatus } = require('../utils/subscription');
 
 const login = async (req, res, next) => {
   try {
@@ -46,6 +47,10 @@ const me = async (req, res, next) => {
             id: true, name: true, allowDeviceCheckIn: true, allowManualCheckIn: true,
             hasStudents: true, openingTime: true, timezone: true,
             shiftSchedules: true,
+            subscriptionStatus: true,
+            subscriptionStart: true,
+            subscriptionExpiresAt: true,
+            lastActivatedAt: true,
           },
         },
       },
@@ -53,7 +58,19 @@ const me = async (req, res, next) => {
     if (!user) {
       return res.status(401).json({ success: false, message: 'User unavailable' });
     }
-    res.json({ success: true, data: user });
+    const subscription = user.organization ? getOrgSubscriptionStatus(user.organization) : null;
+    res.json({
+      success: true,
+      data: {
+        ...user,
+        organization: user.organization
+          ? {
+              ...user.organization,
+              subscription,
+            }
+          : null,
+      },
+    });
   } catch (err) { next(err); }
 };
 

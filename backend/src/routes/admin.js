@@ -9,7 +9,11 @@ const { prisma } = require('../config/database');
 const { stationLimiter } = require('../middleware/rateLimiter');
 const studentRoutes = require('./students');
 const { validateFaceEnrollment, hasValidEnrolledFace } = require('../utils/faceVerify');
+const { checkSubscription } = require('../middleware/subscriptionGuard');
 const fs = require('fs');
+
+// Enforce active subscription on admin operations (except redeem-code and subscription-status)
+router.use(checkSubscription);
 
 // Secure employee station. The admin session must already be authenticated;
 // the employee then confirms their own password for each manual action.
@@ -195,6 +199,12 @@ router.post('/employees', authenticate, isAdmin, [
   body('shiftType').optional().isIn(['FULL_TIME', 'MORNING', 'EVENING', 'AFTERNOON', 'NIGHT', 'FLEXIBLE']),
   body('phone').optional({ nullable: true }).isString(),
 ], validate, ctrl.createEmployee);
+
+// Subscription & Activation
+router.get('/subscription-status', authenticate, isAdmin, ctrl.getSubscriptionStatus);
+router.post('/redeem-code', authenticate, isAdmin, [
+  body('code').trim().notEmpty().withMessage('Activation code is required'),
+], validate, ctrl.redeemCode);
 
 router.use('/students', studentRoutes);
 

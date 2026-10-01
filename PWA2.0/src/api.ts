@@ -48,6 +48,9 @@ async function request<T>(path: string, options: RequestInit = {}, retry = true)
     clearSession();
     throw new Error('Your session expired. Please sign in again.');
   }
+  if (response.status === 403 && body?.code === 'SUBSCRIPTION_EXPIRED') {
+    window.dispatchEvent(new CustomEvent('kiosk:subscription_expired', { detail: body }));
+  }
   if (!response.ok) {
     const error = new Error(body?.message || `Request failed (${response.status})`) as Error & { code?: string; status?: number };
     error.code = body?.code;

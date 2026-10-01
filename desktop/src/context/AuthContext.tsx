@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { api, setToken, getToken, setActiveOrgId, getActiveOrgId } from '../services/api';
 import { fetchOrganizations } from '../services';
-import type { AdminOrganization, AdminUser } from '../types/api';
+import type { AdminOrganization, AdminUser, SubscriptionStatus } from '../types/api';
 
 interface AuthCtx {
   user: AdminUser | null;
@@ -14,6 +14,9 @@ interface AuthCtx {
   serverNow: Date | null;
   organizationTimezone: string;
   currentTime: () => Date | null;
+  isSubscriptionExpired: boolean;
+  subscription: SubscriptionStatus | null;
+  refreshSubscription: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthCtx>({
@@ -27,13 +30,21 @@ const AuthContext = createContext<AuthCtx>({
   serverNow: null,
   organizationTimezone: 'Africa/Lagos',
   currentTime: () => null,
+  isSubscriptionExpired: false,
+  subscription: null,
+  refreshSubscription: async () => {},
 });
 
 function normalizeUser(raw: AdminUser, overrideOrg?: any): AdminUser {
   const organization = overrideOrg || raw.organization;
   const isSuper = raw.role === 'SUPER_ADMIN';
+  const sub: SubscriptionStatus | null = isSuper
+    ? { isExpired: false, status: 'ACTIVE', daysRemaining: 999, subscriptionExpiresAt: null }
+    : ((raw.subscription || organization?.subscription) ?? null);
+
   return {
     ...raw,
+    subscription: sub,
     organization: {
       id: organization?.id ?? raw.orgId,
       name: organization?.name ?? 'Organization',
@@ -42,6 +53,7 @@ function normalizeUser(raw: AdminUser, overrideOrg?: any): AdminUser {
       hasStudents: isSuper ? true : (organization?.hasStudents ?? false),
       openingTime: organization?.openingTime ?? null,
       timezone: organization?.timezone ?? null,
+      subscription: sub,
     },
   };
 }
@@ -52,6 +64,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [serverNow, setServerNow] = useState<Date | null>(null);
   const [serverNowAt, setServerNowAt] = useState(0);
+  const [isSubscriptionExpired, setIsSubscriptionExpired] = useState(false);
+
+  useEffect(() => {
+    if (user?.role === 'SUPER_ADMIN') {
+      setIsSubscriptionExpired(false);
+    } else if (user?.organization?.subscription?.isExpired || user?.subscription?.isExpired) {
+      setIsSubscriptionExpired(true);
+    } else {
+      setIsSubscriptionExpired(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const handleSubExpired = () => {
+      if (user?.role !== 'SUPER_ADMIN') {
+        setIsSubscriptionExpired(true);
+      }
+    };
+    window.addEventListener('subscription:expired', handleSubExpired);
+    return () => window.removeEventListener('subscription:expired', handleSubExpired);
+  }, [user?.role]);
+
+  const refreshSubscription = async () => {
+    try {
+      const res = await api.get<{ success: boolean; data: any }>('/admin/subscription-status');
+      if (res?.data) {
+        const sub = res.data;
+        setIsSubscriptionExpired(!!sub.isExpired);
+        setUser((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            subscription: sub,
+            organization: {
+              ...prev.organization,
+              subscription: sub,
+            },
+          };
+        });
+      }
+    } catch {
+      // ignore
+    }
+  };
 
   const syncServerTime = async () => {
     const response = await api.get<{ success: boolean; data?: { now?: string } }>('/reports/server-time');
@@ -212,6 +268,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       serverNow,
       organizationTimezone: user?.organization?.timezone || 'Africa/Lagos',
       currentTime,
+      isSubscriptionExpired,
+      subscription: user?.organization?.subscription ?? user?.subscription ?? null,
+      refreshSubscription,
     }}>
       {children}
     </AuthContext.Provider>

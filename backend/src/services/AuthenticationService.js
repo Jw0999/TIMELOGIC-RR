@@ -7,6 +7,7 @@ const env = require('../config/env');
 const logger = require('../config/logger');
 const { getCurrentServerTime } = require('../utils/networkTime');
 const EmployeePolicy = require('./EmployeePolicyService');
+const { getOrgSubscriptionStatus } = require('../utils/subscription');
 
 class AuthenticationService {
   async login(identifier, password, deviceFingerprint = null, context = {}) {
@@ -82,6 +83,7 @@ class AuthenticationService {
       select: {
         id: true, name: true, allowDeviceCheckIn: true, allowManualCheckIn: true,
         hasStudents: true, openingTime: true, timezone: true,
+        subscriptionStatus: true, subscriptionStart: true, subscriptionExpiresAt: true, lastActivatedAt: true,
       },
     });
     if (!org) {
@@ -144,10 +146,11 @@ class AuthenticationService {
 
     const accessToken = this._signAccess(user);
     const refreshToken = await this._createRefreshToken(user.id);
+    const subscription = org ? getOrgSubscriptionStatus(org) : null;
 
     return {
       accessToken, refreshToken,
-      user: { ...this._safeUser(user), lastLoginAt: loginAt, organization: org },
+      user: { ...this._safeUser(user), lastLoginAt: loginAt, organization: { ...org, subscription } },
       adminLogin,
     };
   }
@@ -162,6 +165,7 @@ class AuthenticationService {
             id: true, name: true, allowDeviceCheckIn: true, allowManualCheckIn: true,
             hasStudents: true, openingTime: true, timezone: true,
             kioskPasswordHash: true, requireFaceVerification: true,
+            subscriptionStatus: true, subscriptionStart: true, subscriptionExpiresAt: true, lastActivatedAt: true,
           },
         },
       },
@@ -173,6 +177,17 @@ class AuthenticationService {
 
     if (user.status !== 'ACTIVE') {
       throw Object.assign(new Error(`Account is ${user.status.toLowerCase()}`), { status: 403 });
+    }
+
+    // Check organization subscription status for kiosk station
+    if (user.role !== 'SUPER_ADMIN' && user.organization) {
+      const sub = getOrgSubscriptionStatus(user.organization);
+      if (sub.isExpired) {
+        throw Object.assign(
+          new Error('Subscription expired. Contact your administrator.'),
+          { status: 403, code: 'SUBSCRIPTION_EXPIRED' }
+        );
+      }
     }
 
     // Station password verification
