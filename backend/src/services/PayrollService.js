@@ -780,6 +780,16 @@ class PayrollService {
     const companyName = payslip.organization.name || 'TimeLogic Enterprise';
     const empName = `${payslip.employee.firstName} ${payslip.employee.lastName}`;
 
+    // Ensure PDF is generated
+    let pdfPath = payslip.pdfPath;
+    if (!pdfPath || !fs.existsSync(pdfPath)) {
+      const generated = await this.generatePayslipPdf(payslip.id);
+      pdfPath = generated.filePath;
+    }
+
+    const backendBaseUrl = process.env.BACKEND_URL || 'https://timelogic-api-fbd3128caa55.herokuapp.com';
+    const pdfPublicUrl = `${backendBaseUrl}/api/payroll/payslips/${payslip.id}/pdf`;
+
     const messageText = [
       `📄 *TIMELOGIC OFFICIAL PAYSLIP*`,
       `🏢 *Company:* ${companyName}`,
@@ -790,16 +800,12 @@ class PayrollService {
       `⚠️ *Total Penalties & Deductions:* -${this.formatMoney(payslip.totalDeductions, currency)}`,
       `💵 *NET PAYABLE:* *${this.formatMoney(payslip.netSalary, currency)}*`,
       ``,
+      `📥 *Official Payslip Document (PDF):*`,
+      `${pdfPublicUrl}`,
+      ``,
       `Your itemized attendance record and payslip PDF have been processed.`,
       `Verified by TimeLogic Enterprise Systems.`,
     ].join('\n');
-
-    // Ensure PDF is generated
-    let pdfPath = payslip.pdfPath;
-    if (!pdfPath || !fs.existsSync(pdfPath)) {
-      const generated = await this.generatePayslipPdf(payslip.id);
-      pdfPath = generated.filePath;
-    }
 
     // Direct WhatsApp web link fallback
     const directUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(messageText)}`;
@@ -832,6 +838,32 @@ class PayrollService {
         if (fetchRes.ok) {
           apiSuccess = true;
           messageId = resBody.messages?.[0]?.id || 'META_SENT';
+
+          // Also dispatch the native PDF document to employee WhatsApp chat
+          try {
+            await fetch(
+              `https://graph.facebook.com/v18.0/${org.whatsappPhoneId}/messages`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${org.whatsappApiToken}`,
+                },
+                body: JSON.stringify({
+                  messaging_product: 'whatsapp',
+                  to: cleanPhone,
+                  type: 'document',
+                  document: {
+                    link: pdfPublicUrl,
+                    caption: `TimeLogic Payslip - ${empName} (${monthStr})`,
+                    filename: `Payslip_${empName.replace(/[^a-zA-Z0-9]/g, '_')}_${payslip.year}_${payslip.month}.pdf`,
+                  },
+                }),
+              }
+            );
+          } catch (docErr) {
+            logger.warn(`WhatsApp Meta Cloud API document send failed: ${docErr.message}`);
+          }
         } else {
           errorDetail = resBody.error?.message || 'Meta API error';
           logger.warn(`WhatsApp Meta Cloud API send failed: ${errorDetail}`);

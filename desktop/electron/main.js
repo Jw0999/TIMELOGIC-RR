@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu } = require('electron');
+const { app, BrowserWindow, Menu, shell, ipcMain } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 
@@ -26,11 +26,24 @@ function createWindow() {
 
   Menu.setApplicationMenu(null);
 
-  // The admin shell never needs arbitrary popups or external navigation.
-  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  // Handle external links (e.g. WhatsApp Web/Desktop, download links) by opening in user's default browser or OS app
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^(https?|whatsapp|mailto):/.test(url)) {
+      shell.openExternal(url);
+    }
+    return { action: 'deny' };
+  });
+
   win.webContents.on('will-navigate', (event, url) => {
     const currentUrl = win.webContents.getURL();
-    if (url !== currentUrl) event.preventDefault();
+    if (url !== currentUrl) {
+      if (/^(https?|whatsapp|mailto):/.test(url) && !url.startsWith('http://localhost') && !url.startsWith('file://')) {
+        event.preventDefault();
+        shell.openExternal(url);
+      } else {
+        event.preventDefault();
+      }
+    }
   });
 
   if (isDev) {
@@ -57,4 +70,18 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+// IPC handler to open external URLs in user's default browser or registered OS handler (e.g. WhatsApp)
+ipcMain.handle('open-external', async (_, url) => {
+  try {
+    if (/^(https?|whatsapp|mailto):/.test(url)) {
+      await shell.openExternal(url);
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.error('Failed to open external url:', err);
+    return false;
+  }
 });

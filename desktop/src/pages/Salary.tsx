@@ -316,11 +316,23 @@ export default function Salary() {
 
     setSendingId(emp.id);
     try {
+      // 1. Auto-download official PDF to local device so admin has the file ready in Downloads
+      try {
+        const fileName = `Payslip-${emp.employeeCode || emp.firstName}-${monthNames[selectedMonth - 1]}-${selectedYear}.pdf`;
+        await downloadPayslipPdf(emp.payslipId, fileName);
+      } catch (pdfErr) {
+        console.warn('Auto PDF download skipped:', pdfErr);
+      }
+
+      // 2. Dispatch/prepare WhatsApp message
       const res = await sendPayslipWhatsApp(emp.payslipId);
       if (res?.directUrl && settingsData.whatsappProvider === 'WEB_LINK') {
-        window.open(res.directUrl, '_blank');
+        const opened = await (window as any).electronAPI?.openExternal?.(res.directUrl);
+        if (!opened) {
+          window.open(res.directUrl, '_blank');
+        }
       }
-      setSuccessMsg(`WhatsApp payslip notification sent to ${emp.name}.`);
+      setSuccessMsg(`WhatsApp payslip opened for ${emp.name}. PDF downloaded.`);
       await loadPayroll();
     } catch (err: any) {
       alert(err?.message || 'Failed to dispatch WhatsApp notification');

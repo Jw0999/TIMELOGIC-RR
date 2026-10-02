@@ -6,7 +6,19 @@ const { isAdmin } = require('../middleware/roleGuard');
 const { validate } = require('../middleware/validate');
 const { checkSubscription } = require('../middleware/subscriptionGuard');
 
-// Require authentication and active subscription for all payroll endpoints
+/**
+ * GET /api/payroll/payslips/:id/pdf
+ * Generate and stream download of branded employee payslip PDF
+ * Accessible via UUID so WhatsApp recipient / Meta Cloud API can view/download
+ */
+router.get(
+  '/payslips/:id/pdf',
+  [param('id').isUUID()],
+  validate,
+  ctrl.downloadPayslipPdf
+);
+
+// Require authentication and active subscription for all management endpoints
 router.use(authenticate);
 router.use(checkSubscription);
 
@@ -85,16 +97,6 @@ router.post(
   ctrl.calculatePayroll
 );
 
-/**
- * GET /api/payroll/payslips/:id/pdf
- * Generate and stream download of branded employee payslip PDF
- */
-router.get(
-  '/payslips/:id/pdf',
-  [param('id').isUUID()],
-  validate,
-  ctrl.downloadPayslipPdf
-);
 
 /**
  * POST /api/payroll/payslips/:id/whatsapp
