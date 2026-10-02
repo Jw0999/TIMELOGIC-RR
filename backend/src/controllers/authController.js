@@ -102,11 +102,14 @@ const changePassword = async (req, res, next) => {
 
 const stationLogin = async (req, res, next) => {
   try {
-    const { identifier, email, password } = req.body;
+    const { identifier, email, password, deviceId, deviceName, platform } = req.body;
     const cleanId = identifier || email;
     const result = await AuthService.stationLogin(cleanId, password, {
       ipAddress: req.ip,
       userAgent: req.get('user-agent'),
+      deviceId,
+      deviceName,
+      platform,
     });
     res.json({ success: true, data: result });
   } catch (err) { next(err); }

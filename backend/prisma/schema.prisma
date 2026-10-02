@@ -27,6 +27,9 @@ model Organization {
   timezone           String            @default("Africa/Lagos")
   kioskPasswordHash  String?
   shiftSchedules     Json?
+  maxEmployees       Int?              @default(20)
+  maxKiosks          Int?              @default(1)
+  maxOffices         Int?              @default(1)
   adminLoginEvents   AdminLoginEvent[]
   departments        Department[]
   offices            Office[]
@@ -34,6 +37,7 @@ model Organization {
   users              User[]
   manualPenalties    ManualPenalty[]
   activationCodes    ActivationCode[]
+  kioskDevices       KioskDevice[]
 
   @@map("organizations")
 }
@@ -707,5 +711,26 @@ model ActivationCode {
   @@index([orgId, code])
   @@index([code])
   @@map("activation_codes")
+}
+
+model KioskDevice {
+  id                String       @id @default(uuid())
+  orgId             String
+  deviceId          String       // Client-generated persistent hardware UUID
+  deviceName        String?      // e.g. "Front Desk PC - Windows"
+  platform          String?      // "Windows", "Linux", "macOS", "Android"
+  ipAddress         String?
+  userAgent         String?
+  isBound           Boolean      @default(true)
+  boundAt           DateTime     @default(now())
+  lastLoginAt       DateTime     @default(now())
+  releasedAt        DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  organization      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, deviceId])
+  @@index([orgId, isBound])
+  @@map("kiosk_devices")
 }
 

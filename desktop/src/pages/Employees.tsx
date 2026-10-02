@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Search, UserPlus, Smartphone, X, Eye, Camera, Pencil, Settings2 } from 'lucide-react';
+import { Search, UserPlus, Smartphone, X, Eye, Camera, Pencil, Settings2, AlertTriangle } from 'lucide-react';
 import Header from '../components/Header';
-import { fetchEmployees, createEmployee, updateEmployee, suspendUser, activateUser, deleteEmployee, resetDevice, fetchDepartments, fetchEmployeeSummary, fetchAdminOrg } from '../services';
+import { fetchEmployees, createEmployee, updateEmployee, suspendUser, activateUser, deleteEmployee, resetDevice, fetchDepartments, fetchEmployeeSummary, fetchAdminOrg, fetchPlanInfo } from '../services';
 import { API_URL, SOCKET_URL } from '../config';
 import { getToken, authenticatedFetch } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -487,6 +487,7 @@ export default function Employees() {
   const [employees, setEmployees] = useState<any[]>([]);
   const [depts, setDepts] = useState<any[]>([]);
   const [offices, setOffices] = useState<any[]>([]);
+  const [planInfo, setPlanInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [shift, setShift] = useState('All');
@@ -498,12 +499,13 @@ export default function Employees() {
 
   const load = () => {
     setLoadError('');
-    Promise.all([fetchEmployees(), fetchDepartments(), fetchAdminOrg()])
-      .then(([e, d, org]) => {
+    Promise.all([fetchEmployees(), fetchDepartments(), fetchAdminOrg(), fetchPlanInfo().catch(() => null)])
+      .then(([e, d, org, plan]) => {
         const emps = e.filter((u: any) => u.role === 'EMPLOYEE');
         setEmployees(emps);
         setDepts(d);
         if (org?.offices) setOffices(org.offices);
+        if (plan) setPlanInfo(plan);
         if (viewEmp) {
           const fresh = emps.find((u: any) => u.id === viewEmp.id);
           if (fresh) setViewEmp(fresh);
@@ -522,23 +524,51 @@ export default function Employees() {
     return matchesSearch && matchesShift && matchesOffice;
   });
 
+  const activeCount = employees.filter((e: any) => e.status !== 'TERMINATED').length;
+  const isAtEmployeeLimit = planInfo && planInfo.limit !== null && activeCount >= planInfo.limit;
+
+  const handleAddClick = () => {
+    if (isAtEmployeeLimit) {
+      alert(`You have reached the maximum employee limit for your ${planInfo.planName} plan (${activeCount}/${planInfo.limit} employees).\n\nPlease contact your Super Administrator to upgrade to Enterprise for expanded capacity.`);
+      return;
+    }
+    setShowAdd(true);
+  };
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <Header
         title="Employees"
-        subtitle={`${employees.filter((e: any) => e.status !== 'TERMINATED').length} active · ${employees.length} total`}
+        subtitle={`${activeCount} active · ${planInfo?.limit ? `Plan Capacity: ${activeCount}/${planInfo.limit} staff (${planInfo.planName})` : `${employees.length} total staff`}`}
         action={
           availableMethods(organization).length === 0 ? (
             <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 text-sm font-semibold rounded-xl">
               <Settings2 size={15} />No check-in channel enabled
             </div>
           ) : (
-            <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 bg-primary-700 hover:bg-primary-800 text-white text-sm font-semibold px-4 py-2 rounded-xl transition">
+            <button
+              onClick={handleAddClick}
+              className={`flex items-center gap-2 text-white text-sm font-semibold px-4 py-2 rounded-xl transition ${
+                isAtEmployeeLimit
+                  ? 'bg-amber-600 hover:bg-amber-700'
+                  : 'bg-primary-700 hover:bg-primary-800'
+              }`}
+            >
               <UserPlus size={15} />Add Employee
             </button>
           )
         }
       />
+      {isAtEmployeeLimit && (
+        <div className="mx-6 mt-4 p-3.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5 text-amber-800 dark:text-amber-300 text-xs font-semibold">
+            <AlertTriangle size={16} className="shrink-0 text-amber-600" />
+            <span>
+              Employee capacity limit reached ({activeCount}/{planInfo.limit} on {planInfo.planName} Plan). Contact your Super Administrator to upgrade to Enterprise for expanded workforce capacity.
+            </span>
+          </div>
+        </div>
+      )}
       <div className="flex-1 overflow-y-auto p-6">
         {loadError && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{loadError}</div>}
         <div className="flex flex-wrap items-center gap-3 mb-5">

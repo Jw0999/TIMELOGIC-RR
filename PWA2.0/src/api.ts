@@ -66,9 +66,41 @@ export const api = {
   put: <T>(path: string, data: unknown) => request<T>(path, { method: 'PUT', body: JSON.stringify(data) }),
 };
 
+export function getOrCreateKioskDeviceId(): string {
+  let id = localStorage.getItem('timelogic_kiosk_device_id');
+  if (!id) {
+    id = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `kiosk-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    localStorage.setItem('timelogic_kiosk_device_id', id);
+  }
+  return id;
+}
+
+export function getKioskDeviceMeta() {
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+  let platform = 'PC Terminal';
+  if (/windows/i.test(ua)) platform = 'Windows PC';
+  else if (/macintosh|mac os x/i.test(ua)) platform = 'macOS Terminal';
+  else if (/linux/i.test(ua)) platform = 'Linux Terminal';
+  else if (/android/i.test(ua)) platform = 'Android Device';
+
+  const host = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'kiosk';
+  const deviceName = `${platform} (${host})`;
+
+  return {
+    deviceId: getOrCreateKioskDeviceId(),
+    deviceName,
+    platform,
+  };
+}
+
 export async function login(identifier: string, password: string) {
-  const body = identifier.includes('@') ? { email: identifier, password } : { employeeCode: identifier, password };
-  const response = await api.post<{ data: { accessToken: string; refreshToken: string; user: AdminUser } }>('/auth/station-login', body);
+  const meta = getKioskDeviceMeta();
+  const body = identifier.includes('@')
+    ? { email: identifier, password, ...meta }
+    : { employeeCode: identifier, password, ...meta };
+  const response = await api.post<{ data: { accessToken: string; refreshToken: string; user: AdminUser; boundDevice?: any } }>('/auth/station-login', body);
   if (!['ADMIN', 'SUPER_ADMIN'].includes(response.data.user.role)) throw new Error('Only administrator accounts can use this station.');
   accessToken = response.data.accessToken;
   localStorage.setItem('timelogic_admin_access', response.data.accessToken);

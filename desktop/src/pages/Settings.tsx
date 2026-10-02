@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Shield, Wifi, Smartphone, Lock, Clock, Building2, AlertTriangle, EyeOff, UserCheck, GraduationCap, KeyRound } from 'lucide-react';
-import { fetchAdminOrg, setStationPassword as apiSetStationPassword, fetchStationPasswordStatus } from '../services';
+import { Shield, Wifi, Smartphone, Lock, Clock, Building2, AlertTriangle, EyeOff, UserCheck, GraduationCap, KeyRound, Monitor } from 'lucide-react';
+import { fetchAdminOrg, setStationPassword as apiSetStationPassword, fetchStationPasswordStatus, fetchKioskDevices, releaseKioskDevice } from '../services';
 import { useAuth } from '../context/AuthContext';
 
 // Read-only badge for a setting that's locked to Super Admin
@@ -23,6 +23,47 @@ export default function Settings() {
   const [savingPwd, setSavingPwd] = useState(false);
   const [pwdMsg, setPwdMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  const [kioskData, setKioskData] = useState<{
+    organization?: {
+      subscriptionTier?: string;
+      maxEmployees?: number | null;
+      maxKiosks?: number | null;
+      activeEmployeesCount?: number;
+      boundKiosksCount?: number;
+    };
+    devices?: any[];
+  } | null>(null);
+  const [loadingKiosks, setLoadingKiosks] = useState(false);
+  const [releasingId, setReleasingId] = useState<string | null>(null);
+  const [kioskMsg, setKioskMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const loadKiosks = async () => {
+    try {
+      setLoadingKiosks(true);
+      const res = await fetchKioskDevices();
+      setKioskData(res);
+    } catch (_) {}
+    finally { setLoadingKiosks(false); }
+  };
+
+  const handleReleaseKiosk = async (deviceId: string, deviceName?: string) => {
+    const confirmRelease = window.confirm(
+      `Are you sure you want to release "${deviceName || 'this kiosk device'}"?\n\nOnce released, this PC will no longer be locked to the kiosk slot, allowing another PC to authenticate and become the authorized terminal.`
+    );
+    if (!confirmRelease) return;
+    try {
+      setReleasingId(deviceId);
+      setKioskMsg(null);
+      await releaseKioskDevice(deviceId);
+      setKioskMsg({ type: 'success', text: 'Kiosk device released successfully. You can now log in on a new PC to bind it.' });
+      await loadKiosks();
+    } catch (err: any) {
+      setKioskMsg({ type: 'error', text: err?.message || 'Failed to release device' });
+    } finally {
+      setReleasingId(null);
+    }
+  };
+
   const loadOrg = async () => {
     try {
       const [org, status] = await Promise.all([
@@ -38,6 +79,7 @@ export default function Settings() {
       } else if (org?.hasStationPassword !== undefined) {
         setHasStationPassword(org.hasStationPassword);
       }
+      await loadKiosks();
     } finally { setLoading(false); }
   };
 
@@ -157,6 +199,88 @@ export default function Settings() {
               Note: Desktop Admin passwords can only be changed by the Super Administrator. The password set here will only be accepted on PWA 2.0 stations.
             </p>
           </form>
+        </div>
+
+        {/* Authorized Kiosk Terminals & Hardware Binding Card */}
+        <div className="bg-[var(--card-bg)] rounded-2xl border border-[var(--border)] p-5">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+            <div>
+              <h3 className="font-bold text-[var(--text-main)] mb-1 flex items-center gap-2">
+                <Monitor size={16} className="text-primary-600" />
+                Authorized Attendance Kiosks & Hardware Binding
+              </h3>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                Attendance kiosks are automatically bound to authorized physical computers. Once bound, other PCs cannot sign in until you release the terminal here.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${
+                kioskData?.organization?.subscriptionTier === 'enterprise'
+                  ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+                  : kioskData?.organization?.subscriptionTier === 'custom'
+                  ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300'
+                  : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+              }`}>
+                {kioskData?.organization?.subscriptionTier === 'enterprise' ? 'Enterprise (Unlimited Kiosks)' : kioskData?.organization?.subscriptionTier === 'custom' ? 'Custom Plan' : 'Starter Plan (1 Kiosk Max)'}
+              </span>
+            </div>
+          </div>
+
+          {kioskMsg && (
+            <div className={`p-3 rounded-xl text-xs font-semibold mt-4 ${kioskMsg.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+              {kioskMsg.text}
+            </div>
+          )}
+
+          <div className="mt-4">
+            {loadingKiosks ? (
+              <div className="py-6 text-center text-xs text-[var(--text-muted)]">Loading bound kiosk stations…</div>
+            ) : !kioskData?.devices?.length ? (
+              <div className="p-4 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)] text-xs text-[var(--text-muted)] flex items-center justify-between">
+                <span>No kiosk stations currently bound. Log into PWA 2.0 on your kiosk PC with the Station Password to automatically bind it.</span>
+                <span className="text-[11px] font-bold text-emerald-600">Slot Open</span>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {kioskData.devices.map((device: any) => (
+                  <div
+                    key={device.id}
+                    className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--hover-bg)] flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-[var(--text-main)]">
+                          {device.deviceName || 'Kiosk Terminal'}
+                        </span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          device.isBound
+                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                            : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                        }`}>
+                          {device.isBound ? 'Bound & Locked' : 'Released / Open'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[var(--text-muted)]">
+                        Platform: {device.platform || 'Unknown OS'} {device.ipAddress ? `· IP: ${device.ipAddress}` : ''} · Last active: {new Date(device.lastLoginAt).toLocaleString()}
+                      </p>
+                    </div>
+
+                    {device.isBound ? (
+                      <button
+                        onClick={() => handleReleaseKiosk(device.id, device.deviceName)}
+                        disabled={releasingId === device.id}
+                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition disabled:opacity-50 shrink-0 self-start sm:self-center"
+                      >
+                        {releasingId === device.id ? 'Releasing…' : 'Release Device Binding'}
+                      </button>
+                    ) : (
+                      <span className="text-xs font-semibold text-[var(--text-muted)] shrink-0">Unbound</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Configured Shift Schedules Card */}

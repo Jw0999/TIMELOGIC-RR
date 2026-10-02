@@ -109,6 +109,8 @@ function LoginScreen({ onLogin }: { onLogin: (user: AdminUser) => void }) {
     } catch (e: any) {
       if (e?.code === 'SUBSCRIPTION_EXPIRED' || e?.message?.includes('subscription has expired')) {
         setError('Subscription expired. Please contact your organization administrator.');
+      } else if (e?.code === 'KIOSK_DEVICE_LOCKED' || e?.message?.includes('locked to an authorized terminal') || e?.message?.includes('releases the station binding')) {
+        setError(e?.message || 'This attendance kiosk is locked to another authorized PC terminal. Please have your Desktop Administrator release the station binding in Desktop Settings to authorize this computer.');
       } else {
         setError(e instanceof Error ? e.message : 'Unable to sign in.');
       }

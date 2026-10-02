@@ -104,6 +104,10 @@ export const setStationPassword = (stationPassword: string) =>
   api.put<any>('/admin/station-password', { stationPassword }).then((r) => r.data);
 export const fetchStationPasswordStatus = () =>
   api.get<any>('/admin/station-password').then((r) => r.data);
+export const fetchKioskDevices = () =>
+  api.get<any>('/admin/kiosk-devices').then((r) => r.data);
+export const releaseKioskDevice = (id: string) =>
+  api.put<any>(`/admin/kiosk-devices/${id}/release`, {}).then((r) => r.data);
 export const suspendUser      = (id: string) => api.put<any>(`/admin/users/${id}/suspend`, {});
 export const activateUser     = (id: string) => api.put<any>(`/admin/users/${id}`, { status: 'ACTIVE' });
 export const deleteEmployee   = (id: string) => api.delete<any>(`/admin/users/${id}`);

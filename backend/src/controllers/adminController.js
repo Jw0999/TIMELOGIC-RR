@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const EmergencyControlService = require('../services/EmergencyControlService');
 const AttendanceService = require('../services/AttendanceService');
 const EmployeePolicy = require('../services/EmployeePolicyService');
+const PlanPolicy = require('../services/PlanPolicyService');
 const AuditService = require('../services/AuditService');
 const { hasValidEnrolledFace } = require('../utils/faceVerify');
 const { getOrgSubscriptionStatus, redeemActivationCode } = require('../utils/subscription');
@@ -69,6 +70,7 @@ const createOffice = async (req, res, next) => {
   try {
     const { name, address, timezone } = req.body;
     const targetOrgId = await resolveAdminOrgId(req);
+    await PlanPolicy.assertCanAddOffice(targetOrgId);
     const office = await prisma.office.create({
       data: { id: uuidv4(), orgId: targetOrgId, name, address, timezone },
     });
@@ -374,6 +376,8 @@ const createEmployee = async (req, res, next) => {
   try {
     const { firstName, lastName, email, password, employeeCode, departmentId, officeId, shiftType, phone, checkInMethod = 'MANUAL' } = req.body;
     const targetOrgId = await resolveAdminOrgId(req);
+
+    await PlanPolicy.assertCanAddEmployee(targetOrgId);
 
     const org = await prisma.organization.findUnique({
       where: { id: targetOrgId },
@@ -787,6 +791,95 @@ const redeemCode = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+const getKioskDevices = async (req, res, next) => {
+  try {
+    const orgId = await resolveAdminOrgId(req);
+    const org = await prisma.organization.findUnique({
+      where: { id: orgId },
+      select: {
+        id: true,
+        name: true,
+        subscriptionTier: true,
+        maxEmployees: true,
+        maxKiosks: true,
+        maxOffices: true,
+        _count: {
+          select: {
+            users: { where: { role: 'EMPLOYEE', status: { not: 'TERMINATED' } } },
+            offices: { where: { isActive: true } },
+          },
+        },
+      },
+    });
+    if (!org) return res.status(404).json({ success: false, message: 'Organization not found.' });
+
+    const devices = await prisma.kioskDevice.findMany({
+      where: { orgId },
+      orderBy: [{ isBound: 'desc' }, { lastLoginAt: 'desc' }],
+    });
+
+    const activeEmployeesCount = org._count?.users || 0;
+    const activeOfficesCount = org._count?.offices || 0;
+    const boundKiosksCount = devices.filter((d) => d.isBound).length;
+
+    res.json({
+      success: true,
+      data: {
+        organization: {
+          id: org.id,
+          name: org.name,
+          subscriptionTier: org.subscriptionTier,
+          maxEmployees: org.maxEmployees,
+          maxKiosks: org.maxKiosks,
+          maxOffices: org.maxOffices,
+          activeEmployeesCount,
+          activeOfficesCount,
+          boundKiosksCount,
+        },
+        devices,
+      },
+    });
+  } catch (err) { next(err); }
+};
+
+const releaseKioskDevice = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const orgId = await resolveAdminOrgId(req);
+
+    const device = await prisma.kioskDevice.findFirst({
+      where: { id, orgId },
+    });
+    if (!device) return res.status(404).json({ success: false, message: 'Kiosk device not found.' });
+
+    const updated = await prisma.kioskDevice.update({
+      where: { id },
+      data: {
+        isBound: false,
+        releasedAt: new Date(),
+      },
+    });
+
+    await AuditService.log({
+      actorId: req.user?.id,
+      actorEmail: req.user?.email,
+      actorRole: req.user?.role || 'ADMIN',
+      action: 'KIOSK_DEVICE_RELEASED',
+      targetId: id,
+      targetType: 'KIOSK_DEVICE',
+      details: { deviceName: device.deviceName, deviceId: device.deviceId },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    res.json({
+      success: true,
+      message: 'Kiosk device released successfully. The kiosk slot is now open for another PC.',
+      data: updated,
+    });
+  } catch (err) { next(err); }
+};
+
 module.exports = {
   getOrg, updateOrg,
   createOffice,
@@ -799,6 +892,7 @@ module.exports = {
   getManualAttendance, findManualEmployee, manualCheckIn, manualCheckOut,
   listPenalties, createPenalty, deletePenalty, waiveEmployeeAutoPenalties,
   setStationPassword, getStationPasswordStatus,
+  getKioskDevices, releaseKioskDevice,
   resolveAdminOrgId,
   getSubscriptionStatus, redeemCode,
 };

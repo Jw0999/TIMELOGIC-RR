@@ -52,22 +52,35 @@ router.post('/offices', authenticate, isSuperAdmin, [
   body('timezone').notEmpty(),
 ], validate, ctrl.createOffice);
 
-// Get org plan info (all organizations now have unlimited capacity)
+// Get org plan info and capacity
 router.get('/plan', authenticate, isAdmin, async (req, res, next) => {
   try {
-    const [active, total] = await Promise.all([
+    const org = await prisma.organization.findUnique({
+      where: { id: req.user.orgId },
+      select: { subscriptionTier: true, maxEmployees: true, maxKiosks: true, maxOffices: true },
+    });
+    const [active, total, boundKiosks] = await Promise.all([
       prisma.user.count({ where: { orgId: req.user.orgId, role: 'EMPLOYEE', status: { not: 'TERMINATED' } } }),
       prisma.user.count({ where: { orgId: req.user.orgId, role: 'EMPLOYEE' } }),
+      prisma.kioskDevice.count({ where: { orgId: req.user.orgId, isBound: true } }),
     ]);
+    const maxEmployees = org?.maxEmployees ?? (org?.subscriptionTier === 'enterprise' ? 60 : 20);
+    const maxKiosks = org?.maxKiosks ?? (org?.subscriptionTier === 'enterprise' ? null : 1);
+    const tier = org?.subscriptionTier || 'starter';
+    const planName = tier === 'enterprise' ? 'Enterprise' : tier === 'custom' ? 'Custom' : 'Starter';
+    const canAddMore = maxEmployees === null ? true : active < maxEmployees;
     res.json({
       success: true,
       data: {
-        plan: 'unlimited',
-        planName: 'Unlimited',
-        limit: null,
+        plan: tier,
+        planName,
+        limit: maxEmployees,
+        maxEmployees,
+        maxKiosks,
         activeEmployees: active,
         totalEmployees: total,
-        canAddMore: true,
+        boundKiosks,
+        canAddMore,
       },
     });
   } catch (err) { next(err); }
@@ -181,6 +194,10 @@ router.get('/station-password', authenticate, isAdmin, ctrl.getStationPasswordSt
 router.put('/station-password', authenticate, isAdmin, [
   body('stationPassword').isLength({ min: 6 }).withMessage('Station password must be at least 6 characters'),
 ], validate, ctrl.setStationPassword);
+
+// Kiosk Devices & Hardware Binding
+router.get('/kiosk-devices', authenticate, isAdmin, ctrl.getKioskDevices);
+router.put('/kiosk-devices/:id/release', authenticate, isAdmin, ctrl.releaseKioskDevice);
 
 const { validateStrongPassword } = require('../utils/passwordPolicy');
 

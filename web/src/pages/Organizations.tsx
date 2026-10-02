@@ -34,6 +34,9 @@ const defaultShiftSchedules = (): ShiftSchedules => ({
 
 interface OrgFormData {
   name: string; industry: string;
+  subscriptionTier: 'starter' | 'enterprise' | 'custom';
+  maxEmployees: number | null;
+  maxKiosks: number | null;
   allowDeviceCheckIn: boolean; allowManualCheckIn: boolean; hasStudents: boolean;
   timezone: string;
   shiftSchedules: ShiftSchedules;
@@ -58,6 +61,9 @@ const newOffice = () => ({
 });
 const defaultForm = (): OrgFormData => ({
   name: '', industry: 'Technology',
+  subscriptionTier: 'starter',
+  maxEmployees: 20,
+  maxKiosks: 1,
   allowDeviceCheckIn: true, allowManualCheckIn: false, hasStudents: false,
   timezone: 'Africa/Lagos',
   shiftSchedules: defaultShiftSchedules(),
@@ -114,6 +120,9 @@ function OrgModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
       await createOrg({
         name: form.name.trim(),
         industry: form.industry,
+        subscriptionTier: form.subscriptionTier,
+        maxEmployees: form.maxEmployees,
+        maxKiosks: form.maxKiosks,
         allowDeviceCheckIn: form.allowDeviceCheckIn,
         allowManualCheckIn: form.allowManualCheckIn,
         hasStudents: form.hasStudents,
@@ -206,6 +215,89 @@ function OrgModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
                 })}
               </div>
             </div>
+            <div className="p-4 bg-[var(--hover-bg)] rounded-xl border border-[var(--border)] space-y-3">
+              <div>
+                <p className="text-sm font-bold text-[var(--text-main)]">Deployment Plan *</p>
+                <p className="text-[11px] text-[var(--text-muted)] mt-0.5">Select the monthly subscription tier for capacity and hardware terminal limits.</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div
+                  onClick={() => setForm((p) => ({ ...p, subscriptionTier: 'starter', maxEmployees: 20, maxKiosks: 1 }))}
+                  className={`p-3.5 rounded-xl border cursor-pointer transition ${
+                    form.subscriptionTier === 'starter'
+                      ? 'border-primary-600 bg-primary-50/20 dark:bg-primary-950/30 ring-2 ring-primary-500/20'
+                      : 'border-[var(--border)] bg-[var(--card-bg)] hover:border-[var(--text-muted)]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Starter</span>
+                    <span className="text-[11px] font-semibold text-[var(--text-muted)]">₦20k/mo</span>
+                  </div>
+                  <p className="text-xs font-bold text-[var(--text-main)]">20 Employees</p>
+                  <p className="text-[11px] text-[var(--text-muted)] mt-1">1 Kiosk Terminal · Single Office</p>
+                </div>
+
+                <div
+                  onClick={() => setForm((p) => ({ ...p, subscriptionTier: 'enterprise', maxEmployees: 60, maxKiosks: null }))}
+                  className={`p-3.5 rounded-xl border cursor-pointer transition ${
+                    form.subscriptionTier === 'enterprise'
+                      ? 'border-purple-600 bg-purple-50/20 dark:bg-purple-950/30 ring-2 ring-purple-500/20'
+                      : 'border-[var(--border)] bg-[var(--card-bg)] hover:border-[var(--text-muted)]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Enterprise</span>
+                    <span className="text-[11px] font-semibold text-[var(--text-muted)]">₦60k/mo</span>
+                  </div>
+                  <p className="text-xs font-bold text-[var(--text-main)]">60 Employees</p>
+                  <p className="text-[11px] text-[var(--text-muted)] mt-1">Unlimited Kiosks · Multi-Office</p>
+                </div>
+
+                <div
+                  onClick={() => setForm((p) => ({ ...p, subscriptionTier: 'custom', maxEmployees: p.maxEmployees || 100, maxKiosks: p.maxKiosks }))}
+                  className={`p-3.5 rounded-xl border cursor-pointer transition ${
+                    form.subscriptionTier === 'custom'
+                      ? 'border-sky-600 bg-sky-50/20 dark:bg-sky-950/30 ring-2 ring-sky-500/20'
+                      : 'border-[var(--border)] bg-[var(--card-bg)] hover:border-[var(--text-muted)]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">Custom</span>
+                    <span className="text-[11px] font-semibold text-[var(--text-muted)]">Custom</span>
+                  </div>
+                  <p className="text-xs font-bold text-[var(--text-main)]">Flexible Headcount</p>
+                  <p className="text-[11px] text-[var(--text-muted)] mt-1">Custom Kiosks & Facilities</p>
+                </div>
+              </div>
+
+              {form.subscriptionTier === 'custom' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[var(--border)]">
+                  <div>
+                    <label className={lbl}>Max Employees (leave empty for unlimited)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      className={inp}
+                      value={form.maxEmployees ?? ''}
+                      onChange={(e) => setForm((p) => ({ ...p, maxEmployees: e.target.value ? parseInt(e.target.value, 10) : null }))}
+                      placeholder="e.g. 150 (empty = unlimited)"
+                    />
+                  </div>
+                  <div>
+                    <label className={lbl}>Max Kiosk Terminals (leave empty for unlimited)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      className={inp}
+                      value={form.maxKiosks ?? ''}
+                      onChange={(e) => setForm((p) => ({ ...p, maxKiosks: e.target.value ? parseInt(e.target.value, 10) : null }))}
+                      placeholder="e.g. 5 (empty = unlimited)"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="p-4 bg-[var(--hover-bg)] rounded-xl border border-[var(--border)] space-y-3">
               <div>
                 <p className="text-sm font-bold text-[var(--text-main)]">Organization capabilities</p>
@@ -521,6 +613,11 @@ function UsersModal({ org, onClose }: { org: any; onClose: () => void }) {
 function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void; onSaved: () => void }) {
   const [name, setName]       = useState(org.name ?? '');
   const [industry, setIndustry] = useState(org.industry ?? 'Technology');
+  const [subscriptionTier, setSubscriptionTier] = useState<'starter' | 'enterprise' | 'custom'>(
+    org.subscriptionTier === 'enterprise' ? 'enterprise' : org.subscriptionTier === 'custom' ? 'custom' : 'starter'
+  );
+  const [maxEmployees, setMaxEmployees] = useState<number | null>(org.maxEmployees ?? (org.subscriptionTier === 'enterprise' ? 60 : 20));
+  const [maxKiosks, setMaxKiosks] = useState<number | null>(org.maxKiosks ?? (org.subscriptionTier === 'enterprise' ? null : 1));
   const [allowDeviceCheckIn, setAllowDeviceCheckIn] = useState(org.allowDeviceCheckIn ?? true);
   const [allowManualCheckIn, setAllowManualCheckIn] = useState(org.allowManualCheckIn ?? false);
   const [hasStudents, setHasStudents] = useState(org.hasStudents ?? false);
@@ -559,6 +656,9 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
       await updateOrg(org.id, {
         name: name.trim(),
         industry,
+        subscriptionTier,
+        maxEmployees,
+        maxKiosks,
         allowDeviceCheckIn,
         allowManualCheckIn,
         hasStudents,
@@ -583,6 +683,87 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
           {error && <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-sm text-red-700">{error}</div>}
           <div><label className={lbl}>Organization Name</label><input className={inp} value={name} onChange={(e) => setName(e.target.value)}/></div>
           <div><label className={lbl}>Industry</label><select className={inp} value={industry} onChange={(e) => setIndustry(e.target.value)}>{INDUSTRIES.map((i) => <option key={i}>{i}</option>)}</select></div>
+
+          {/* Deployment Plan Tier */}
+          <div className="p-4 bg-[var(--hover-bg)] rounded-xl border border-[var(--border)] space-y-3">
+            <div>
+              <p className="text-sm font-bold text-[var(--text-main)]">Deployment Plan Tier</p>
+              <p className="text-[11px] text-[var(--text-muted)] mt-0.5">Control employee capacity limits and hardware terminal capabilities.</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div
+                onClick={() => { setSubscriptionTier('starter'); setMaxEmployees(20); setMaxKiosks(1); }}
+                className={`p-3 rounded-xl border cursor-pointer transition ${
+                  subscriptionTier === 'starter'
+                    ? 'border-primary-600 bg-primary-50/20 dark:bg-primary-950/30 ring-2 ring-primary-500/20'
+                    : 'border-[var(--border)] bg-[var(--card-bg)] hover:border-[var(--text-muted)]'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Starter</span>
+                  <span className="text-[10px] font-semibold text-[var(--text-muted)]">₦20k</span>
+                </div>
+                <p className="text-xs font-bold text-[var(--text-main)]">20 Staff · 1 Kiosk</p>
+              </div>
+
+              <div
+                onClick={() => { setSubscriptionTier('enterprise'); setMaxEmployees(60); setMaxKiosks(null); }}
+                className={`p-3 rounded-xl border cursor-pointer transition ${
+                  subscriptionTier === 'enterprise'
+                    ? 'border-purple-600 bg-purple-50/20 dark:bg-purple-950/30 ring-2 ring-purple-500/20'
+                    : 'border-[var(--border)] bg-[var(--card-bg)] hover:border-[var(--text-muted)]'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Enterprise</span>
+                  <span className="text-[10px] font-semibold text-[var(--text-muted)]">₦60k</span>
+                </div>
+                <p className="text-xs font-bold text-[var(--text-main)]">60 Staff · Unlimited Kiosks</p>
+              </div>
+
+              <div
+                onClick={() => { setSubscriptionTier('custom'); }}
+                className={`p-3 rounded-xl border cursor-pointer transition ${
+                  subscriptionTier === 'custom'
+                    ? 'border-sky-600 bg-sky-50/20 dark:bg-sky-950/30 ring-2 ring-sky-500/20'
+                    : 'border-[var(--border)] bg-[var(--card-bg)] hover:border-[var(--text-muted)]'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">Custom</span>
+                  <span className="text-[10px] font-semibold text-[var(--text-muted)]">Custom</span>
+                </div>
+                <p className="text-xs font-bold text-[var(--text-main)]">Custom Capacity</p>
+              </div>
+            </div>
+
+            {subscriptionTier === 'custom' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[var(--border)]">
+                <div>
+                  <label className={lbl}>Max Employees (empty = unlimited)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    className={inp}
+                    value={maxEmployees ?? ''}
+                    onChange={(e) => setMaxEmployees(e.target.value ? parseInt(e.target.value, 10) : null)}
+                    placeholder="e.g. 150"
+                  />
+                </div>
+                <div>
+                  <label className={lbl}>Max Kiosks (empty = unlimited)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    className={inp}
+                    value={maxKiosks ?? ''}
+                    onChange={(e) => setMaxKiosks(e.target.value ? parseInt(e.target.value, 10) : null)}
+                    placeholder="e.g. 5"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
 
           <div className="p-4 bg-[var(--hover-bg)] rounded-xl border border-[var(--border)] space-y-3">
             <div>
@@ -774,6 +955,7 @@ export default function Organizations() {
                 <TH>ID</TH>
                 <TH className="min-w-[200px]">Organization</TH>
                 <TH>Industry</TH>
+                <TH className="min-w-[140px]">Plan & Kiosks</TH>
                 <TH className="min-w-[210px]">Capabilities</TH>
                 <TH>Users</TH>
                 <TH>Offices</TH>
@@ -783,11 +965,11 @@ export default function Organizations() {
             </thead>
             <tbody className="divide-y divide-[var(--border)]">
               {loading ? (
-                <tr><td colSpan={8} className="text-center py-14 text-[var(--text-muted)]">
+                <tr><td colSpan={9} className="text-center py-14 text-[var(--text-muted)]">
                   <div className="flex justify-center"><div className="animate-spin rounded-full h-6 w-6 border-2 border-primary-600 border-t-transparent"/></div>
                 </td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={8} className="text-center py-14">
+                <tr><td colSpan={9} className="text-center py-14">
                   <p className="text-sm font-semibold text-[var(--text-muted)]">No organizations found</p>
                 </td></tr>
               ) : filtered.map((o, idx) => {
@@ -814,6 +996,22 @@ export default function Organizations() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-[var(--text-muted)]">{o.industry ?? '—'}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col gap-1">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full w-fit ${
+                          o.subscriptionTier === 'enterprise'
+                            ? 'bg-purple-100 text-purple-700'
+                            : o.subscriptionTier === 'custom'
+                            ? 'bg-sky-100 text-sky-700'
+                            : 'bg-emerald-100 text-emerald-700'
+                        }`}>
+                          {o.subscriptionTier === 'enterprise' ? 'Enterprise' : o.subscriptionTier === 'custom' ? 'Custom' : 'Starter'}
+                        </span>
+                        <p className="text-[10px] text-[var(--text-muted)] whitespace-nowrap">
+                          Cap: {o.maxEmployees ? `${o.maxEmployees} staff` : '∞ staff'} · {o.maxKiosks ? `${o.maxKiosks} kiosk` : '∞ kiosks'}
+                        </p>
+                      </div>
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1.5">
                         {deviceEnabled && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Device</span>}

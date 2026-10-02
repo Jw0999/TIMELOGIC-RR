@@ -5,6 +5,7 @@ const env = require('../config/env');
 const logger = require('../config/logger');
 const { redis, PREFIXES } = require('../config/redis');
 const EmployeePolicy = require('../services/EmployeePolicyService');
+const PlanPolicy = require('../services/PlanPolicyService');
 const AuditService = require('../services/AuditService');
 const { generate8DigitCode, getOrgSubscriptionStatus } = require('../utils/subscription');
 
@@ -29,7 +30,11 @@ const listOrgs = async (req, res, next) => {
   try {
     const orgs = await prisma.organization.findMany({
       include: {
-        _count: { select: { offices: true, departments: true, users: true, students: true } },
+        _count: { select: { offices: true, departments: true, users: true, students: true, kioskDevices: true } },
+        kioskDevices: {
+          where: { isBound: true },
+          select: { id: true, deviceName: true, platform: true, lastLoginAt: true },
+        },
         offices: {
           select: {
             id: true, name: true, address: true, timezone: true, isActive: true,
@@ -62,6 +67,7 @@ const listOrgs = async (req, res, next) => {
         subscriptionExpiresAt: sub.subscriptionExpiresAt,
         daysRemaining: sub.daysRemaining,
         isExpired: sub.isExpired,
+        activeKiosksCount: org.kioskDevices ? org.kioskDevices.length : 0,
       };
     });
 
@@ -74,6 +80,10 @@ const createOrg = async (req, res, next) => {
   try {
     const {
       name, industry,
+      subscriptionTier = 'starter',
+      maxEmployees,
+      maxKiosks,
+      maxOffices,
       allowDeviceCheckIn = true,
       allowManualCheckIn = false,
       hasStudents = false,
@@ -93,6 +103,12 @@ const createOrg = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Enable phone/device check-in, manual check-in, or both.' });
     }
 
+    const resolvedLimits = PlanPolicy.resolvePlanLimits(subscriptionTier, { maxEmployees, maxKiosks, maxOffices });
+
+    if (resolvedLimits.subscriptionTier === 'starter' && offices.length > 1) {
+      return res.status(400).json({ success: false, message: 'Starter plan is limited to 1 office location. Upgrade to Enterprise to add multiple branch offices.' });
+    }
+
     // Check for duplicate email
     const existing = await prisma.user.findUnique({ where: { email: admin.email.toLowerCase() } });
     if (existing) {
@@ -108,7 +124,10 @@ const createOrg = async (req, res, next) => {
           id: uuidv4(),
           name: String(name).trim(),
           industry: industry || 'General',
-          subscriptionTier: 'enterprise',
+          subscriptionTier: resolvedLimits.subscriptionTier,
+          maxEmployees: resolvedLimits.maxEmployees,
+          maxKiosks: resolvedLimits.maxKiosks,
+          maxOffices: resolvedLimits.maxOffices,
           subscriptionStatus: 'EXPIRED',
           subscriptionStart: new Date(),
           subscriptionExpiresAt: new Date(Date.now() - 1000),
@@ -242,8 +261,13 @@ const updateOrg = async (req, res, next) => {
     const { id } = req.params;
     const {
       name, industry, offices = [], departments = [],
+      subscriptionTier, maxEmployees, maxKiosks, maxOffices,
       allowDeviceCheckIn, allowManualCheckIn, hasStudents, openingTime, timezone, shiftSchedules,
     } = req.body;
+
+    const resolvedPlan = subscriptionTier !== undefined
+      ? PlanPolicy.resolvePlanLimits(subscriptionTier, { maxEmployees, maxKiosks, maxOffices })
+      : null;
 
     const current = await prisma.organization.findUnique({
       where: { id },
@@ -286,6 +310,12 @@ const updateOrg = async (req, res, next) => {
         data: {
           ...(name !== undefined ? { name } : {}),
           ...(industry !== undefined ? { industry } : {}),
+          ...(resolvedPlan ? {
+            subscriptionTier: resolvedPlan.subscriptionTier,
+            maxEmployees: resolvedPlan.maxEmployees,
+            maxKiosks: resolvedPlan.maxKiosks,
+            maxOffices: resolvedPlan.maxOffices,
+          } : {}),
           ...(allowDeviceCheckIn !== undefined ? { allowDeviceCheckIn } : {}),
           ...(allowManualCheckIn !== undefined ? { allowManualCheckIn } : {}),
           ...(hasStudents !== undefined ? { hasStudents } : {}),

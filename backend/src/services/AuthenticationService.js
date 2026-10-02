@@ -7,6 +7,7 @@ const env = require('../config/env');
 const logger = require('../config/logger');
 const { getCurrentServerTime } = require('../utils/networkTime');
 const EmployeePolicy = require('./EmployeePolicyService');
+const PlanPolicy = require('./PlanPolicyService');
 const { getOrgSubscriptionStatus } = require('../utils/subscription');
 
 class AuthenticationService {
@@ -214,6 +215,21 @@ class AuthenticationService {
     const loginAt = await getCurrentServerTime();
     await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: loginAt } });
 
+    // Kiosk Hardware Device Binding and Plan Terminal Limit Enforcement
+    let boundKioskDevice = null;
+    if (user.role !== 'SUPER_ADMIN' && user.orgId) {
+      const incomingDeviceId = context.deviceId ? String(context.deviceId).trim() : null;
+      if (incomingDeviceId) {
+        const bindResult = await PlanPolicy.evaluateKioskDeviceBinding(user.orgId, incomingDeviceId, {
+          deviceName: context.deviceName,
+          platform: context.platform,
+          ipAddress: context.ipAddress,
+          userAgent: context.userAgent,
+        });
+        boundKioskDevice = bindResult.device;
+      }
+    }
+
     const accessToken = this._signAccess(user);
     const refreshToken = await this._createRefreshToken(user.id);
 
@@ -221,6 +237,7 @@ class AuthenticationService {
       accessToken,
       refreshToken,
       user: { ...this._safeUser(user), lastLoginAt: loginAt, organization: user.organization },
+      boundDevice: boundKioskDevice,
     };
   }
 
