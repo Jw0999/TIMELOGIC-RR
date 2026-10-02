@@ -57,6 +57,7 @@ const listOrgs = async (req, res, next) => {
       const sub = getOrgSubscriptionStatus(org);
       return {
         ...org,
+        subscription: sub,
         subscriptionStatus: sub.status,
         subscriptionExpiresAt: sub.subscriptionExpiresAt,
         daysRemaining: sub.daysRemaining,

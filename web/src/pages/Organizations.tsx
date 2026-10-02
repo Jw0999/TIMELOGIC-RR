@@ -796,8 +796,9 @@ export default function Organizations() {
                 const manualEnabled = o.allowManualCheckIn ?? false;
                 const studentsEnabled = o.hasStudents ?? false;
                 const sub = o.subscription || {};
-                const isExpired = sub.isExpired;
-                const days = sub.daysRemaining ?? 0;
+                const isExpired = sub.isExpired ?? o.isExpired ?? (o.subscriptionStatus === 'EXPIRED');
+                const days = sub.daysRemaining ?? o.daysRemaining ?? 0;
+                const expiryDate = sub.subscriptionExpiresAt ?? o.subscriptionExpiresAt;
                 return (
                   <tr key={o.id} className="hover:bg-[var(--hover-bg)] transition-colors">
                     <td className="px-4 py-3 text-xs font-mono text-[var(--text-muted)]">{String(idx + 1).padStart(5,'0')}</td>
@@ -833,14 +834,21 @@ export default function Organizations() {
                             </span>
                           ) : days <= 5 ? (
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" /> Due ({days}d)
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" /> Due ({days}d left)
                             </span>
                           ) : (
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Active ({days}d)
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Active ({days}d left)
                             </span>
                           )}
                         </div>
+                        <p className="text-[10px] text-[var(--text-muted)] whitespace-nowrap">
+                          {expiryDate && !isExpired
+                            ? `Expires ${new Date(expiryDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
+                            : isExpired
+                            ? 'Locked out'
+                            : 'No active code'}
+                        </p>
                         <button
                           onClick={() => setLicenseOrg(o)}
                           className="inline-flex items-center gap-1 text-[11px] font-bold text-primary-700 hover:text-primary-900 transition-colors w-fit"
@@ -1008,9 +1016,10 @@ function ActivationCodeModal({ org, onClose }: { org: any; onClose: () => void }
   };
 
   const sub = org.subscription || {};
-  const isExpired = sub.isExpired;
-  const days = sub.daysRemaining ?? 0;
-  const expiresAt = sub.subscriptionExpiresAt ? new Date(sub.subscriptionExpiresAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Not set';
+  const isExpired = sub.isExpired ?? org.isExpired ?? (org.subscriptionStatus === 'EXPIRED');
+  const days = sub.daysRemaining ?? org.daysRemaining ?? 0;
+  const expiryRaw = sub.subscriptionExpiresAt ?? org.subscriptionExpiresAt;
+  const expiresAt = expiryRaw ? new Date(expiryRaw).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Not set';
 
   const waMessage = latestCode 
     ? encodeURIComponent(`Hello ${org.name},\nHere is your TimeLogic 30-day activation code: *${latestCode}*.\n\nPlease enter this code in your TimeLogic Desktop Application to activate/renew your subscription.\nThank you!`)
