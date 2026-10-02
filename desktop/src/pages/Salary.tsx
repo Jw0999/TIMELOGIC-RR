@@ -332,7 +332,7 @@ export default function Salary() {
           window.open(res.directUrl, '_blank');
         }
       }
-      setSuccessMsg(`WhatsApp payslip opened for ${emp.name}. PDF downloaded.`);
+      setSuccessMsg(`WhatsApp opened for ${emp.name}. PDF saved to Downloads — drag & drop it into the chat.`);
       await loadPayroll();
     } catch (err: any) {
       alert(err?.message || 'Failed to dispatch WhatsApp notification');
