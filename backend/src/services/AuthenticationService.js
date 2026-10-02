@@ -231,7 +231,7 @@ class AuthenticationService {
     }
 
     const accessToken = this._signAccess(user, '30d');
-    const refreshToken = await this._createRefreshToken(user.id);
+    const refreshToken = await this._createRefreshToken(user.id, '90d');
 
     return {
       accessToken,
@@ -275,8 +275,17 @@ class AuthenticationService {
       EmployeePolicy.assertChannelAllowed(org, user.checkInMethod, 'PHONE');
     }
 
-    const accessToken = this._signAccess(user);
-    return { accessToken };
+    const isAdminStation = ['ADMIN', 'SUPER_ADMIN'].includes(user.role);
+    const accessToken = isAdminStation ? this._signAccess(user, '30d') : this._signAccess(user);
+
+    // Rotate refresh token for admin kiosk station so sessions never expire mid-use
+    let newRefreshToken = rawRefreshToken;
+    if (isAdminStation) {
+      newRefreshToken = await this._createRefreshToken(user.id, '90d');
+      await prisma.refreshToken.delete({ where: { id: stored.id } }).catch(() => {});
+    }
+
+    return { accessToken, refreshToken: newRefreshToken };
   }
 
   async registerDevice(userId, deviceData) {
@@ -424,12 +433,12 @@ class AuthenticationService {
     );
   }
 
-  async _createRefreshToken(userId) {
+  async _createRefreshToken(userId, expiresIn = env.JWT_REFRESH_EXPIRES_IN || '7d') {
     const id = uuidv4();
     const token = jwt.sign(
       { sub: userId, jti: id },
       env.JWT_REFRESH_SECRET,
-      { expiresIn: env.JWT_REFRESH_EXPIRES_IN }
+      { expiresIn }
     );
     const decoded = jwt.decode(token);
     const expiresAt = new Date(decoded.exp * 1000);

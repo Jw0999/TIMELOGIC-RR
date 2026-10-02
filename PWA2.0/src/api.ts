@@ -86,11 +86,9 @@ async function request<T>(path: string, options: RequestInit = {}, retry = true)
   const body = await response.json().catch(() => null);
   if (response.status === 401 && retry && !path.includes('/auth/')) {
     if (await refresh()) return request<T>(path, options, false);
-    if (navigator.onLine) {
-      clearSession();
-      throw new Error('Your session expired. Please sign in again.');
-    }
-    throw new Error('Unable to connect to TimeLogic services. Offline mode active.');
+    // Do NOT wipe tokens on background polling 401 errors.
+    // Throw auth error so caller can gracefully use offline fallback.
+    throw new Error('Your session expired. Please sign in again.');
   }
   if (response.status === 403 && body?.code === 'SUBSCRIPTION_EXPIRED') {
     window.dispatchEvent(new CustomEvent('kiosk:subscription_expired', { detail: body }));
@@ -215,7 +213,12 @@ export async function getDashboard(sessionId?: string, search?: string): Promise
       const { getPendingOutbox } = await import('./offline/db');
       const pending = await getPendingOutbox().catch(() => []);
       for (const item of pending) {
-        const emp = data.employees.find((e) => e.id === item.employeeId);
+        const emp = data.employees.find(
+          (e) =>
+            e.id === item.employeeId ||
+            `${e.firstName} ${e.lastName}`.toLowerCase() === item.employeeName.toLowerCase() ||
+            e.employeeCode?.toLowerCase() === item.employeeName.toLowerCase()
+        );
         if (emp) {
           if (item.type === 'check_in') {
             emp.attendance = {
@@ -235,53 +238,84 @@ export async function getDashboard(sessionId?: string, search?: string): Promise
     }
     return data;
   } catch (err: any) {
-    if (!navigator.onLine || err.message?.includes('Unable to connect') || err.message?.includes('Failed to fetch')) {
-      const cached = await getCachedRoster();
-      if (cached.employees.length > 0) {
-        let employees = cached.employees;
-        if (search && search.trim()) {
-          const s = search.trim().toLowerCase();
-          employees = employees.filter(
-            (e) =>
-              e.firstName.toLowerCase().includes(s) ||
-              e.lastName.toLowerCase().includes(s) ||
-              e.employeeCode?.toLowerCase().includes(s) ||
-              e.email?.toLowerCase().includes(s)
-          );
-        }
-        const selectedSession = cached.sessions.find((s) => s.id === sessionId) || cached.sessions[0] || null;
-        return {
-          enabled: true,
-          serverTime: new Date().toISOString(),
-          organization: {
-            id: 'offline-org',
-            name: 'Offline Kiosk Terminal',
-            allowManualCheckIn: true,
-          },
-          activeSessions: cached.sessions,
-          selectedSession,
-          employees,
-          total: employees.length,
-          totalPages: 1,
-          isOffline: true,
-        };
+    // ALWAYS fall back to cached roster when request fails (offline, 401, network drop, etc.)!
+    const cached = await getCachedRoster().catch(() => null);
+    if (cached && cached.employees.length > 0) {
+      let employees = cached.employees;
+      if (search && search.trim()) {
+        const s = search.trim().toLowerCase();
+        employees = employees.filter(
+          (e) =>
+            e.firstName.toLowerCase().includes(s) ||
+            e.lastName.toLowerCase().includes(s) ||
+            e.employeeCode?.toLowerCase().includes(s) ||
+            e.email?.toLowerCase().includes(s)
+        );
       }
+      const selectedSession = cached.sessions.find((s) => s.id === sessionId) || cached.sessions[0] || null;
+      return {
+        enabled: true,
+        serverTime: new Date().toISOString(),
+        organization: {
+          id: 'offline-org',
+          name: 'Offline Kiosk Terminal',
+          allowManualCheckIn: true,
+        },
+        activeSessions: cached.sessions,
+        selectedSession,
+        employees,
+        total: employees.length,
+        totalPages: 1,
+        isOffline: true,
+      };
     }
     throw err;
   }
 }
 
 export async function findManualEmployee(email: string): Promise<Employee> {
+  const cleanEmail = email.trim().toLowerCase();
+  let emp: Employee | null = null;
   try {
-    const query = new URLSearchParams({ email });
-    return (await api.get<{ data: Employee }>(`/admin/manual-attendance/employee?${query}`)).data;
-  } catch (err: any) {
-    if (!navigator.onLine || err.message?.includes('Unable to connect') || err.message?.includes('Failed to fetch')) {
-      const offlineEmp = await findEmployeeOffline(email);
-      if (offlineEmp) return offlineEmp;
-    }
-    throw err;
+    const query = new URLSearchParams({ email: cleanEmail });
+    emp = (await api.get<{ data: Employee }>(`/admin/manual-attendance/employee?${query}`)).data;
+  } catch {
+    emp = await findEmployeeOffline(cleanEmail);
   }
+
+  if (!emp) {
+    emp = await findEmployeeOffline(cleanEmail);
+  }
+
+  if (!emp) {
+    throw new Error('No active employee was found with that registered Gmail address.');
+  }
+
+  // ALWAYS overlay any pending attendance action from outbox onto this employee!
+  const { getPendingOutbox } = await import('./offline/db');
+  const pending = await getPendingOutbox().catch(() => []);
+  const matching = pending.find(
+    (p) =>
+      p.employeeId === emp!.id ||
+      p.employeeName?.toLowerCase() === `${emp!.firstName} ${emp!.lastName}`.toLowerCase()
+  );
+  if (matching) {
+    if (matching.type === 'check_in') {
+      emp.attendance = {
+        sessionId: matching.sessionId || emp.attendance?.sessionId,
+        clockInTime: matching.timestamp,
+        clockOutTime: null,
+        status: 'PRESENT',
+      };
+    } else if (matching.type === 'check_out') {
+      emp.attendance = {
+        ...(emp.attendance || {}),
+        clockOutTime: matching.timestamp,
+      };
+    }
+  }
+
+  return emp;
 }
 
 export async function manualCheckIn(

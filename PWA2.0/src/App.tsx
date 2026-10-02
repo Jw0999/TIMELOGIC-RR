@@ -545,6 +545,13 @@ function App() {
     setResetCountdown(null);
     try {
       const emp = await findManualEmployee(email);
+      // Double check if this employee was already optimistically updated in dashboard.employees
+      const currentInDashboard = dashboard?.employees.find(
+        (item) => item.id === emp.id || item.email?.toLowerCase() === email
+      );
+      if (currentInDashboard?.attendance?.clockInTime && !emp.attendance?.clockInTime) {
+        emp.attendance = currentInDashboard.attendance;
+      }
       setIdentifiedEmployee(emp);
     } catch (err: unknown) {
       const e = err as Error;
@@ -657,7 +664,7 @@ function App() {
     } catch (e: any) {
       if (e?.code === 'SUBSCRIPTION_EXPIRED' || e?.message?.includes('subscription has expired')) {
         setSubscriptionExpired(true);
-      } else {
+      } else if (!quiet) {
         setError(e instanceof Error ? e.message : 'Could not refresh attendance data.');
       }
     } finally {

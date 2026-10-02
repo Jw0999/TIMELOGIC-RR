@@ -176,7 +176,12 @@ export async function cacheRosterAndSessions(employees: Employee[], sessions: Se
     const pending = await getPendingOutbox();
     // Do not overwrite pending outbox items with stale server attendance states
     for (const item of pending) {
-      const emp = employees.find((e) => e.id === item.employeeId);
+      const emp = employees.find(
+        (e) =>
+          e.id === item.employeeId ||
+          `${e.firstName} ${e.lastName}`.toLowerCase() === item.employeeName.toLowerCase() ||
+          e.employeeCode?.toLowerCase() === item.employeeName.toLowerCase()
+      );
       if (emp) {
         if (item.type === 'check_in') {
           emp.attendance = {
@@ -249,7 +254,12 @@ export async function getCachedRoster(): Promise<{ employees: Employee[]; sessio
 
     // Overlay pending outbox records onto employees so count is 100% accurate
     for (const item of outbox) {
-      const emp = employees.find((e) => e.id === item.employeeId);
+      const emp = employees.find(
+        (e) =>
+          e.id === item.employeeId ||
+          `${e.firstName} ${e.lastName}`.toLowerCase() === item.employeeName.toLowerCase() ||
+          e.employeeCode?.toLowerCase() === item.employeeName.toLowerCase()
+      );
       if (emp) {
         if (item.type === 'check_in') {
           emp.attendance = {
@@ -322,9 +332,15 @@ export async function queueOfflineAttendance(action: {
 
     // Update employee record directly in local roster store so getCachedRoster() reflects it immediately!
     const rosterStore = tx.objectStore('roster');
-    const empReq = rosterStore.get(action.employeeId);
-    empReq.onsuccess = () => {
-      const emp = empReq.result;
+    const allReq = rosterStore.getAll();
+    allReq.onsuccess = () => {
+      const allEmps: Employee[] = allReq.result || [];
+      const emp = allEmps.find(
+        (e) =>
+          e.id === action.employeeId ||
+          `${e.firstName} ${e.lastName}`.toLowerCase() === action.employeeName.toLowerCase() ||
+          e.employeeCode?.toLowerCase() === action.employeeName.toLowerCase()
+      );
       if (emp) {
         if (action.type === 'check_in') {
           emp.attendance = {
