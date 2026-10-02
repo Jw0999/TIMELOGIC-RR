@@ -56,7 +56,7 @@ class PayrollService {
     const m = parseInt(month || new Date().getMonth() + 1, 10);
     const { startDate, endDate } = this.getMonthDateRange(y, m);
 
-    const [org, employees, attendanceRecords, manualPenalties, existingPayslips] = await Promise.all([
+    const [org, employees, attendanceRecords, manualPenalties, breakRecords, existingPayslips] = await Promise.all([
       prisma.organization.findUnique({
         where: { id: orgId },
         select: {
@@ -365,7 +365,7 @@ class PayrollService {
     const m = parseInt(month || new Date().getMonth() + 1, 10);
     const { startDate, endDate } = this.getMonthDateRange(y, m);
 
-    const [org, employees, attendanceRecords, manualPenalties] = await Promise.all([
+    const [org, employees, attendanceRecords, manualPenalties, breakRecords] = await Promise.all([
       prisma.organization.findUnique({ where: { id: orgId } }),
       prisma.user.findMany({
         where: {
