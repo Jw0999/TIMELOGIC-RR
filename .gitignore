@@ -54,3 +54,8 @@ __pycache__/
 deepface-service/models/*.onnx
 deepface-service/models/
 
+# Backups & database dumps
+backups/
+*.dump
+
+

@@ -1,22 +1,30 @@
 import Image from "next/image";
 import type { CSSProperties } from "react";
 
+interface LogoProps {
+  size?: number;
+  className?: string;
+  theme?: "dark" | "light";
+}
+
 /**
- * Brand mark: the real TimeLogic clock logo (cropped from the company logo)
- * shown in a white rounded badge so it reads cleanly on the dark UI.
+ * Brand mark: Authentic TimeLogic clock logo with transparent background.
+ * Renders crisp electric-cyan mark on dark backgrounds and deep navy on light surfaces.
  */
-export function Logo({ size = 40, className }: { size?: number; className?: string }) {
+export function Logo({ size = 36, className, theme = "dark" }: LogoProps) {
+  const iconSrc = theme === "light" ? "/logo-mark-transparent.png" : "/logo-mark-cyan.png";
+
   return (
     <span
-      className={`inline-grid flex-shrink-0 place-items-center overflow-hidden rounded-xl bg-white ring-1 ring-white/10 ${className ?? ""}`}
+      className={`relative inline-flex flex-shrink-0 items-center justify-center ${className ?? ""}`}
       style={{ width: size, height: size }}
     >
       <Image
-        src="/logo-mark.png"
-        alt="TimeLogic"
+        src={iconSrc}
+        alt="TimeLogic Mark"
         width={size}
         height={size}
-        className="h-[86%] w-[86%] object-contain"
+        className="w-full h-full object-contain filter drop-shadow-[0_0_12px_rgba(56,189,248,0.25)] transition-all duration-200"
       />
     </span>
   );
@@ -25,29 +33,33 @@ export function Logo({ size = 40, className }: { size?: number; className?: stri
 export function Wordmark({
   className,
   style,
+  theme = "dark",
 }: {
   className?: string;
   style?: CSSProperties;
+  theme?: "dark" | "light";
 }) {
   return (
-    <span className={className} style={{ letterSpacing: "-0.02em", ...style }}>
-      <span className="text-fg">Time</span>
-      <span className="text-sky">Logic</span>
+    <span className={`tracking-tight font-bold select-none ${className ?? ""}`} style={style}>
+      <span className={theme === "light" ? "text-slate-900" : "text-white"}>Time</span>
+      <span className="text-sky-400">Logic</span>
     </span>
   );
 }
 
 export function BrandLockup({
-  size = 36,
+  size = 34,
   className,
+  theme = "dark",
 }: {
   size?: number;
   className?: string;
+  theme?: "dark" | "light";
 }) {
   return (
     <span className={`inline-flex items-center gap-2.5 ${className ?? ""}`}>
-      <Logo size={size} />
-      <Wordmark className="text-[18px] font-bold" />
+      <Logo size={size} theme={theme} />
+      <Wordmark theme={theme} className="text-lg font-bold" />
     </span>
   );
 }

@@ -3,145 +3,149 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { MessageSquare, Menu, X, ArrowRight } from "lucide-react";
+import { Menu, X, ArrowRight, ShieldCheck, MessageSquare } from "lucide-react";
 import { Logo, Wordmark } from "./ui/Logo";
-import { Button } from "./ui/Button";
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
 
-  // Close mobile menu on route change
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [pathname]);
 
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 20);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   const navLinks = [
-    { label: "Overview", href: "/" },
-    { label: "Architecture", href: "/solution" },
-    { label: "System UI", href: "/post" },
-    { label: "Monthly Plans", href: "/pricing" },
-    { label: "Investors", href: "/investors" },
-    { label: "Team", href: "/team" },
+    { label: "Product", href: "/#features" },
+    { label: "Solutions", href: "/solution" },
+    { label: "Pricing", href: "/pricing" },
+    { label: "Company", href: "/team" },
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-white/[0.08] bg-[#070d1e]/90 backdrop-blur-md transition-colors">
-      <div className="max-w-7xl mx-auto px-6 sm:px-8 h-16 flex items-center justify-between">
-        {/* Left: Brand Logo + Primary Nav */}
-        <div className="flex items-center gap-8 lg:gap-10">
-          <Link href="/" className="flex items-center gap-3 group select-none">
-            <Logo size={32} />
-            <Wordmark className="text-lg font-bold tracking-tight text-white" />
-          </Link>
+    <header className="sticky top-0 z-50 w-full pt-3 sm:pt-4 px-4 sm:px-6 transition-all duration-300">
+      <div
+        className={`max-w-6xl mx-auto rounded-full px-5 sm:px-6 h-14 sm:h-16 flex items-center justify-between transition-all duration-300 ${
+          scrolled
+            ? "bg-[#07090E]/90 backdrop-blur-xl border border-white/[0.12] shadow-[0_8px_32px_rgba(0,0,0,0.6)]"
+            : "bg-[#07090E]/70 backdrop-blur-lg border border-white/[0.08] shadow-[0_4px_24px_rgba(0,0,0,0.4)]"
+        }`}
+      >
+        {/* Left: Brand Logo */}
+        <Link href="/" className="flex items-center gap-3 group select-none">
+          <Logo size={32} theme="dark" />
+          <Wordmark className="text-base sm:text-lg font-bold tracking-tight text-white" />
+          <span className="hidden lg:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-cyan-500/10 border border-cyan-400/25 text-cyan-300">
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+            v2.4
+          </span>
+        </Link>
 
-          {/* Desktop Navigation Links */}
-          <nav className="hidden md:flex items-center gap-1">
-            {navLinks.map((item) => {
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors ${
-                    isActive
-                      ? "text-white bg-white/[0.1] font-semibold"
-                      : "text-slate-200 hover:text-white hover:bg-white/[0.04]"
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
+        {/* Center: Desktop Navigation Links */}
+        <nav className="hidden md:flex items-center gap-1 bg-white/[0.03] p-1 rounded-full border border-white/[0.05]">
+          {navLinks.map((item) => {
+            const isActive = pathname === item.href;
+            return (
+              <Link
+                key={item.label}
+                href={item.href}
+                className={`px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 ${
+                  isActive
+                    ? "text-white bg-white/[0.12] shadow-xs"
+                    : "text-slate-300 hover:text-white hover:bg-white/[0.06]"
+                }`}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
 
-        {/* Right: Direct Action Buttons */}
+        {/* Right: Action CTAs */}
         <div className="hidden sm:flex items-center gap-3">
-          <Button
-            variant="outline"
-            size="sm"
+          <a
             href="https://wa.me/2349113380364"
-            icon={<MessageSquare size={13} />}
-            className="text-xs text-white border-white/20 hover:bg-white/10"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-slate-300 hover:text-white hover:bg-white/[0.06] transition-colors"
           >
-            Chat on WhatsApp
-          </Button>
+            <MessageSquare size={13} className="text-sky-400" />
+            <span>Support</span>
+          </a>
 
-          <Button
-            variant="primary"
-            size="sm"
-            href="/pricing"
-            icon={<ArrowRight size={13} />}
-            className="text-xs font-semibold shadow-xs"
+          <Link
+            href="/register"
+            className="group relative inline-flex items-center gap-1.5 px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-semibold text-white bg-gradient-to-r from-blue-600 via-sky-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 transition-all duration-200 shadow-[0_0_20px_rgba(0,229,255,0.25)] hover:shadow-[0_0_25px_rgba(0,229,255,0.4)] active:scale-[0.98]"
           >
-            Deploy Plans
-          </Button>
+            <span>Get Started</span>
+            <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
+          </Link>
         </div>
 
-        {/* Mobile: Hamburger Toggle Button */}
-        <div className="flex sm:hidden items-center">
+        {/* Mobile Hamburger Toggle */}
+        <div className="flex md:hidden items-center gap-2">
+          <Link
+            href="/register"
+            className="sm:hidden inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold text-white bg-gradient-to-r from-blue-600 to-cyan-500"
+          >
+            Get Started
+          </Link>
           <button
             type="button"
             onClick={() => setMobileMenuOpen((prev) => !prev)}
-            className="p-2 text-slate-200 hover:text-white hover:bg-white/[0.08] rounded-lg focus:outline-none transition-colors"
+            className="p-2 text-slate-200 hover:text-white hover:bg-white/[0.08] rounded-full focus:outline-none transition-colors"
             aria-expanded={mobileMenuOpen}
-            aria-controls="mobile-navigation-menu"
-            aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+            aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
           >
             {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
         </div>
       </div>
 
-      {/* Mobile Dropdown Menu */}
+      {/* Mobile Glass Dropdown */}
       {mobileMenuOpen && (
-        <div
-          id="mobile-navigation-menu"
-          className="border-b border-white/[0.08] bg-[#070d1e] px-6 py-5 sm:hidden space-y-4 shadow-2xl relative z-50 animate-in fade-in duration-150"
-        >
+        <div className="max-w-6xl mx-auto mt-2 rounded-2xl border border-white/[0.12] bg-[#07090E]/95 backdrop-blur-2xl p-5 md:hidden space-y-4 shadow-2xl relative z-50">
           <nav className="flex flex-col gap-1">
-            {navLinks.map((item) => {
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? "text-white bg-blue-600/25 border border-blue-500/30 font-semibold"
-                      : "text-slate-200 hover:text-white hover:bg-white/[0.04]"
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
+            {navLinks.map((item) => (
+              <Link
+                key={item.label}
+                href={item.href}
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-4 py-2.5 rounded-xl text-sm font-medium text-slate-200 hover:text-white hover:bg-white/[0.06] transition-colors"
+              >
+                {item.label}
+              </Link>
+            ))}
           </nav>
 
-          <div className="pt-4 border-t border-white/[0.08] flex flex-col gap-2.5">
-            <Button
-              variant="primary"
-              size="md"
-              href="/pricing"
+          <div className="pt-3 border-t border-white/[0.08] flex flex-col gap-2.5">
+            <Link
+              href="/register"
               onClick={() => setMobileMenuOpen(false)}
-              icon={<ArrowRight size={14} />}
-              className="w-full justify-center py-2 text-xs font-semibold shadow-xs"
+              className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-blue-600 to-cyan-500 shadow-md"
             >
-              View Monthly Plans
-            </Button>
+              <span>Get Started</span>
+              <ArrowRight size={14} />
+            </Link>
 
-            <Button
-              variant="outline"
-              size="md"
+            <a
               href="https://wa.me/2349113380364"
+              target="_blank"
+              rel="noopener noreferrer"
               onClick={() => setMobileMenuOpen(false)}
-              icon={<MessageSquare size={14} />}
-              className="w-full justify-center py-2 text-xs text-white border-white/20 hover:bg-white/10"
+              className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-medium text-slate-200 border border-white/10 hover:bg-white/[0.05]"
             >
-              Chat on WhatsApp (+2349113380364)
-            </Button>
+              <MessageSquare size={14} className="text-sky-400" />
+              <span>Chat on WhatsApp (+234 911 338 0364)</span>
+            </a>
           </div>
         </div>
       )}

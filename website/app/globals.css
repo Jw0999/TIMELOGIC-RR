@@ -50,21 +50,56 @@ body {
 
 /* ─────────────────────────────────────────────────────────────
    Direct High-Contrast Guarantees
-   Fixes browser lab() / color-space bugs.
-   Guarantees ALL body & descriptive text is bright silver-white!
+   Guarantees ALL body & descriptive text on dark canvases is bright silver-white,
+   while preserving deep readable contrast on light canvas sections!
    ───────────────────────────────────────────────────────────── */
 
+body {
+  color: #f8fafc;
+}
+
+/* Dark canvas text brightness */
 .text-slate-300,
 .text-slate-400 {
-  color: #e2e8f0 !important;
+  color: #e2e8f0;
 }
 
 .text-slate-200,
 .text-slate-100 {
-  color: #f8fafc !important;
+  color: #f8fafc;
 }
 
 .text-slate-500,
 .text-slate-600 {
-  color: #cbd5e1 !important;
+  color: #cbd5e1;
 }
+
+/* Light canvas high-contrast overrides */
+#features {
+  color-scheme: light;
+}
+
+#features .text-slate-950 {
+  color: #020617 !important;
+}
+
+#features .text-slate-900 {
+  color: #0f172a !important;
+}
+
+#features .text-slate-800 {
+  color: #1e293b !important;
+}
+
+#features .text-slate-700 {
+  color: #334155 !important;
+}
+
+#features .text-slate-600 {
+  color: #475569 !important;
+}
+
+#features .text-slate-500 {
+  color: #64748b !important;
+}
+
