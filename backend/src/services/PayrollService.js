@@ -179,7 +179,8 @@ class PayrollService {
       let attendancePenalties = 0;
 
       for (const a of userAtt) {
-        if (a.status === 'PRESENT' || a.status === 'LATE' || a.status === 'HALF_DAY') {
+        const hasCheckedIn = Boolean(a.clockInTime) || ['PRESENT', 'LATE', 'COMPLETELY_LATE', 'HALF_DAY', 'REVIEW_REQUIRED'].includes(a.status);
+        if (hasCheckedIn && a.status !== 'ABSENT') {
           totalPresentDays += 1;
         }
         if (a.status === 'LATE' || a.status === 'COMPLETELY_LATE') {
@@ -442,7 +443,8 @@ class PayrollService {
       const itemizedDeductions = [];
 
       for (const a of userAtt) {
-        if (a.status === 'PRESENT' || a.status === 'LATE' || a.status === 'HALF_DAY') {
+        const hasCheckedIn = Boolean(a.clockInTime) || ['PRESENT', 'LATE', 'COMPLETELY_LATE', 'HALF_DAY', 'REVIEW_REQUIRED'].includes(a.status);
+        if (hasCheckedIn && a.status !== 'ABSENT') {
           totalPresentDays += 1;
         }
         if (a.status === 'LATE' || a.status === 'COMPLETELY_LATE') {
@@ -569,6 +571,46 @@ class PayrollService {
 
     if (!payslip) throw new Error('Payslip record not found');
 
+    // Ensure metrics accurately reflect all check-ins (present, late, completely late)
+    let displayPresentDays = payslip.totalPresentDays || 0;
+    let displayLateDays = payslip.totalLateDays || 0;
+    let displayWorkHours = payslip.totalWorkHours || 0;
+
+    try {
+      const atts = await prisma.attendanceRecord.findMany({
+        where: {
+          employeeId: payslip.employeeId,
+          date: { gte: payslip.periodStart, lte: payslip.periodEnd },
+        },
+        select: {
+          status: true,
+          clockInTime: true,
+          totalWorkHours: true,
+        },
+      });
+
+      if (atts && atts.length > 0) {
+        let livePresent = 0;
+        let liveLate = 0;
+        let liveHours = 0;
+        for (const a of atts) {
+          const hasCheckedIn = Boolean(a.clockInTime) || ['PRESENT', 'LATE', 'COMPLETELY_LATE', 'HALF_DAY', 'REVIEW_REQUIRED'].includes(a.status);
+          if (hasCheckedIn && a.status !== 'ABSENT') {
+            livePresent += 1;
+          }
+          if (a.status === 'LATE' || a.status === 'COMPLETELY_LATE') {
+            liveLate += 1;
+          }
+          liveHours += a.totalWorkHours || 0;
+        }
+        displayPresentDays = Math.max(displayPresentDays, livePresent);
+        displayLateDays = Math.max(displayLateDays, liveLate);
+        displayWorkHours = Math.round((Math.max(displayWorkHours, liveHours)) * 10) / 10;
+      }
+    } catch (attErr) {
+      logger.warn('Failed to query live attendance metrics for PDF:', attErr);
+    }
+
     const uploadsDir = path.join(__dirname, '../../uploads/payslips');
     if (!fs.existsSync(uploadsDir)) {
       fs.mkdirSync(uploadsDir, { recursive: true });
@@ -643,9 +685,9 @@ class PayrollService {
 
       const metricColW = 515 / 4;
       const metrics = [
-        { label: 'DAYS PRESENT', val: `${payslip.totalPresentDays} Days` },
-        { label: 'WORK DURATION', val: `${payslip.totalWorkHours} Hours` },
-        { label: 'LATE INSTANCES', val: `${payslip.totalLateDays} Days` },
+        { label: 'DAYS PRESENT', val: `${displayPresentDays} Days` },
+        { label: 'WORK DURATION', val: `${displayWorkHours} Hours` },
+        { label: 'LATE INSTANCES', val: `${displayLateDays} ${displayLateDays === 1 ? 'Instance' : 'Instances'}` },
         { label: 'PENALTIES APPLIED', val: this.formatMoneyPdf(payslip.totalDeductions, currency), isAlert: payslip.totalDeductions > 0 },
       ];
 
