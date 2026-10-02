@@ -133,14 +133,14 @@ export default function PricingPage() {
   ];
 
   return (
-    <div className="min-h-screen w-full bg-[#070d1e] text-white flex flex-col justify-between">
+    <div className="min-h-screen w-full bg-[#090A0F] text-white flex flex-col justify-between">
       {/* Header */}
       <Header />
 
       {/* ── SECTION 1: HEADER & INTRO ── */}
-      <section className="pt-16 sm:pt-20 pb-16 bg-[#070d1e] border-b border-white/[0.08] bg-grid-pattern">
+      <section className="pt-16 sm:pt-20 pb-16 bg-[#090A0F] border-b border-white/[0.08]">
         <div className="max-w-4xl mx-auto px-6 sm:px-8 text-center space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-blue-950/80 border border-blue-400/30 text-xs font-mono font-medium text-sky-300">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-white/[0.04] border border-white/[0.1] text-xs font-mono font-medium text-sky-300">
             Licensing & Deployment
           </div>
 
@@ -148,14 +148,14 @@ export default function PricingPage() {
             Transparent Monthly Deployment Plans
           </h1>
 
-          <p className="text-slate-200 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
+          <p className="text-slate-300 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
             Predictable monthly billing based on verified employee headcount. No proprietary hardware lock-in or per-punch surcharges.
           </p>
         </div>
       </section>
 
       {/* ── SECTION 2: 3 PRICING CARDS ── */}
-      <section className="py-20 sm:py-24 bg-[#091124] border-b border-white/[0.08]">
+      <section className="py-20 sm:py-24 bg-[#0B0D14] border-b border-white/[0.08]">
         <div className="max-w-7xl mx-auto px-6 sm:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
             {plans.map((plan) => (
@@ -163,8 +163,8 @@ export default function PricingPage() {
                 key={plan.name}
                 className={`rounded-xl p-7 sm:p-8 flex flex-col justify-between transition-all shadow-md ${
                   plan.highlighted
-                    ? "bg-[#0d1838] border-2 border-blue-500 shadow-xl"
-                    : "bg-[#0b142c] border border-white/[0.08]"
+                    ? "bg-[#131826] border-2 border-blue-500 shadow-xl"
+                    : "bg-[#0E121B] border border-white/[0.08]"
                 }`}
               >
                 <div>
@@ -248,30 +248,30 @@ export default function PricingPage() {
       </section>
 
       {/* ── SECTION 3: SIDE-BY-SIDE FEATURE MATRIX TABLE ── */}
-      <section className="py-20 sm:py-24 bg-[#070d1e] border-b border-white/[0.08]">
+      <section className="py-20 sm:py-24 bg-[#090A0F] border-b border-white/[0.08]">
         <div className="max-w-7xl mx-auto px-6 sm:px-8 space-y-12">
           <div className="max-w-3xl space-y-3">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-blue-950/80 border border-blue-400/30 text-xs font-mono font-medium text-sky-300">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-white/[0.04] border border-white/[0.1] text-xs font-mono font-medium text-sky-300">
               Feature Comparison
             </div>
             <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
               Compare Plan Capabilities
             </h2>
-            <p className="text-xs sm:text-sm text-slate-200">
+            <p className="text-xs sm:text-sm text-slate-300">
               Starter includes complete biometric, policy, and Excel payroll capabilities for a single dedicated kiosk terminal.
             </p>
           </div>
 
-          <div className="rounded-xl border border-white/[0.08] bg-[#0b142c] overflow-hidden shadow-lg">
+          <div className="rounded-xl border border-white/[0.08] bg-[#0E121B] overflow-hidden shadow-lg">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs sm:text-sm">
                 <thead>
-                  <tr className="border-b border-white/[0.08] bg-[#080d1e] text-white font-semibold">
+                  <tr className="border-b border-white/[0.08] bg-[#090A0F] text-white font-semibold">
                     <th className="py-4 px-5 sm:px-6 w-1/3">Feature</th>
                     <th className="py-4 px-4 text-center w-1/5 text-sky-400 font-bold">
                       Starter (1 Terminal)
                     </th>
-                    <th className="py-4 px-4 text-center w-1/5 bg-blue-950/40 text-sky-300 font-bold">
+                    <th className="py-4 px-4 text-center w-1/5 bg-white/[0.03] text-sky-300 font-bold">
                       Enterprise
                     </th>
                     <th className="py-4 px-4 text-center w-1/5 font-bold">Organisation</th>
@@ -280,7 +280,7 @@ export default function PricingPage() {
                 <tbody className="divide-y divide-white/[0.06] text-slate-200">
                   {comparisonFeatures.map((group, gIdx) => (
                     <React.Fragment key={gIdx}>
-                      <tr className="bg-[#080d1e]/80">
+                      <tr className="bg-[#090A0F]/80">
                         <td
                           colSpan={4}
                           className="py-2.5 px-5 sm:px-6 font-mono text-[11px] font-bold uppercase tracking-wider text-sky-400"
@@ -304,7 +304,7 @@ export default function PricingPage() {
                               <span className="text-xs font-semibold text-sky-300">{item.starter}</span>
                             )}
                           </td>
-                          <td className="py-3.5 px-4 text-center bg-blue-950/20 font-medium">
+                          <td className="py-3.5 px-4 text-center bg-white/[0.02] font-medium">
                             {typeof item.enterprise === "boolean" ? (
                               item.enterprise ? (
                                 <Check size={16} className="text-sky-400 mx-auto" />
@@ -338,13 +338,13 @@ export default function PricingPage() {
       </section>
 
       {/* ── SECTION 4: OPERATIONAL FAQS ── */}
-      <section className="py-20 sm:py-24 bg-[#091124] border-b border-white/[0.08]">
+      <section className="py-20 sm:py-24 bg-[#0B0D14] border-b border-white/[0.08]">
         <div className="max-w-4xl mx-auto px-6 sm:px-8 space-y-12">
           <div className="text-center space-y-3">
             <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
               Frequently Asked Billing & Deployment Questions
             </h2>
-            <p className="text-xs sm:text-sm text-slate-200">
+            <p className="text-xs sm:text-sm text-slate-300">
               Technical, licensing, and operational details regarding TimeLogic subscriptions.
             </p>
           </div>
@@ -353,7 +353,7 @@ export default function PricingPage() {
             {faqs.map((faq, fIdx) => (
               <div
                 key={fIdx}
-                className="p-6 rounded-xl bg-[#0b142c] border border-white/[0.08] space-y-2 shadow-sm"
+                className="p-6 rounded-xl bg-[#0E121B] border border-white/[0.08] space-y-2 shadow-xs"
               >
                 <div className="text-sm sm:text-base font-semibold text-white flex items-start gap-2.5">
                   <HelpCircle size={18} className="text-sky-400 flex-shrink-0 mt-0.5" />

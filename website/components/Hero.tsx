@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import {
   Users,
   ScanFace,
@@ -16,18 +15,7 @@ import {
 } from "lucide-react";
 
 export function Hero() {
-  const router = useRouter();
-  const [email, setEmail] = useState("");
   const [activeStage, setActiveStage] = useState(0);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (email.trim()) {
-      router.push(`/register?email=${encodeURIComponent(email.trim())}`);
-    } else {
-      router.push("/register");
-    }
-  };
 
   const workflowStages = [
     {
@@ -96,111 +84,96 @@ export function Hero() {
   }, [workflowStages.length]);
 
   return (
-    <section className="relative w-full pt-16 sm:pt-24 pb-20 sm:pb-28 bg-[#07090E] text-white overflow-hidden">
-      {/* ── Ambient Glow Lighting & Technical Grid ── */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_75%_50%_at_50%_0%,rgba(0,229,255,0.13),transparent_70%)]" />
-      <div className="pointer-events-none absolute top-1/4 left-1/2 -translate-x-1/2 w-[700px] sm:w-[900px] h-[350px] bg-gradient-to-r from-blue-600/10 via-cyan-500/15 to-blue-600/10 blur-[130px] rounded-full" />
-      
-      {/* Precision architectural background grid */}
-      <div 
-        className="pointer-events-none absolute inset-0 opacity-[0.035]"
-        style={{
-          backgroundImage: `linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)`,
-          backgroundSize: '48px 48px'
-        }}
-      />
+    <section className="relative w-full pt-16 sm:pt-24 pb-20 sm:pb-28 bg-[#090A0F] text-white overflow-hidden">
+      {/* Subtle architectural depth lighting (no loud neon overload) */}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_75%_40%_at_50%_0%,rgba(56,189,248,0.08),transparent_70%)]" />
 
       <div className="max-w-6xl mx-auto px-5 sm:px-6 relative z-10 space-y-10 sm:space-y-14">
         
         {/* ── Hero Center Header Block ── */}
         <div className="text-center space-y-6 max-w-4xl mx-auto">
           {/* Pill Badge */}
-          <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-cyan-950/40 border border-cyan-400/30 text-xs font-mono font-medium text-cyan-300 shadow-[0_0_20px_rgba(0,229,255,0.15)] backdrop-blur-md">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-400" />
-            </span>
-            <span>Automated Workforce Intelligence · 100% Tamper-Proof</span>
+          <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.1] text-xs font-mono font-medium text-sky-300">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            <span>Hardware-Anchored Attendance Infrastructure</span>
           </div>
 
           {/* Master Headline */}
-          <h1 className="text-3xl sm:text-5xl lg:text-[56px] font-extrabold text-white tracking-tight leading-[1.12]">
-            Your Entire Workforce & Attendance Management{" "}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-sky-400 to-blue-500">
-              In One Platform
+          <h1 className="text-3xl sm:text-5xl lg:text-[56px] font-bold text-white tracking-tight leading-[1.14]">
+            Workforce attendance locked to <br className="hidden sm:inline" />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-cyan-300 to-blue-500">
+              physical company hardware.
             </span>
           </h1>
 
           {/* Subtitle */}
-          <p className="text-sm sm:text-base lg:text-lg text-slate-300 max-w-2xl mx-auto leading-relaxed">
-            Eliminate buddy-punching, mobile GPS spoofing, and unmonitored break leaks.
-            TimeLogic anchors workforce attendance to authorized physical kiosk hardware with instant facial biometric authentication and verified Excel payroll reconciliation.
+          <p className="text-sm sm:text-base lg:text-lg text-slate-300 max-w-2xl mx-auto leading-relaxed font-normal">
+            Eliminate proxy check-ins, mobile GPS mock spoofing, and unmonitored break leaks.
+            TimeLogic binds attendance strictly to authorized on-premise kiosk terminals with sub-second facial verification and verified Excel payroll reconciliation.
           </p>
 
-          {/* Work Email Action Input Box */}
-          <form onSubmit={handleSubmit} className="pt-2 max-w-xl mx-auto">
-            <div className="relative flex items-center p-1.5 sm:p-2 rounded-full bg-[#0d1222]/90 border border-white/[0.14] shadow-[0_12px_40px_rgba(0,0,0,0.6)] backdrop-blur-xl focus-within:border-cyan-400/60 focus-within:ring-2 focus-within:ring-cyan-400/20 transition-all duration-300">
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your work email address..."
-                className="w-full bg-transparent px-4 sm:px-5 py-2 text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none"
-              />
-              <button
-                type="submit"
-                className="flex-shrink-0 inline-flex items-center gap-2 px-5 sm:px-6 py-2.5 sm:py-3 rounded-full text-xs sm:text-sm font-semibold text-white bg-gradient-to-r from-blue-600 via-sky-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 transition-all duration-200 shadow-[0_0_25px_rgba(0,229,255,0.3)] hover:shadow-[0_0_30px_rgba(0,229,255,0.5)] active:scale-[0.98]"
-              >
-                <span>Get Started</span>
-                <ArrowRight size={14} />
-              </button>
-            </div>
-          </form>
+          {/* Clean Action Buttons (No AI slop forms) */}
+          <div className="pt-2 flex items-center justify-center gap-4 flex-wrap">
+            <a
+              href="/pricing"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full text-xs sm:text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow-md transition-all active:scale-[0.98]"
+            >
+              <span>View Plans & Pricing</span>
+              <ArrowRight size={14} />
+            </a>
 
-          {/* Value Micro-Pills */}
-          <div className="pt-2 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-slate-300 font-mono">
+            <a
+              href="https://wa.me/2349113380364?text=Hello%20TimeLogic%20Team%2C%20we%20want%20to%20deploy%20TimeLogic%20on-premise%20attendance."
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-full text-xs sm:text-sm font-medium text-slate-200 border border-white/15 bg-white/[0.03] hover:bg-white/[0.08] hover:text-white transition-all"
+            >
+              <span>Chat with Deployment Lead</span>
+              <span className="text-xs font-mono text-emerald-400">● 24h SLA</span>
+            </a>
+          </div>
+
+          {/* Verified Specs */}
+          <div className="pt-3 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-slate-400 font-mono">
             <span className="flex items-center gap-1.5">
-              <CheckCircle2 size={13} className="text-cyan-400" />
+              <CheckCircle2 size={13} className="text-sky-400" />
               Sub-second facial match
             </span>
             <span className="flex items-center gap-1.5">
-              <CheckCircle2 size={13} className="text-cyan-400" />
+              <CheckCircle2 size={13} className="text-sky-400" />
               Zero hardware lock-in
             </span>
             <span className="flex items-center gap-1.5">
-              <CheckCircle2 size={13} className="text-cyan-400" />
-              1-Click Excel payroll export
+              <CheckCircle2 size={13} className="text-sky-400" />
+              1-Click Excel export
             </span>
             <span className="flex items-center gap-1.5">
-              <CheckCircle2 size={13} className="text-cyan-400" />
-              24-Hour setup
+              <CheckCircle2 size={13} className="text-sky-400" />
+              Server-clock sync
             </span>
           </div>
         </div>
 
         {/* ── Animated Workflow Circuit Flow (Radial Arc Pipeline) ── */}
         <div className="pt-8 sm:pt-12">
-          <div className="rounded-3xl border border-white/[0.1] bg-[#0A0E1A]/80 backdrop-blur-xl p-5 sm:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative overflow-hidden">
-            {/* Ambient circuit glow */}
-            <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-[500px] h-[150px] bg-cyan-500/10 blur-[80px]" />
-            
+          <div className="rounded-2xl border border-white/[0.08] bg-[#0E121B] p-5 sm:p-7 shadow-xl relative overflow-hidden">
             {/* Header info */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 sm:mb-8 pb-4 border-b border-white/[0.06]">
               <div className="flex items-center gap-2.5">
-                <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-                <span className="text-xs font-mono font-semibold tracking-wider uppercase text-cyan-300">
-                  Automated Attendance Pipeline
+                <div className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
+                <span className="text-xs font-mono font-semibold tracking-wider uppercase text-sky-300">
+                  On-Premise Verification Sequence
                 </span>
-                <span className="text-[11px] font-mono text-slate-400">· 5 Live Verified Stages</span>
+                <span className="text-[11px] font-mono text-slate-400">· 5 Operational Stages</span>
               </div>
               <div className="text-xs font-mono text-slate-400 flex items-center gap-2">
                 <Zap size={13} className="text-amber-400" />
-                <span>Real-time execution: Click any stage to inspect</span>
+                <span>Click any stage to inspect execution details</span>
               </div>
             </div>
 
             {/* Connecting Circuit Flow Stages */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 relative">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 relative">
               {workflowStages.map((stage, idx) => {
                 const isSelected = activeStage === idx;
                 const IconComponent = stage.icon;
@@ -210,24 +183,19 @@ export function Hero() {
                     key={stage.id}
                     type="button"
                     onClick={() => setActiveStage(idx)}
-                    className={`text-left rounded-2xl p-4 sm:p-4.5 transition-all duration-300 relative group cursor-pointer border ${
+                    className={`text-left rounded-xl p-4 transition-all duration-200 relative group cursor-pointer border ${
                       isSelected
-                        ? "bg-gradient-to-b from-[#131d38] to-[#0d1428] border-cyan-400/50 shadow-[0_0_25px_rgba(0,229,255,0.2)] scale-[1.02]"
-                        : "bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.05] hover:border-white/[0.12]"
+                        ? "bg-[#181F2E] border-sky-400/50 shadow-md"
+                        : "bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.04] hover:border-white/[0.1]"
                     }`}
                   >
-                    {/* Active Tracer Line */}
-                    {isSelected && (
-                      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent animate-pulse" />
-                    )}
-
                     <div className="flex items-center justify-between mb-3">
-                      <span className={`text-[10px] font-mono font-bold ${isSelected ? "text-cyan-300" : "text-slate-400"}`}>
+                      <span className={`text-[10px] font-mono font-bold ${isSelected ? "text-sky-300" : "text-slate-400"}`}>
                         {stage.step}
                       </span>
-                      <span className={`text-[9px] font-mono px-2 py-0.5 rounded-full border ${
+                      <span className={`text-[9px] font-mono px-2 py-0.5 rounded border ${
                         isSelected 
-                          ? "bg-cyan-500/20 text-cyan-300 border-cyan-400/30" 
+                          ? "bg-sky-500/20 text-sky-300 border-sky-400/30" 
                           : "bg-white/[0.04] text-slate-400 border-white/[0.06]"
                       }`}>
                         {stage.badge}
@@ -237,7 +205,7 @@ export function Hero() {
                     <div className="flex items-center gap-2.5 mb-2">
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
                         isSelected 
-                          ? "bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-[0_0_15px_rgba(0,229,255,0.4)]" 
+                          ? "bg-blue-600 text-white shadow-xs" 
                           : "bg-white/[0.06] text-slate-300 group-hover:text-white"
                       }`}>
                         <IconComponent size={16} />
@@ -256,10 +224,10 @@ export function Hero() {
             </div>
 
             {/* Active Stage Deep-Dive Telemetry Card */}
-            <div className="mt-5 pt-4 sm:pt-5 border-t border-white/[0.08] bg-[#060A14]/70 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="mt-5 pt-4 sm:pt-5 border-t border-white/[0.06] bg-[#090B10] rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="space-y-1 max-w-2xl">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono font-bold text-cyan-400">
+                  <span className="text-xs font-mono font-bold text-sky-400">
                     STAGE {activeStage + 1} OF 5:
                   </span>
                   <span className="text-xs sm:text-sm font-semibold text-white">
@@ -272,8 +240,8 @@ export function Hero() {
               </div>
 
               <div className="flex items-center gap-3 flex-shrink-0">
-                <div className="px-3.5 py-1.5 rounded-xl bg-cyan-950/50 border border-cyan-400/25 text-xs font-mono text-cyan-300 flex items-center gap-2">
-                  <Sparkles size={13} className="text-cyan-400" />
+                <div className="px-3.5 py-1.5 rounded-lg bg-sky-950/50 border border-sky-400/25 text-xs font-mono text-sky-300 flex items-center gap-2">
+                  <Sparkles size={13} className="text-sky-400" />
                   <span>{workflowStages[activeStage].detailMetric}</span>
                 </div>
               </div>

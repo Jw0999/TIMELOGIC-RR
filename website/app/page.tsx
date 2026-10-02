@@ -11,7 +11,7 @@ import { Footer } from "@/components/Footer";
 
 export default function Home() {
   return (
-    <div className="min-h-screen w-full bg-[#07090E] text-white flex flex-col justify-between selection:bg-cyan-500/30 selection:text-white">
+    <div className="min-h-screen w-full bg-[#090A0F] text-white flex flex-col justify-between selection:bg-sky-500/30 selection:text-white">
       {/* ── 1. HEADER / NAVBAR: Floating glass pill navigation bar ── */}
       <Header />
 

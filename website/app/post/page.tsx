@@ -172,14 +172,14 @@ export default function PostPage() {
       : screens.filter((s) => s.category === activeCategory);
 
   return (
-    <div className="min-h-screen w-full bg-[#070d1e] text-white flex flex-col justify-between">
+    <div className="min-h-screen w-full bg-[#090A0F] text-white flex flex-col justify-between">
       {/* Header */}
       <Header />
 
       {/* ── SECTION 1: HERO HEADER ── */}
-      <section className="pt-16 sm:pt-20 pb-16 bg-[#070d1e] border-b border-white/[0.08] bg-grid-pattern">
+      <section className="pt-16 sm:pt-20 pb-16 bg-[#090A0F] border-b border-white/[0.08]">
         <div className="max-w-4xl mx-auto px-6 sm:px-8 text-center space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-blue-950/80 border border-blue-400/30 text-xs font-mono font-medium text-sky-300">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-white/[0.04] border border-white/[0.1] text-xs font-mono font-medium text-sky-300">
             System Tour
           </div>
 
@@ -187,7 +187,7 @@ export default function PostPage() {
             Inside TimeLogic: All 9 Production System Interfaces
           </h1>
 
-          <p className="text-slate-200 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
+          <p className="text-slate-300 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
             Authentic production captures of the TimeLogic platform. Review the operator interfaces, supervisory tools, and automated engines powering our enterprise attendance infrastructure.
           </p>
 
@@ -200,7 +200,7 @@ export default function PostPage() {
                 className={`px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
                   activeCategory === cat.id
                     ? "bg-blue-600 text-white font-semibold shadow-xs"
-                    : "bg-[#0b142c] text-slate-200 border border-white/[0.08] hover:text-white hover:bg-white/[0.06]"
+                    : "bg-[#0E121B] text-slate-300 border border-white/[0.08] hover:text-white hover:bg-white/[0.06]"
                 }`}
               >
                 {cat.label}
@@ -211,12 +211,12 @@ export default function PostPage() {
       </section>
 
       {/* ── SECTION 2: SYSTEM SCREENS LIST ── */}
-      <section className="py-20 sm:py-24 bg-[#091124] border-b border-white/[0.08]">
+      <section className="py-20 sm:py-24 bg-[#0B0D14] border-b border-white/[0.08]">
         <div className="max-w-6xl mx-auto px-6 sm:px-8 space-y-20">
           {filteredScreens.map((screen) => (
             <article
               key={screen.id}
-              className="p-7 sm:p-9 rounded-xl bg-[#0b142c] border border-white/[0.08] shadow-md space-y-8"
+              className="p-7 sm:p-9 rounded-xl bg-[#0E121B] border border-white/[0.08] shadow-md space-y-8"
             >
               <div className="space-y-3">
                 <div className="flex items-center gap-3 text-xs text-sky-400">
@@ -229,14 +229,14 @@ export default function PostPage() {
                   {screen.heading}
                 </h2>
 
-                <p className="text-xs sm:text-sm text-slate-200 leading-relaxed max-w-3xl">
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-3xl">
                   {screen.summary}
                 </p>
               </div>
 
               {/* Framed Window */}
               <div className="rounded-lg border border-white/[0.12] bg-slate-950 shadow-xl overflow-hidden">
-                <div className="h-8 px-4 bg-[#080d1e] border-b border-white/[0.08] flex items-center justify-between text-xs text-slate-300">
+                <div className="h-8 px-4 bg-[#090A0F] border-b border-white/[0.08] flex items-center justify-between text-xs text-slate-300">
                   <span className="font-mono text-[11px]">timelogic.app / {screen.id}</span>
                   <span className="text-[11px] text-emerald-400 font-mono font-medium">Production Capture</span>
                 </div>
@@ -254,7 +254,7 @@ export default function PostPage() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {screen.keyCapabilities.map((cap, cIdx) => (
-                    <div key={cIdx} className="flex items-start gap-2.5 text-xs text-slate-200">
+                    <div key={cIdx} className="flex items-start gap-2.5 text-xs text-slate-300">
                       <CheckCircle2 size={14} className="text-sky-400 flex-shrink-0 mt-0.5" />
                       <span>{cap}</span>
                     </div>
@@ -267,7 +267,7 @@ export default function PostPage() {
       </section>
 
       {/* ── SECTION 3: BOTTOM CTA ── */}
-      <section className="py-20 sm:py-24 bg-[#070d1e]">
+      <section className="py-20 sm:py-24 bg-[#090A0F]">
         <div className="max-w-4xl mx-auto px-6 sm:px-8 text-center space-y-6">
           <h2 className="text-2xl sm:text-4xl font-bold text-white tracking-tight">
             Schedule a Live On-Premise Demonstration

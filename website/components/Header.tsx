@@ -35,8 +35,8 @@ export function Header() {
       <div
         className={`max-w-6xl mx-auto rounded-full px-5 sm:px-6 h-14 sm:h-16 flex items-center justify-between transition-all duration-300 ${
           scrolled
-            ? "bg-[#07090E]/90 backdrop-blur-xl border border-white/[0.12] shadow-[0_8px_32px_rgba(0,0,0,0.6)]"
-            : "bg-[#07090E]/70 backdrop-blur-lg border border-white/[0.08] shadow-[0_4px_24px_rgba(0,0,0,0.4)]"
+            ? "bg-[#0B0D14]/90 backdrop-blur-xl border border-white/[0.1] shadow-[0_8px_32px_rgba(0,0,0,0.6)]"
+            : "bg-[#0B0D14]/75 backdrop-blur-lg border border-white/[0.08] shadow-[0_4px_24px_rgba(0,0,0,0.4)]"
         }`}
       >
         {/* Left: Brand Logo */}
@@ -82,7 +82,7 @@ export function Header() {
           </a>
 
           <Link
-            href="/register"
+            href="/pricing"
             className="group relative inline-flex items-center gap-1.5 px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-semibold text-white bg-gradient-to-r from-blue-600 via-sky-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 transition-all duration-200 shadow-[0_0_20px_rgba(0,229,255,0.25)] hover:shadow-[0_0_25px_rgba(0,229,255,0.4)] active:scale-[0.98]"
           >
             <span>Get Started</span>
@@ -93,7 +93,7 @@ export function Header() {
         {/* Mobile Hamburger Toggle */}
         <div className="flex md:hidden items-center gap-2">
           <Link
-            href="/register"
+            href="/pricing"
             className="sm:hidden inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold text-white bg-gradient-to-r from-blue-600 to-cyan-500"
           >
             Get Started
@@ -112,7 +112,7 @@ export function Header() {
 
       {/* Mobile Glass Dropdown */}
       {mobileMenuOpen && (
-        <div className="max-w-6xl mx-auto mt-2 rounded-2xl border border-white/[0.12] bg-[#07090E]/95 backdrop-blur-2xl p-5 md:hidden space-y-4 shadow-2xl relative z-50">
+        <div className="max-w-6xl mx-auto mt-2 rounded-2xl border border-white/[0.12] bg-[#0B0D14]/95 backdrop-blur-2xl p-5 md:hidden space-y-4 shadow-2xl relative z-50">
           <nav className="flex flex-col gap-1">
             {navLinks.map((item) => (
               <Link
@@ -128,7 +128,7 @@ export function Header() {
 
           <div className="pt-3 border-t border-white/[0.08] flex flex-col gap-2.5">
             <Link
-              href="/register"
+              href="/pricing"
               onClick={() => setMobileMenuOpen(false)}
               className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-blue-600 to-cyan-500 shadow-md"
             >

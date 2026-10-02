@@ -146,23 +146,20 @@ export function MetricsDashboard() {
   const activeHover = hoveredIdx !== null ? coords[hoveredIdx] : coords[coords.length - 1];
 
   return (
-    <section id="results" className="py-20 sm:py-28 bg-[#07090E] text-white relative overflow-hidden">
-      {/* Ambient Lighting */}
-      <div className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[350px] bg-cyan-500/10 blur-[130px] rounded-full" />
-
+    <section id="results" className="py-20 sm:py-28 bg-[#090A0F] text-white relative overflow-hidden">
       <div className="max-w-6xl mx-auto px-5 sm:px-6 relative z-10 space-y-14 sm:space-y-16">
         
         {/* Section Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div className="max-w-2xl space-y-4">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-cyan-950/50 border border-cyan-400/30 text-xs font-mono font-medium text-cyan-300">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.1] text-xs font-mono font-medium text-sky-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
               <span>Results & Measurable ROI</span>
             </div>
 
-            <h2 className="text-3xl sm:text-4xl lg:text-[44px] font-extrabold text-white tracking-tight leading-[1.18]">
+            <h2 className="text-3xl sm:text-4xl lg:text-[44px] font-bold text-white tracking-tight leading-[1.18]">
               Eliminate Time-Theft and Automate{" "}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-blue-500">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-blue-500">
                 Shift Compliance
               </span>
             </h2>
@@ -173,7 +170,7 @@ export function MetricsDashboard() {
           </div>
 
           {/* Timeframe Toggle Buttons */}
-          <div className="flex items-center p-1.5 rounded-full bg-[#0d1222] border border-white/[0.1] self-start md:self-auto shadow-lg">
+          <div className="flex items-center p-1 rounded-full bg-[#0E121B] border border-white/[0.08] self-start md:self-auto shadow-sm">
             <button
               type="button"
               onClick={() => {
@@ -182,8 +179,8 @@ export function MetricsDashboard() {
               }}
               className={`px-4 py-1.5 rounded-full text-xs font-mono font-semibold transition-all ${
                 range === "30d"
-                  ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-[0_0_15px_rgba(0,229,255,0.3)]"
-                  : "text-slate-300 hover:text-white"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "text-slate-400 hover:text-white"
               }`}
             >
               30 Days
@@ -196,8 +193,8 @@ export function MetricsDashboard() {
               }}
               className={`px-4 py-1.5 rounded-full text-xs font-mono font-semibold transition-all ${
                 range === "quarterly"
-                  ? "bg-gradient-to-r from-emerald-500 to-cyan-600 text-white shadow-[0_0_15px_rgba(16,185,129,0.3)]"
-                  : "text-slate-300 hover:text-white"
+                  ? "bg-emerald-600 text-white shadow-xs"
+                  : "text-slate-400 hover:text-white"
               }`}
             >
               Quarterly
@@ -210,8 +207,8 @@ export function MetricsDashboard() {
               }}
               className={`px-4 py-1.5 rounded-full text-xs font-mono font-semibold transition-all ${
                 range === "annual"
-                  ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-[0_0_15px_rgba(96,165,250,0.3)]"
-                  : "text-slate-300 hover:text-white"
+                  ? "bg-indigo-600 text-white shadow-xs"
+                  : "text-slate-400 hover:text-white"
               }`}
             >
               Annual
@@ -220,9 +217,9 @@ export function MetricsDashboard() {
         </div>
 
         {/* ── Interactive SVG Area Curve Chart ── */}
-        <div className="rounded-3xl border border-white/[0.1] bg-[#0A0E1A]/90 backdrop-blur-xl p-5 sm:p-8 shadow-2xl relative overflow-hidden">
+        <div className="rounded-2xl border border-white/[0.08] bg-[#0E121B] p-5 sm:p-8 shadow-xl relative overflow-hidden">
           {/* Chart Header Info */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/[0.08]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/[0.06]">
             <div className="space-y-1">
               <div className="text-xs font-mono text-slate-400 uppercase tracking-wider">
                 {currentData.title}
@@ -231,7 +228,7 @@ export function MetricsDashboard() {
                 <span className="text-2xl sm:text-3xl font-extrabold text-white">
                   {activeHover.displayVal}
                 </span>
-                <span className="px-2 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-400/25 text-cyan-300 text-xs font-mono flex items-center gap-1">
+                <span className="px-2 py-0.5 rounded-md bg-sky-500/10 border border-sky-400/25 text-sky-300 text-xs font-mono flex items-center gap-1">
                   <ArrowUpRight size={13} />
                   {currentData.highlight}
                 </span>
@@ -239,11 +236,11 @@ export function MetricsDashboard() {
             </div>
 
             {/* Dynamic Telemetry Tooltip */}
-            <div className="bg-[#0e1528] border border-white/[0.12] rounded-xl px-4 py-2.5 text-xs font-mono shadow-md self-start sm:self-auto">
+            <div className="bg-[#141824] border border-white/[0.08] rounded-xl px-4 py-2.5 text-xs font-mono shadow-sm self-start sm:self-auto">
               <div className="text-slate-400 text-[10px] uppercase">
                 Active Telemetry Node · {activeHover.label}
               </div>
-              <div className="text-cyan-300 font-semibold mt-0.5">
+              <div className="text-sky-300 font-semibold mt-0.5">
                 {activeHover.metric}
               </div>
             </div>
@@ -352,13 +349,13 @@ export function MetricsDashboard() {
         </div>
 
         {/* ── 4 Live KPI Cards ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {kpis.map((kpi, idx) => {
             const Icon = kpi.icon;
             return (
               <div
                 key={idx}
-                className={`p-6 rounded-2xl bg-[#0A0E1A]/80 border ${kpi.border} backdrop-blur-md shadow-lg space-y-3 transition-transform hover:-translate-y-1 duration-200`}
+                className="p-6 rounded-xl bg-[#0E121B] border border-white/[0.08] shadow-xs space-y-3 transition-transform hover:-translate-y-0.5 duration-200"
               >
                 <div className="flex items-center justify-between">
                   <div className={`text-3xl sm:text-4xl font-extrabold tracking-tight ${kpi.color}`}>

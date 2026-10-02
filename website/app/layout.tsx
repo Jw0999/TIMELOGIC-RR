@@ -52,7 +52,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#070d1e",
+  themeColor: "#090A0F",
   colorScheme: "dark",
   width: "device-width",
   initialScale: 1,
@@ -66,7 +66,7 @@ export default function RootLayout({
       lang="en"
       className={`dark ${GeistSans.variable} ${GeistMono.variable}`}
     >
-      <body className="bg-[#070d1e] text-white antialiased">
+      <body className="bg-[#090A0F] text-slate-100 antialiased">
         <a
           href="#main"
           className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-blue-600 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"

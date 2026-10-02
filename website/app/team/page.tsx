@@ -29,14 +29,14 @@ export default function TeamPage() {
   ];
 
   return (
-    <div className="min-h-screen w-full bg-[#070d1e] text-white flex flex-col justify-between">
+    <div className="min-h-screen w-full bg-[#090A0F] text-white flex flex-col justify-between">
       {/* Header */}
       <Header />
 
       {/* ── SECTION 1: HERO ── */}
-      <section className="pt-16 sm:pt-20 pb-16 bg-[#070d1e] border-b border-white/[0.08] bg-grid-pattern">
+      <section className="pt-16 sm:pt-20 pb-16 bg-[#090A0F] border-b border-white/[0.08]">
         <div className="max-w-4xl mx-auto px-6 sm:px-8 text-center space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-blue-950/80 border border-blue-400/30 text-xs font-mono font-medium text-sky-300">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-white/[0.04] border border-white/[0.1] text-xs font-mono font-medium text-sky-300">
             People & Engineering Philosophy
           </div>
 
@@ -44,17 +44,17 @@ export default function TeamPage() {
             The Team Behind TimeLogic
           </h1>
 
-          <p className="text-slate-200 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
+          <p className="text-slate-300 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
             Software engineers, systems architects, and security researchers dedicated to eliminating attendance fraud and establishing transparent workplace accountability.
           </p>
         </div>
       </section>
 
       {/* ── SECTION 2: ENGINEERING STATEMENT ── */}
-      <section className="py-20 sm:py-24 bg-[#091124] border-b border-white/[0.08]">
+      <section className="py-20 sm:py-24 bg-[#0B0D14] border-b border-white/[0.08]">
         <div className="max-w-5xl mx-auto px-6 sm:px-8">
-          <div className="p-8 sm:p-12 rounded-xl bg-[#0b142c] border border-white/[0.08] text-center space-y-6 shadow-md">
-            <div className="inline-block px-3 py-1 rounded-md bg-blue-950/80 border border-blue-400/30 text-sky-300 text-xs font-mono font-medium">
+          <div className="p-8 sm:p-12 rounded-xl bg-[#0E121B] border border-white/[0.08] text-center space-y-6 shadow-md">
+            <div className="inline-block px-3 py-1 rounded-md bg-white/[0.04] border border-white/[0.1] text-sky-300 text-xs font-mono font-medium">
               Engineering Dispatch
             </div>
 
@@ -62,7 +62,7 @@ export default function TeamPage() {
               Building Infrastructure For Emerging & Global Enterprises
             </h2>
 
-            <p className="text-xs sm:text-sm text-slate-200 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-300 max-w-2xl mx-auto leading-relaxed">
               We are currently scaling our core engineering, product security, and operations teams as we expand our on-premise deployments across commercial hubs in West Africa and international markets.
             </p>
 
@@ -91,7 +91,7 @@ export default function TeamPage() {
       </section>
 
       {/* ── SECTION 3: GUIDING PRINCIPLES ── */}
-      <section className="py-20 sm:py-24 bg-[#070d1e] border-b border-white/[0.08]">
+      <section className="py-20 sm:py-24 bg-[#090A0F] border-b border-white/[0.08]">
         <div className="max-w-5xl mx-auto px-6 sm:px-8 space-y-12">
           <div className="space-y-2 text-center sm:text-left">
             <div className="text-xs font-mono font-bold text-sky-400 uppercase tracking-wider">
@@ -108,7 +108,7 @@ export default function TeamPage() {
               return (
                 <div
                   key={idx}
-                  className="p-6 rounded-xl bg-[#0b142c] border border-white/[0.08] space-y-3 shadow-sm"
+                  className="p-6 rounded-xl bg-[#0E121B] border border-white/[0.08] space-y-3 shadow-xs"
                 >
                   <div className="w-9 h-9 rounded-lg bg-blue-500/20 text-sky-300 flex items-center justify-center">
                     <Icon size={18} />
@@ -116,7 +116,7 @@ export default function TeamPage() {
                   <h4 className="text-sm font-bold text-white tracking-tight">
                     {item.title}
                   </h4>
-                  <p className="text-xs text-slate-200 leading-relaxed">
+                  <p className="text-xs text-slate-300 leading-relaxed">
                     {item.description}
                   </p>
                 </div>

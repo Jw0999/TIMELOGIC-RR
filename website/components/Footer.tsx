@@ -79,8 +79,8 @@ export function Footer() {
             </div>
             <ul className="space-y-2 text-xs sm:text-sm">
               <li>
-                <Link href="/register" className="text-slate-300 hover:text-white transition-colors">
-                  Get Started
+                <Link href="/pricing" className="text-slate-300 hover:text-white transition-colors">
+                  Monthly Plans & Pricing
                 </Link>
               </li>
               <li>

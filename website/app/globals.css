@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 /* ─────────────────────────────────────────────────────────────
-   TimeLogic Production Design System
-   High-contrast, professional enterprise B2B dark canvas.
-   Ensures ALL text is bright, crisp, and 100% readable.
+   TimeLogic Engineering Design System
+   Neutral, high-contrast, production software aesthetic.
+   Clean dark charcoal/zinc palette — zero cartoon grid patterns.
    ───────────────────────────────────────────────────────────── */
 
 * {
@@ -13,7 +13,7 @@
 html {
   scroll-behavior: smooth;
   overflow-x: hidden;
-  background-color: #070d1e;
+  background-color: #090A0F;
   color-scheme: dark;
 }
 
@@ -21,8 +21,8 @@ body {
   position: relative;
   width: 100%;
   max-width: 100%;
-  background-color: #070d1e;
-  color: #f8fafc;
+  background-color: #090A0F;
+  color: #F8FAFC;
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -30,51 +30,35 @@ body {
 }
 
 ::selection {
-  background: rgba(37, 99, 235, 0.4);
-  color: #ffffff;
+  background: rgba(56, 189, 248, 0.25);
+  color: #FFFFFF;
 }
 
-/* Accessible focus outline */
 :focus-visible {
-  outline: 2px solid #38bdf8;
+  outline: 2px solid #38BDF8;
   outline-offset: 2px;
-}
-
-/* Subtle engineering grid background */
-.bg-grid-pattern {
-  background-size: 32px 32px;
-  background-image: 
-    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
 }
 
 /* ─────────────────────────────────────────────────────────────
    Direct High-Contrast Guarantees
-   Guarantees ALL body & descriptive text on dark canvases is bright silver-white,
-   while preserving deep readable contrast on light canvas sections!
    ───────────────────────────────────────────────────────────── */
 
-body {
-  color: #f8fafc;
-}
-
-/* Dark canvas text brightness */
 .text-slate-300,
 .text-slate-400 {
-  color: #e2e8f0;
+  color: #CBD5E1;
 }
 
 .text-slate-200,
 .text-slate-100 {
-  color: #f8fafc;
+  color: #F8FAFC;
 }
 
 .text-slate-500,
 .text-slate-600 {
-  color: #cbd5e1;
+  color: #94A3B8;
 }
 
-/* Light canvas high-contrast overrides */
+/* Light canvas high-contrast overrides for feature section */
 #features {
   color-scheme: light;
 }
@@ -84,11 +68,11 @@ body {
 }
 
 #features .text-slate-900 {
-  color: #0f172a !important;
+  color: #0F172A !important;
 }
 
 #features .text-slate-800 {
-  color: #1e293b !important;
+  color: #1E293B !important;
 }
 
 #features .text-slate-700 {
@@ -100,6 +84,5 @@ body {
 }
 
 #features .text-slate-500 {
-  color: #64748b !important;
+  color: #64748B !important;
 }
-

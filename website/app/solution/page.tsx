@@ -134,14 +134,14 @@ export default function SolutionPage() {
   ];
 
   return (
-    <div className="min-h-screen w-full bg-[#070d1e] text-white flex flex-col justify-between">
+    <div className="min-h-screen w-full bg-[#090A0F] text-white flex flex-col justify-between">
       {/* Header */}
       <Header />
 
       {/* ── SECTION 1: HERO HEADER ── */}
-      <section className="pt-16 sm:pt-20 pb-16 bg-[#070d1e] border-b border-white/[0.08] bg-grid-pattern">
+      <section className="pt-16 sm:pt-20 pb-16 bg-[#090A0F] border-b border-white/[0.08]">
         <div className="max-w-4xl mx-auto px-6 sm:px-8 text-center space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-blue-950/80 border border-blue-400/30 text-xs font-mono font-medium text-sky-300">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-white/[0.04] border border-white/[0.1] text-xs font-mono font-medium text-sky-300">
             System Architecture
           </div>
 
@@ -149,18 +149,18 @@ export default function SolutionPage() {
             How TimeLogic Solves Workplace Attendance Fraud
           </h1>
 
-          <p className="text-slate-200 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
+          <p className="text-slate-300 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
             A comprehensive architectural breakdown of our hardware-bound kiosk terminals, facial biometric locks, live executive command center, automated fraud engine, and instant payroll analytics.
           </p>
         </div>
       </section>
 
       {/* ── SECTION 2: TECHNICAL PARAMETERS STRIP ── */}
-      <section className="py-8 bg-[#091124] border-b border-white/[0.08]">
+      <section className="py-8 bg-[#0B0D14] border-b border-white/[0.08]">
         <div className="max-w-7xl mx-auto px-6 sm:px-8">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
             {technicalSpecs.map((spec) => (
-              <div key={spec.label} className="p-4 rounded-lg bg-[#0b142c] border border-white/[0.08] shadow-sm">
+              <div key={spec.label} className="p-4 rounded-lg bg-[#0E121B] border border-white/[0.08] shadow-xs">
                 <div className="text-xl sm:text-2xl font-mono font-bold text-white">
                   {spec.value}
                 </div>
@@ -177,7 +177,7 @@ export default function SolutionPage() {
       </section>
 
       {/* ── SECTION 3: ARCHITECTURAL PROTOCOLS ── */}
-      <section className="py-20 sm:py-24 bg-[#070d1e] border-b border-white/[0.08]">
+      <section className="py-20 sm:py-24 bg-[#090A0F] border-b border-white/[0.08]">
         <div className="max-w-6xl mx-auto px-6 sm:px-8 space-y-24">
           {architectures.map((arch) => (
             <div
@@ -195,7 +195,7 @@ export default function SolutionPage() {
                   {arch.title}
                 </h2>
 
-                <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
                   {arch.lead}
                 </p>
 
@@ -204,7 +204,7 @@ export default function SolutionPage() {
                     Key Architectural Guarantees:
                   </div>
                   {arch.points.map((pt, pIdx) => (
-                    <div key={pIdx} className="flex items-start gap-2.5 text-xs text-slate-200">
+                    <div key={pIdx} className="flex items-start gap-2.5 text-xs text-slate-300">
                       <CheckCircle2 size={14} className="text-sky-400 flex-shrink-0 mt-0.5" />
                       <span>{pt}</span>
                     </div>
@@ -213,8 +213,8 @@ export default function SolutionPage() {
               </div>
 
               <div className="lg:col-span-7 space-y-3">
-                <div className="rounded-xl border border-white/[0.12] bg-[#0b142c] shadow-xl overflow-hidden">
-                  <div className="h-8 px-4 bg-[#080d1e] border-b border-white/[0.08] flex items-center justify-between text-xs text-slate-300">
+                <div className="rounded-xl border border-white/[0.12] bg-[#0E121B] shadow-xl overflow-hidden">
+                  <div className="h-8 px-4 bg-[#090A0F] border-b border-white/[0.08] flex items-center justify-between text-xs text-slate-300">
                     <span className="font-mono text-[11px]">timelogic.app / {arch.id}</span>
                     <span className="text-[11px] text-emerald-400 font-mono font-medium">Verified Capture</span>
                   </div>
@@ -225,7 +225,7 @@ export default function SolutionPage() {
                   />
                 </div>
                 {arch.secondaryImage && (
-                  <div className="rounded-xl border border-white/[0.08] bg-[#0b142c] overflow-hidden shadow-md">
+                  <div className="rounded-xl border border-white/[0.08] bg-[#0E121B] overflow-hidden shadow-md">
                     <img
                       src={arch.secondaryImage}
                       alt={`${arch.caption} supplementary view`}
@@ -233,7 +233,7 @@ export default function SolutionPage() {
                     />
                   </div>
                 )}
-                <div className="text-[11px] text-slate-300 italic">
+                <div className="text-[11px] text-slate-400 italic">
                   {arch.caption}
                 </div>
               </div>
@@ -243,7 +243,7 @@ export default function SolutionPage() {
       </section>
 
       {/* ── SECTION 4: BOTTOM CTA ── */}
-      <section className="py-20 sm:py-24 bg-[#091124]">
+      <section className="py-20 sm:py-24 bg-[#0B0D14]">
         <div className="max-w-4xl mx-auto px-6 sm:px-8 text-center space-y-6">
           <h2 className="text-2xl sm:text-4xl font-bold text-white tracking-tight">
             Ready to deploy TimeLogic in your facility?
