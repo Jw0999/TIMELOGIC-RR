@@ -6,6 +6,7 @@ DESKTOP_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 RELEASE_DIR="${DESKTOP_DIR}/release"
 UNPACKED_DIR="${RELEASE_DIR}/linux-unpacked"
 ICON_FILE="$(cd "${DESKTOP_DIR}/../mobile/assets" && pwd)/icon.png"
+PKG_VER="$(node -p "require('${DESKTOP_DIR}/package.json').version")"
 
 if [ ! -d "${UNPACKED_DIR}" ]; then
   echo "Error: ${UNPACKED_DIR} does not exist. Run electron-builder first." >&2
@@ -17,7 +18,7 @@ trap 'rm -rf "${BUILD_DIR}"' EXIT
 
 cat > "${BUILD_DIR}/PKGBUILD" << EOF
 pkgname=timelogic-admin
-pkgver=1.0.17
+pkgver=${PKG_VER}
 pkgrel=1
 pkgdesc="TimeLogic attendance administration. Desktop administration app for the TimeLogic attendance platform."
 arch=('x86_64')
