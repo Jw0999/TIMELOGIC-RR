@@ -596,6 +596,14 @@ const manualCheckOut = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+const batchSyncAttendance = async (req, res, next) => {
+  try {
+    const targetOrgId = await resolveAdminOrgId(req);
+    const data = await AttendanceService.batchSyncAttendance(req.user.id, targetOrgId, req.body);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
 const listPenalties = async (req, res, next) => {
   try {
     const targetOrgId = await resolveAdminOrgId(req);
@@ -889,7 +897,7 @@ module.exports = {
   setBreakPolicy,
   emergencyStopAll, emergencyLockSystem, emergencyInvalidateQR, emergencyRevert,
   getNotifications, createEmployee,
-  getManualAttendance, findManualEmployee, manualCheckIn, manualCheckOut,
+  getManualAttendance, findManualEmployee, manualCheckIn, manualCheckOut, batchSyncAttendance,
   listPenalties, createPenalty, deletePenalty, waiveEmployeeAutoPenalties,
   setStationPassword, getStationPasswordStatus,
   getKioskDevices, releaseKioskDevice,

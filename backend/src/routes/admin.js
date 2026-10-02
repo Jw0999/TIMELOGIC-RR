@@ -24,13 +24,18 @@ router.post('/manual-attendance/check-in', authenticate, isAdmin, stationLimiter
   body('sessionId').isUUID(),
   body('password').notEmpty(),
   body('faceImage').optional({ nullable: true }).isString(),
+  body('timestamp').optional({ nullable: true }).isISO8601(),
 ], validate, ctrl.manualCheckIn);
 router.post('/manual-attendance/check-out', authenticate, isAdmin, stationLimiter, [
   body('employeeId').isUUID(),
   body('sessionId').optional({ nullable: true }).isUUID(),
   body('password').notEmpty(),
   body('faceImage').optional({ nullable: true }).isString(),
+  body('timestamp').optional({ nullable: true }).isISO8601(),
 ], validate, ctrl.manualCheckOut);
+router.post('/manual-attendance/batch-sync', authenticate, isAdmin, [
+  body('records').isArray({ min: 1 }).withMessage('records must be an array with at least one record'),
+], validate, ctrl.batchSyncAttendance);
 
 router.get('/penalties', authenticate, isAdmin, ctrl.listPenalties);
 router.post('/penalties', authenticate, isAdmin, [

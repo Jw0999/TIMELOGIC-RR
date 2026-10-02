@@ -1,11 +1,61 @@
-const CACHE = 'timelogic-admin-station-v1';
+// ============================================================================
+// TimeLogic Kiosk Service Worker
+// Enables offline boot, asset caching, and zero-downtime kiosk operation.
+// ============================================================================
+
+const CACHE_NAME = 'timelogic-station-cache-v2';
+
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(['./', './manifest.webmanifest'])).then(() => self.skipWaiting()));
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll([
+        '/',
+        '/index.html',
+        '/logo.jpg',
+        '/icon-192.png',
+        '/manifest.webmanifest',
+      ]).catch((err) => console.warn('[SW] Cache addAll warning:', err));
+    }).then(() => self.skipWaiting())
+  );
 });
+
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(
+        keys.map((k) => {
+          if (k !== CACHE_NAME) return caches.delete(k);
+        })
+      )
+    ).then(() => self.clients.claim())
+  );
 });
+
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET' || event.request.url.includes('/api/')) return;
-  event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+  // Never intercept backend API calls (handled explicitly by api.ts and IndexedDB)
+  if (event.request.method !== 'GET' || event.request.url.includes('/api/')) {
+    return;
+  }
+
+  event.respondWith(
+    caches.match(event.request).then((cachedResponse) => {
+      // Stale-while-revalidate: return cached if available, update cache in background
+      const fetchPromise = fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          if (event.request.mode === 'navigate') {
+            return caches.match('/') || caches.match('/index.html');
+          }
+          return cachedResponse;
+        });
+
+      return cachedResponse || fetchPromise;
+    })
+  );
 });

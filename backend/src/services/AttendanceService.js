@@ -798,8 +798,8 @@ class AttendanceService {
     };
   }
 
-  async manualCheckIn(adminId, adminOrgId, { employeeId, sessionId, password, faceImage }) {
-    const clockInTime = await getCurrentServerTime();
+  async manualCheckIn(adminId, adminOrgId, { employeeId, sessionId, password, faceImage, timestamp }) {
+    const clockInTime = timestamp ? new Date(timestamp) : await getCurrentServerTime();
     const employee = await this._loadEmployeeForChannel(employeeId, 'MANUAL', true);
     if (adminOrgId !== 'platform-org' && employee.orgId !== adminOrgId) {
       throw Object.assign(new Error('Employee not found.'), { status: 404 });
@@ -843,7 +843,7 @@ class AttendanceService {
     return { record, status, penalty, clockInTime };
   }
 
-  async manualCheckOut(adminId, adminOrgId, { employeeId, sessionId, password, faceImage }) {
+  async manualCheckOut(adminId, adminOrgId, { employeeId, sessionId, password, faceImage, timestamp }) {
     const employee = await this._loadEmployeeForChannel(employeeId, 'MANUAL', true);
     if (adminOrgId !== 'platform-org' && employee.orgId !== adminOrgId) {
       throw Object.assign(new Error('Employee not found.'), { status: 404 });
@@ -873,7 +873,7 @@ class AttendanceService {
       },
     });
     if (!record) throw Object.assign(new Error('No open attendance record found for this employee.'), { status: 404 });
-    const clockOutTime = await getCurrentServerTime();
+    const clockOutTime = timestamp ? new Date(timestamp) : await getCurrentServerTime();
     this._assertCheckoutAllowed(record, clockOutTime);
     const totalWorkHours = parseFloat(((clockOutTime - record.clockInTime) / 3600000).toFixed(2));
     // Auto-end any active break upon manual clock out
@@ -899,6 +899,85 @@ class AttendanceService {
     const updated = await prisma.attendanceRecord.findUnique({ where: { id: record.id } });
     this._emit('attendance:checkout', { record: updated, sessionId: record.sessionId, source: 'MANUAL' });
     return { record: updated, clockOutTime: updated.clockOutTime };
+  }
+
+  async batchSyncAttendance(adminId, adminOrgId, { records }) {
+    if (!Array.isArray(records)) {
+      throw Object.assign(new Error('records array is required'), { status: 400 });
+    }
+
+    const results = [];
+    let syncedCount = 0;
+    let failedCount = 0;
+
+    for (const item of records) {
+      const { clientEventId, employeeId, type, sessionId, password, faceImage, timestamp } = item;
+      try {
+        if (type === 'check_in') {
+          const res = await this.manualCheckIn(adminId, adminOrgId, {
+            employeeId,
+            sessionId,
+            password,
+            faceImage,
+            timestamp,
+          });
+          results.push({
+            clientEventId,
+            status: 'SYNCED',
+            type: 'check_in',
+            recordId: res.record.id,
+            clockInTime: res.clockInTime,
+          });
+          syncedCount++;
+        } else if (type === 'check_out') {
+          const res = await this.manualCheckOut(adminId, adminOrgId, {
+            employeeId,
+            sessionId,
+            password,
+            faceImage,
+            timestamp,
+          });
+          results.push({
+            clientEventId,
+            status: 'SYNCED',
+            type: 'check_out',
+            recordId: res.record.id,
+            clockOutTime: res.clockOutTime,
+          });
+          syncedCount++;
+        } else {
+          results.push({
+            clientEventId,
+            status: 'FAILED',
+            error: `Unsupported record type: ${type}`,
+          });
+          failedCount++;
+        }
+      } catch (err) {
+        if (err.status === 409 || err.message?.includes('Already clocked in') || err.message?.includes('already checked out')) {
+          results.push({
+            clientEventId,
+            status: 'ALREADY_SYNCED',
+            message: err.message,
+          });
+          syncedCount++;
+        } else {
+          results.push({
+            clientEventId,
+            status: 'FAILED',
+            error: err.message || 'Sync failed',
+          });
+          failedCount++;
+        }
+      }
+    }
+
+    return {
+      total: records.length,
+      syncedCount,
+      failedCount,
+      results,
+    };
   }
 
   _assertCheckoutAllowed(record, clockOutTime) {

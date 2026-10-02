@@ -20,7 +20,11 @@ import {
   Mail,
   ArrowRight,
   RotateCcw,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
+import { startBackgroundSync, syncOutboxNow } from './offline/syncEngine';
+import { getOutboxCount } from './offline/db';
 import {
   clearSession,
   enrollFace,
@@ -413,6 +417,50 @@ function App() {
     return () => clearInterval(timer);
   }, []);
 
+  // Offline & Background Sync States
+  const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
+  const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
+  const [syncingNow, setSyncingNow] = useState<boolean>(false);
+
+  useEffect(() => {
+    startBackgroundSync();
+
+    const updateOnline = () => setIsOnline(navigator.onLine);
+    window.addEventListener('online', updateOnline);
+    window.addEventListener('offline', updateOnline);
+
+    const refreshOutbox = () => {
+      getOutboxCount().then(setPendingSyncCount).catch(() => {});
+    };
+    refreshOutbox();
+
+    const onOutboxChanged = () => refreshOutbox();
+    const onSyncStatus = (e: any) => {
+      setSyncingNow(Boolean(e.detail?.syncing));
+      if (typeof e.detail?.pendingCount === 'number') {
+        setPendingSyncCount(e.detail.pendingCount);
+      }
+    };
+    const onSyncComplete = (e: any) => {
+      if (e.detail?.synced > 0) {
+        setNotice(`✓ Synced ${e.detail.synced} offline attendance record(s) to cloud!`);
+      }
+      refreshOutbox();
+    };
+
+    window.addEventListener('timelogic:outbox_changed', onOutboxChanged);
+    window.addEventListener('timelogic:sync_status', onSyncStatus);
+    window.addEventListener('timelogic:sync_complete', onSyncComplete);
+
+    return () => {
+      window.removeEventListener('online', updateOnline);
+      window.removeEventListener('offline', updateOnline);
+      window.removeEventListener('timelogic:outbox_changed', onOutboxChanged);
+      window.removeEventListener('timelogic:sync_status', onSyncStatus);
+      window.removeEventListener('timelogic:sync_complete', onSyncComplete);
+    };
+  }, []);
+
   // Kiosk Privacy Mode States
   const [kioskEmail, setKioskEmail] = useState('');
   const [identifiedEmployee, setIdentifiedEmployee] = useState<Employee | null>(null);
@@ -512,7 +560,24 @@ function App() {
     }
     getMe()
       .then(setUser)
-      .catch(clearSession)
+      .catch(async (err) => {
+        if (!navigator.onLine || err?.message?.includes('Unable to connect') || err?.message?.includes('Failed to fetch')) {
+          const { getCachedRoster } = await import('./offline/db');
+          const cached = await getCachedRoster();
+          if (cached.employees.length > 0) {
+            setUser({
+              id: 'offline-admin',
+              firstName: 'Station',
+              lastName: 'Operator',
+              role: 'ADMIN',
+              orgId: 'offline-org',
+              isOffline: true,
+            });
+            return;
+          }
+        }
+        clearSession();
+      })
       .finally(() => setBooting(false));
   }, []);
 
@@ -668,10 +733,11 @@ function App() {
     setActionBusy(true);
     setError('');
     try {
+      const empName = `${employee.firstName} ${employee.lastName}`;
       const result =
         type === 'check_in'
-          ? await manualCheckIn(employee.id, sessionId, password, faceImage || undefined)
-          : await manualCheckOut(employee.id, employee.attendance?.sessionId || sessionId || undefined, password);
+          ? await manualCheckIn(employee.id, sessionId, password, faceImage || undefined, empName)
+          : await manualCheckOut(employee.id, employee.attendance?.sessionId || sessionId || undefined, password, empName);
 
       const actionText = type === 'check_in' ? 'checked in' : 'checked out';
       const eventTime = formatTime(
@@ -679,7 +745,8 @@ function App() {
         dashboard?.organization.timezone
       );
 
-      setNotice(`✓ ${employee.firstName} ${employee.lastName} ${actionText} successfully at ${eventTime}.`);
+      const offlineSuffix = result.isOffline ? ' (Saved to local queue — will sync automatically when online)' : '';
+      setNotice(`✓ ${employee.firstName} ${employee.lastName} ${actionText} successfully at ${eventTime}${offlineSuffix}.`);
 
       // Update identifiedEmployee if currently displayed in kiosk view
       setIdentifiedEmployee((prev) => {
@@ -935,6 +1002,50 @@ function App() {
         </div>
 
         <div className="topbar-right">
+          {/* Online/Offline connectivity indicator */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              fontSize: '0.72rem',
+              fontWeight: 600,
+              padding: '4px 8px',
+              borderRadius: '6px',
+              background: isOnline ? 'rgba(16, 185, 129, 0.12)' : 'rgba(245, 158, 11, 0.15)',
+              color: isOnline ? '#10b981' : '#f59e0b',
+              border: `1px solid ${isOnline ? 'rgba(16, 185, 129, 0.25)' : 'rgba(245, 158, 11, 0.3)'}`,
+            }}
+          >
+            {isOnline ? <Wifi size={13} /> : <WifiOff size={13} />}
+            <span>{isOnline ? 'Online' : 'Offline'}</span>
+          </div>
+
+          {/* Pending Sync Outbox Badge */}
+          {pendingSyncCount > 0 && (
+            <button
+              onClick={() => syncOutboxNow()}
+              disabled={syncingNow || !isOnline}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                color: '#ea580c',
+                background: 'rgba(234, 88, 12, 0.12)',
+                border: '1px solid rgba(234, 88, 12, 0.3)',
+                padding: '4px 9px',
+                borderRadius: '6px',
+                cursor: isOnline ? 'pointer' : 'default',
+              }}
+              title={isOnline ? 'Click to sync queued records now' : 'Records saved locally. Will sync automatically when connected.'}
+            >
+              <RefreshCw size={12} className={syncingNow ? 'spin' : ''} />
+              <span>{syncingNow ? 'Syncing...' : `${pendingSyncCount} Pending Sync`}</span>
+            </button>
+          )}
+
           <div className="live-clock-pill">
             <div className="pulse-dot"></div>
             <Clock size={14} />
@@ -967,6 +1078,28 @@ function App() {
 
       {/* ── Main Workspace ────────────────────────────────────────────────── */}
       <main className="workspace">
+        {!isOnline && (
+          <div
+            style={{
+              background: 'linear-gradient(135deg, rgba(120, 53, 15, 0.9), rgba(180, 83, 9, 0.9))',
+              color: '#fef3c7',
+              padding: '10px 16px',
+              borderRadius: '8px',
+              marginBottom: '1rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              fontSize: '0.85rem',
+              border: '1px solid rgba(251, 191, 36, 0.3)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+            }}
+          >
+            <WifiOff size={18} style={{ flexShrink: 0, color: '#fde68a' }} />
+            <span>
+              <strong>Offline Kiosk Mode Active:</strong> No internet connection detected. Employee clock-ins are being securely saved on this device and will automatically sync to cloud once connected.
+            </span>
+          </div>
+        )}
         {/* Alerts */}
         {notice && (
           <div className="alert success">

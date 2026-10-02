@@ -95,47 +95,225 @@ export function getKioskDeviceMeta() {
   };
 }
 
-export async function login(identifier: string, password: string) {
+import {
+  cacheStationAuth,
+  verifyOfflineStationAuth,
+  cacheRosterAndSessions,
+  getCachedRoster,
+  findEmployeeOffline,
+  queueOfflineAttendance,
+} from './offline/db';
+
+export async function login(identifier: string, password: string): Promise<AdminUser> {
   const meta = getKioskDeviceMeta();
   const body = identifier.includes('@')
     ? { email: identifier, password, ...meta }
     : { employeeCode: identifier, password, ...meta };
-  const response = await api.post<{ data: { accessToken: string; refreshToken: string; user: AdminUser; boundDevice?: any } }>('/auth/station-login', body);
-  if (!['ADMIN', 'SUPER_ADMIN'].includes(response.data.user.role)) throw new Error('Only administrator accounts can use this station.');
-  accessToken = response.data.accessToken;
-  localStorage.setItem('timelogic_admin_access', response.data.accessToken);
-  localStorage.setItem('timelogic_admin_refresh', response.data.refreshToken);
-  return response.data.user;
+
+  try {
+    const response = await api.post<{ data: { accessToken: string; refreshToken: string; user: AdminUser; boundDevice?: any } }>('/auth/station-login', body);
+    if (!['ADMIN', 'SUPER_ADMIN'].includes(response.data.user.role)) throw new Error('Only administrator accounts can use this station.');
+    accessToken = response.data.accessToken;
+    localStorage.setItem('timelogic_admin_access', response.data.accessToken);
+    localStorage.setItem('timelogic_admin_refresh', response.data.refreshToken);
+
+    // Cache credentials for offline emergency unlocking
+    await cacheStationAuth(response.data.user, identifier, password);
+
+    return response.data.user;
+  } catch (error: any) {
+    if (!navigator.onLine || error.message?.includes('Unable to connect') || error.message?.includes('Failed to fetch')) {
+      const offlineUser = await verifyOfflineStationAuth(identifier, password);
+      if (offlineUser) {
+        (offlineUser as any).isOffline = true;
+        return offlineUser;
+      }
+      throw new Error('No internet connection. Offline credentials do not match or this station has not been authenticated online yet.');
+    }
+    throw error;
+  }
 }
 
-export interface AdminUser { id: string; firstName: string; lastName: string; role: string; orgId: string; organization?: Organization }
+export interface AdminUser { id: string; firstName: string; lastName: string; role: string; orgId: string; organization?: Organization; isOffline?: boolean }
 export interface Organization { id: string; name: string; allowManualCheckIn: boolean; hasStudents?: boolean; requireFaceVerification?: boolean; timezone?: string | null }
 export interface Attendance { sessionId?: string; clockInTime?: string | null; clockOutTime?: string | null; status?: string | null; penalty?: number | null; session?: { office?: { timezone?: string | null } | null } | null }
 export interface Office { id: string; name: string; timezone?: string | null; openTime?: string | null; closeTime?: string | null; breakStart?: string | null; breakEnd?: string | null; breakMinutes?: number | null; graceMinutes?: number | null; lateAfterMinutes?: number | null }
 export interface Employee { id: string; firstName: string; lastName: string; email?: string | null; employeeCode?: string | null; profileImageUrl?: string | null; hasFaceEnrolled?: boolean; department?: { name?: string | null } | string | null; officeId?: string | null; office?: Office | { id: string; name: string } | null; shiftType?: string | null; checkInMethod: string; attendance?: Attendance | null }
 export interface Session { id: string; sessionName?: string | null; office?: Office | string | null; startTime?: string | null; endTime?: string | null }
-export interface Dashboard { enabled: boolean; serverTime: string; organization: Organization; offices?: Office[]; activeSessions: Session[]; selectedSession: Session | null; employees: Employee[]; total?: number; totalPages?: number }
+export interface Dashboard { enabled: boolean; serverTime: string; organization: Organization; offices?: Office[]; activeSessions: Session[]; selectedSession: Session | null; employees: Employee[]; total?: number; totalPages?: number; isOffline?: boolean }
 export interface LiveAttendance { employeeId: string; clockInTime?: string | null; clockOutTime?: string | null; employee?: Employee }
-export interface ActionResult { record?: Attendance; status?: string; penalty?: number; clockInTime?: string; clockOutTime?: string; serverTime?: string }
+export interface ActionResult { record?: Attendance; status?: string; penalty?: number; clockInTime?: string; clockOutTime?: string; serverTime?: string; isOffline?: boolean }
 export interface BreakRecord { id: string; employeeId: string; breakType: string; startTime: string; endTime?: string | null; durationMinutes?: number | null; lifecycleStatus?: string }
 export interface Student { id: string; firstName: string; lastName: string; studentCode: string; className?: string | null; status: string; todayAttendance?: { id: string; checkInTime: string; checkOutTime?: string | null } | null }
 
 export async function getMe() { return (await api.get<{ data: AdminUser }>('/auth/me')).data; }
-export async function getDashboard(sessionId?: string, search?: string) {
+export async function getDashboard(sessionId?: string, search?: string): Promise<Dashboard> {
   const query = new URLSearchParams({ page: '1', limit: '200' });
   if (sessionId) query.set('sessionId', sessionId);
   if (search) query.set('search', search);
-  return (await api.get<{ data: Dashboard }>(`/admin/manual-attendance?${query}`)).data;
+
+  try {
+    const data = (await api.get<{ data: Dashboard }>(`/admin/manual-attendance?${query}`)).data;
+    if (data && Array.isArray(data.employees)) {
+      cacheRosterAndSessions(data.employees, data.activeSessions || []).catch(() => {});
+    }
+    return data;
+  } catch (err: any) {
+    if (!navigator.onLine || err.message?.includes('Unable to connect') || err.message?.includes('Failed to fetch')) {
+      const cached = await getCachedRoster();
+      if (cached.employees.length > 0) {
+        let employees = cached.employees;
+        if (search && search.trim()) {
+          const s = search.trim().toLowerCase();
+          employees = employees.filter(
+            (e) =>
+              e.firstName.toLowerCase().includes(s) ||
+              e.lastName.toLowerCase().includes(s) ||
+              e.employeeCode?.toLowerCase().includes(s) ||
+              e.email?.toLowerCase().includes(s)
+          );
+        }
+        const selectedSession = cached.sessions.find((s) => s.id === sessionId) || cached.sessions[0] || null;
+        return {
+          enabled: true,
+          serverTime: new Date().toISOString(),
+          organization: {
+            id: 'offline-org',
+            name: 'Offline Kiosk Terminal',
+            allowManualCheckIn: true,
+          },
+          activeSessions: cached.sessions,
+          selectedSession,
+          employees,
+          total: employees.length,
+          totalPages: 1,
+          isOffline: true,
+        };
+      }
+    }
+    throw err;
+  }
 }
-export async function findManualEmployee(email: string) {
-  const query = new URLSearchParams({ email });
-  return (await api.get<{ data: Employee }>(`/admin/manual-attendance/employee?${query}`)).data;
+
+export async function findManualEmployee(email: string): Promise<Employee> {
+  try {
+    const query = new URLSearchParams({ email });
+    return (await api.get<{ data: Employee }>(`/admin/manual-attendance/employee?${query}`)).data;
+  } catch (err: any) {
+    if (!navigator.onLine || err.message?.includes('Unable to connect') || err.message?.includes('Failed to fetch')) {
+      const offlineEmp = await findEmployeeOffline(email);
+      if (offlineEmp) return offlineEmp;
+    }
+    throw err;
+  }
 }
-export async function manualCheckIn(employeeId: string, sessionId: string, password: string, faceImage?: string) {
-  return (await api.post<{ data: ActionResult }>('/admin/manual-attendance/check-in', { employeeId, sessionId, password, faceImage })).data;
+
+export async function manualCheckIn(
+  employeeId: string,
+  sessionId: string,
+  password: string,
+  faceImage?: string,
+  employeeName = 'Employee'
+): Promise<ActionResult> {
+  if (!navigator.onLine) {
+    const clientTime = new Date().toISOString();
+    await queueOfflineAttendance({
+      employeeId,
+      employeeName,
+      type: 'check_in',
+      sessionId,
+      password,
+      faceImage,
+      timestamp: clientTime,
+    });
+    return {
+      status: 'SAVED_OFFLINE',
+      clockInTime: clientTime,
+      serverTime: clientTime,
+      isOffline: true,
+    };
+  }
+
+  try {
+    return (await api.post<{ data: ActionResult }>('/admin/manual-attendance/check-in', {
+      employeeId,
+      sessionId,
+      password,
+      faceImage,
+    })).data;
+  } catch (error: any) {
+    if (error.message?.includes('Unable to connect') || error.message?.includes('Failed to fetch') || !navigator.onLine) {
+      const clientTime = new Date().toISOString();
+      await queueOfflineAttendance({
+        employeeId,
+        employeeName,
+        type: 'check_in',
+        sessionId,
+        password,
+        faceImage,
+        timestamp: clientTime,
+      });
+      return {
+        status: 'SAVED_OFFLINE',
+        clockInTime: clientTime,
+        serverTime: clientTime,
+        isOffline: true,
+      };
+    }
+    throw error;
+  }
 }
-export async function manualCheckOut(employeeId: string, sessionId: string | undefined, password: string) {
-  return (await api.post<{ data: ActionResult }>('/admin/manual-attendance/check-out', { employeeId, sessionId, password })).data;
+
+export async function manualCheckOut(
+  employeeId: string,
+  sessionId: string | undefined,
+  password: string,
+  employeeName = 'Employee'
+): Promise<ActionResult> {
+  if (!navigator.onLine) {
+    const clientTime = new Date().toISOString();
+    await queueOfflineAttendance({
+      employeeId,
+      employeeName,
+      type: 'check_out',
+      sessionId,
+      password,
+      timestamp: clientTime,
+    });
+    return {
+      status: 'SAVED_OFFLINE',
+      clockOutTime: clientTime,
+      serverTime: clientTime,
+      isOffline: true,
+    };
+  }
+
+  try {
+    return (await api.post<{ data: ActionResult }>('/admin/manual-attendance/check-out', {
+      employeeId,
+      sessionId,
+      password,
+    })).data;
+  } catch (error: any) {
+    if (error.message?.includes('Unable to connect') || error.message?.includes('Failed to fetch') || !navigator.onLine) {
+      const clientTime = new Date().toISOString();
+      await queueOfflineAttendance({
+        employeeId,
+        employeeName,
+        type: 'check_out',
+        sessionId,
+        password,
+        timestamp: clientTime,
+      });
+      return {
+        status: 'SAVED_OFFLINE',
+        clockOutTime: clientTime,
+        serverTime: clientTime,
+        isOffline: true,
+      };
+    }
+    throw error;
+  }
 }
 export async function startEmployeeBreak(employeeId: string, breakType = 'LUNCH') {
   return (await api.post<{ data: BreakRecord }>(`/admin/breaks/${employeeId}/start`, { breakType })).data;
