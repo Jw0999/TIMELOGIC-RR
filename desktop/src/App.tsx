@@ -17,6 +17,7 @@ import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import Students from './pages/Students';
 import Penalties from './pages/Penalties';
+import Salary from './pages/Salary';
 import SubscriptionLockModal from './components/SubscriptionLockModal';
 
 function Guard({ children }: { children: React.ReactNode }) {
@@ -68,6 +69,7 @@ function AppRoutes() {
       <Route path="/attendance" element={<Guard><Layout><Attendance /></Layout></Guard>} />
       <Route path="/manual-attendance" element={<Guard><Layout><ManualCheckIn /></Layout></Guard>} />
       <Route path="/employees"  element={<Guard><Layout><Employees /></Layout></Guard>} />
+      <Route path="/salary"     element={<Guard><Layout><Salary /></Layout></Guard>} />
       <Route path="/penalties"  element={<Guard><Layout><Penalties /></Layout></Guard>} />
       <Route path="/students"   element={<Guard><CapabilityGuard capability="hasStudents"><Layout><Students /></Layout></CapabilityGuard></Guard>} />
       <Route path="/leaves"     element={<Guard><Layout><Leaves /></Layout></Guard>} />

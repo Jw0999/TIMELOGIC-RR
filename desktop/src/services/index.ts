@@ -1,4 +1,4 @@
-import { api } from './api';
+import { api, authenticatedFetch } from './api';
 import { API_URL } from '../config';
 import type {
   ApiEnvelope,
@@ -158,3 +158,55 @@ export const revertEmergency   = (controlId: string) => api.post<any>(`/admin/em
 // ─── Subscription & Activation ─────────────────────────────────────────────
 export const fetchSubscriptionStatus = () => api.get<any>('/admin/subscription-status').then((r) => r?.data || r);
 export const redeemActivationCode = (code: string) => api.post<any>('/admin/redeem-code', { code }).then((r) => r?.data || r);
+
+// ─── Payroll & Salary Management ───────────────────────────────────────────
+export const fetchPayrollOverview = (year?: number, month?: number) => {
+  const params = new URLSearchParams();
+  if (year) params.set('year', String(year));
+  if (month) params.set('month', String(month));
+  const query = params.toString() ? `?${params.toString()}` : '';
+  return api.get<any>(`/payroll/overview${query}`).then((r) => r.data ?? r);
+};
+
+export const setEmployeeSalary = (
+  employeeId: string,
+  body: {
+    baseSalary: number;
+    salaryCurrency?: string;
+    bankName?: string;
+    accountNumber?: string;
+    accountName?: string;
+  }
+) => api.put<any>(`/payroll/employees/${employeeId}/salary`, body).then((r) => r.data ?? r);
+
+export const fetchPayrollSettings = () =>
+  api.get<any>('/payroll/settings').then((r) => r.data ?? r);
+
+export const updatePayrollSettings = (body: any) =>
+  api.put<any>('/payroll/settings', body).then((r) => r.data ?? r);
+
+export const calculatePayroll = (body?: { year?: number; month?: number }) =>
+  api.post<any>('/payroll/calculate', body || {}).then((r) => r.data ?? r);
+
+export const sendPayslipWhatsApp = (payslipId: string) =>
+  api.post<any>(`/payroll/payslips/${payslipId}/whatsapp`, {}).then((r) => r.data ?? r);
+
+export const batchSendWhatsApp = (body: { year: number; month: number }) =>
+  api.post<any>('/payroll/batch-whatsapp', body).then((r) => r.data ?? r);
+
+export const downloadPayslipPdf = async (payslipId: string, fileName = 'payslip.pdf') => {
+  const res = await authenticatedFetch(`${API_URL}/payroll/payslips/${payslipId}/pdf`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.message || 'Failed to download payslip PDF');
+  }
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+};

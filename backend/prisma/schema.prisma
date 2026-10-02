@@ -38,6 +38,14 @@ model Organization {
   manualPenalties    ManualPenalty[]
   activationCodes    ActivationCode[]
   kioskDevices       KioskDevice[]
+  salaryPayoutDay          Int               @default(28)
+  salaryAutomationEnabled  Boolean           @default(true)
+  salaryCurrency           String            @default("NGN")
+  whatsappProvider         String?           @default("META")
+  whatsappPhoneId          String?
+  whatsappApiToken         String?
+  whatsappSenderNumber     String?
+  payslipRecords           PayslipRecord[]
 
   @@map("organizations")
 }
@@ -139,6 +147,12 @@ model User {
   studentCheckOuts   StudentAttendance[]   @relation("StudentCheckOutRecorder")
   manualPenalties    ManualPenalty[]       @relation("EmployeeManualPenalties")
   createdPenalties   ManualPenalty[]       @relation("CreatedManualPenalties")
+  baseSalary         Float?                @default(0)
+  salaryCurrency     String                @default("NGN")
+  bankName           String?
+  accountNumber      String?
+  accountName        String?
+  payslipRecords     PayslipRecord[]
   department         Department?           @relation("DepartmentEmployees", fields: [departmentId], references: [id])
   office             Office?               @relation("OfficeEmployees", fields: [officeId], references: [id])
   organization       Organization          @relation(fields: [orgId], references: [id], onDelete: Cascade)
@@ -733,4 +747,55 @@ model KioskDevice {
   @@index([orgId, isBound])
   @@map("kiosk_devices")
 }
+
+model PayslipRecord {
+  id                  String       @id @default(uuid())
+  orgId               String
+  employeeId          String
+  year                Int
+  month               Int          // 1 to 12
+  periodStart         DateTime     @db.Date
+  periodEnd           DateTime     @db.Date
+  
+  // Earnings
+  baseSalary          Float
+  currency            String       @default("NGN")
+  
+  // Work & Lateness Metrics
+  totalWorkHours      Float        @default(0)
+  totalPresentDays    Int          @default(0)
+  totalLateDays       Int          @default(0)
+  totalLateMinutes    Int          @default(0)
+  
+  // Deductions
+  attendancePenalties Float        @default(0)
+  manualPenalties     Float        @default(0)
+  totalDeductions     Float        @default(0)
+  netSalary           Float
+  
+  // Itemized breakdown JSON: [{ date, type, minutes, amount, reason }]
+  breakdownJson       Json?
+  
+  // Status & Delivery
+  status              String       @default("DRAFT") // DRAFT, GENERATED, SENT, PAID
+  pdfUrl              String?
+  pdfPath             String?
+  
+  // WhatsApp Telemetry
+  whatsappStatus      String       @default("PENDING") // PENDING, SENT, FAILED, SKIPPED
+  whatsappSentAt      DateTime?
+  whatsappError       String?
+  whatsappMessageId   String?
+  
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  
+  organization        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  employee            User         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, year, month])
+  @@index([orgId, year, month])
+  @@map("payslip_records")
+}
+
 
