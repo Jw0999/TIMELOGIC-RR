@@ -88,16 +88,6 @@ export function Footer() {
                   Engineering Leadership
                 </Link>
               </li>
-              <li>
-                <a
-                  href="https://timelogic-superadminin.pages.dev"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-cyan-400 hover:text-cyan-300 transition-colors inline-flex items-center gap-1"
-                >
-                  Super Admin Portal ↗
-                </a>
-              </li>
             </ul>
           </div>
 
