@@ -71,7 +71,11 @@ class PayrollService {
         },
       }),
       prisma.user.findMany({
-        where: { orgId, role: 'EMPLOYEE' },
+        where: {
+          orgId,
+          role: 'EMPLOYEE',
+          status: { notIn: ['SUSPENDED', 'TERMINATED'] },
+        },
         select: {
           id: true,
           firstName: true,
@@ -235,7 +239,11 @@ class PayrollService {
     const accountName = data.accountName || null;
 
     const updated = await prisma.user.updateMany({
-      where: { id: employeeId, orgId },
+      where: {
+        id: employeeId,
+        orgId,
+        status: { notIn: ['SUSPENDED', 'TERMINATED'] },
+      },
       data: {
         baseSalary,
         salaryCurrency,
@@ -333,7 +341,11 @@ class PayrollService {
     const [org, employees, attendanceRecords, manualPenalties] = await Promise.all([
       prisma.organization.findUnique({ where: { id: orgId } }),
       prisma.user.findMany({
-        where: { orgId, role: 'EMPLOYEE' },
+        where: {
+          orgId,
+          role: 'EMPLOYEE',
+          status: { notIn: ['SUSPENDED', 'TERMINATED'] },
+        },
         select: {
           id: true,
           firstName: true,

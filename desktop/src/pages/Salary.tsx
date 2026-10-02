@@ -351,6 +351,8 @@ export default function Salary() {
 
   const filteredEmployees = useMemo(() => {
     return employees.filter((emp) => {
+      if (emp.status === 'SUSPENDED' || emp.status === 'TERMINATED') return false;
+
       const q = search.toLowerCase();
       const matchesSearch =
         emp.name.toLowerCase().includes(q) ||
