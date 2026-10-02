@@ -122,6 +122,19 @@ class PayrollService {
           createdAt: true,
         },
       }),
+      prisma.breakRecord.findMany({
+        where: {
+          employee: { orgId },
+          startTime: { gte: startDate, lte: endDate },
+        },
+        select: {
+          id: true,
+          employeeId: true,
+          penalty: true,
+          breakType: true,
+          startTime: true,
+        },
+      }),
       prisma.payslipRecord.findMany({
         where: { orgId, year: y, month: m },
       }),
@@ -144,10 +157,17 @@ class PayrollService {
       manualPenaltiesByEmployee.get(mp.employeeId).push(mp);
     }
 
+    const breakByEmployee = new Map();
+    for (const br of breakRecords) {
+      if (!breakByEmployee.has(br.employeeId)) breakByEmployee.set(br.employeeId, []);
+      breakByEmployee.get(br.employeeId).push(br);
+    }
+
     const employeeRows = employees.map((emp) => {
       const existing = payslipMap.get(emp.id);
       const userAtt = attendanceByEmployee.get(emp.id) || [];
       const userMp = manualPenaltiesByEmployee.get(emp.id) || [];
+      const userBr = breakByEmployee.get(emp.id) || [];
 
       const baseSalary = Number(emp.baseSalary || 0);
       const currency = emp.salaryCurrency || org?.salaryCurrency || 'NGN';
@@ -169,12 +189,18 @@ class PayrollService {
         attendancePenalties += Number(a.penalty || 0);
       }
 
+      let breakPenaltiesTotal = 0;
+      for (const b of userBr) {
+        breakPenaltiesTotal += Number(b.penalty || 0);
+      }
+
       let manualPenaltiesTotal = 0;
       for (const m of userMp) {
         manualPenaltiesTotal += Number(m.amount || 0);
       }
 
-      const totalDeductions = attendancePenalties + manualPenaltiesTotal;
+      // Sum ALL penalties: Lateness + Break Overstay + HR Manual
+      const totalDeductions = attendancePenalties + breakPenaltiesTotal + manualPenaltiesTotal;
       const netSalary = Math.max(0, baseSalary - totalDeductions);
 
       return {
@@ -198,6 +224,7 @@ class PayrollService {
         totalPresentDays,
         totalLateDays,
         attendancePenalties,
+        breakPenalties: breakPenaltiesTotal,
         manualPenalties: manualPenaltiesTotal,
         totalDeductions,
         netSalary,
@@ -371,6 +398,13 @@ class PayrollService {
         },
         orderBy: { createdAt: 'asc' },
       }),
+      prisma.breakRecord.findMany({
+        where: {
+          employee: { orgId },
+          startTime: { gte: startDate, lte: endDate },
+        },
+        orderBy: { startTime: 'asc' },
+      }),
     ]);
 
     const currency = org?.salaryCurrency || 'NGN';
@@ -386,12 +420,19 @@ class PayrollService {
       manualByEmployee.get(mp.employeeId).push(mp);
     }
 
+    const breakByEmployee = new Map();
+    for (const br of breakRecords) {
+      if (!breakByEmployee.has(br.employeeId)) breakByEmployee.set(br.employeeId, []);
+      breakByEmployee.get(br.employeeId).push(br);
+    }
+
     const savedPayslips = [];
 
     for (const emp of employees) {
       const baseSalary = Number(emp.baseSalary || 0);
       const userAtt = attendanceByEmployee.get(emp.id) || [];
       const userMp = manualByEmployee.get(emp.id) || [];
+      const userBr = breakByEmployee.get(emp.id) || [];
 
       let totalWorkHours = 0;
       let totalPresentDays = 0;
@@ -421,6 +462,20 @@ class PayrollService {
         }
       }
 
+      let breakPenaltiesTotal = 0;
+      for (const br of userBr) {
+        const pen = Number(br.penalty || 0);
+        if (pen > 0) {
+          breakPenaltiesTotal += pen;
+          itemizedDeductions.push({
+            date: br.startTime.toISOString().split('T')[0],
+            type: 'BREAK_PENALTY',
+            amount: pen,
+            reason: `Break overstay penalty (${br.breakType || 'Break'})`,
+          });
+        }
+      }
+
       let manualPenaltiesTotal = 0;
       for (const mp of userMp) {
         const amt = Number(mp.amount || 0);
@@ -433,7 +488,8 @@ class PayrollService {
         });
       }
 
-      const totalDeductions = attendancePenalties + manualPenaltiesTotal;
+      // Sum ALL penalties: Lateness + Break Overstay + HR Administrative
+      const totalDeductions = attendancePenalties + breakPenaltiesTotal + manualPenaltiesTotal;
       const netSalary = Math.max(0, baseSalary - totalDeductions);
 
       const payslip = await prisma.payslipRecord.upsert({
@@ -458,6 +514,7 @@ class PayrollService {
           totalLateDays,
           totalLateMinutes,
           attendancePenalties,
+          breakPenalties: breakPenaltiesTotal,
           manualPenalties: manualPenaltiesTotal,
           totalDeductions,
           netSalary,
@@ -472,6 +529,7 @@ class PayrollService {
           totalLateDays,
           totalLateMinutes,
           attendancePenalties,
+          breakPenalties: breakPenaltiesTotal,
           manualPenalties: manualPenaltiesTotal,
           totalDeductions,
           netSalary,
@@ -640,8 +698,24 @@ class PayrollService {
         );
       yPos += 26;
 
-      // Manual Penalties Row
+      // Break Overstay Penalties Row
       doc.rect(40, yPos, 515, 26).fill('#ffffff');
+      doc.rect(40, yPos, 515, 26).strokeColor('#f1f5f9').stroke();
+      doc.fillColor('#0f172a').fontSize(9).font('Helvetica')
+        .text('Break Overstay Deductions', 55, yPos + 8, { width: 260 });
+      doc.fillColor('#94a3b8').font('Helvetica')
+        .text('—', 320, yPos + 8, { width: 105, align: 'right' });
+      doc.fillColor('#ef4444').font('Helvetica-Bold')
+        .text(
+          (payslip.breakPenalties || 0) > 0 ? `-${this.formatMoneyPdf(payslip.breakPenalties, currency)}` : `${currency} 0.00`,
+          430,
+          yPos + 8,
+          { width: 110, align: 'right' }
+        );
+      yPos += 26;
+
+      // Manual Penalties Row
+      doc.rect(40, yPos, 515, 26).fill('#f8fafc');
       doc.rect(40, yPos, 515, 26).strokeColor('#f1f5f9').stroke();
       doc.fillColor('#0f172a').fontSize(9).font('Helvetica')
         .text('HR Administrative / Disciplinary Penalties', 55, yPos + 8, { width: 260 });

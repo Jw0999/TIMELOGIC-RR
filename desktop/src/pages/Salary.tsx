@@ -59,6 +59,7 @@ interface EmployeePayroll {
   totalPresentDays: number;
   totalLateDays: number;
   attendancePenalties: number;
+  breakPenalties: number;
   manualPenalties: number;
   totalDeductions: number;
   netSalary: number;
@@ -703,6 +704,7 @@ export default function Salary() {
                                 </span>
                                 <span className="block text-[10px] text-[var(--text-muted)]">
                                   Late: {formatMoney(emp.attendancePenalties, emp.currency)}
+                                  {emp.breakPenalties > 0 && ` + Break: ${formatMoney(emp.breakPenalties, emp.currency)}`}
                                   {emp.manualPenalties > 0 && ` + HR: ${formatMoney(emp.manualPenalties, emp.currency)}`}
                                 </span>
                               </button>
@@ -1101,6 +1103,16 @@ export default function Salary() {
                   </div>
                   <span className="font-bold text-xs text-red-600 dark:text-red-400">
                     -{formatMoney(breakdownModalEmployee.attendancePenalties, breakdownModalEmployee.currency)}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)]">
+                  <div>
+                    <p className="font-semibold text-xs text-[var(--text-main)]">Break Overstay Deductions</p>
+                    <p className="text-[11px] text-[var(--text-muted)]">Automatic deductions for exceeded break limits</p>
+                  </div>
+                  <span className="font-bold text-xs text-red-600 dark:text-red-400">
+                    -{formatMoney(breakdownModalEmployee.breakPenalties || 0, breakdownModalEmployee.currency)}
                   </span>
                 </div>
 

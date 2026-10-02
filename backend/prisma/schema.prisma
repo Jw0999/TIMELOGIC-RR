@@ -769,6 +769,7 @@ model PayslipRecord {
   
   // Deductions
   attendancePenalties Float        @default(0)
+  breakPenalties      Float        @default(0)
   manualPenalties     Float        @default(0)
   totalDeductions     Float        @default(0)
   netSalary           Float
