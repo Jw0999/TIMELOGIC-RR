@@ -230,7 +230,7 @@ class AuthenticationService {
       }
     }
 
-    const accessToken = this._signAccess(user);
+    const accessToken = this._signAccess(user, '30d');
     const refreshToken = await this._createRefreshToken(user.id);
 
     return {
@@ -416,11 +416,11 @@ class AuthenticationService {
 
   // ── helpers ──────────────────────────────────────────────────────────────────
 
-  _signAccess(user) {
+  _signAccess(user, expiresIn) {
     return jwt.sign(
       { sub: user.id, role: user.role, orgId: user.orgId },
       env.JWT_ACCESS_SECRET,
-      { expiresIn: env.JWT_ACCESS_EXPIRES_IN }
+      { expiresIn: expiresIn || env.JWT_ACCESS_EXPIRES_IN || '15m' }
     );
   }
 

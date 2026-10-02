@@ -3,8 +3,8 @@
 // Automatically uploads offline queued records to Heroku API upon reconnection.
 // ============================================================================
 
-import { api } from '../api';
-import { getPendingOutbox, removeSyncedRecords, getOutboxCount, OutboxRecord } from './db';
+import { api, getAccessToken } from '../api';
+import { getPendingOutbox, removeSyncedRecords, getOutboxCount, getStationAuthCache, OutboxRecord } from './db';
 
 let isSyncing = false;
 let syncInterval: any = null;
@@ -36,6 +36,16 @@ export async function syncOutboxNow(): Promise<SyncResult | null> {
   window.dispatchEvent(new CustomEvent('timelogic:sync_status', { detail: { syncing: true, pendingCount: pending.length } }));
 
   try {
+    // Ensure access token is active
+    let token = getAccessToken();
+    if (!token) {
+      const cached = await getStationAuthCache().catch(() => null);
+      if (cached?.accessToken) {
+        localStorage.setItem('timelogic_admin_access', cached.accessToken);
+        if (cached.refreshToken) localStorage.setItem('timelogic_admin_refresh', cached.refreshToken);
+      }
+    }
+
     const payload = {
       records: pending.map((r) => ({
         clientEventId: r.clientEventId,
@@ -80,6 +90,9 @@ export async function syncOutboxNow(): Promise<SyncResult | null> {
         remaining,
       },
     }));
+
+    // Trigger dashboard refresh so all updated attendance reflects immediately on UI
+    window.dispatchEvent(new CustomEvent('timelogic:reload_dashboard'));
 
     return {
       total: res.total,

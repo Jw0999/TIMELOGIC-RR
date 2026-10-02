@@ -1,9 +1,24 @@
 import { API_URL } from './config';
+import {
+  cacheStationAuth,
+  verifyOfflineStationAuth,
+  cacheRosterAndSessions,
+  getCachedRoster,
+  findEmployeeOffline,
+  queueOfflineAttendance,
+  getStationAuthCache,
+} from './offline/db';
 
 let accessToken = localStorage.getItem('timelogic_admin_access');
 let refreshPromise: Promise<boolean> | null = null;
 
-export function getAccessToken() { return accessToken; }
+export function getAccessToken() {
+  if (!accessToken) {
+    accessToken = localStorage.getItem('timelogic_admin_access');
+  }
+  return accessToken;
+}
+
 export function clearSession() {
   accessToken = null;
   localStorage.removeItem('timelogic_admin_access');
@@ -11,23 +26,49 @@ export function clearSession() {
 }
 
 async function refresh(): Promise<boolean> {
-  const token = localStorage.getItem('timelogic_admin_refresh');
+  let token = localStorage.getItem('timelogic_admin_refresh');
+  if (!token) {
+    const cached = await getStationAuthCache().catch(() => null);
+    if (cached?.refreshToken) {
+      token = cached.refreshToken;
+      localStorage.setItem('timelogic_admin_refresh', token);
+      if (cached.accessToken) {
+        accessToken = cached.accessToken;
+        localStorage.setItem('timelogic_admin_access', cached.accessToken);
+      }
+    }
+  }
   if (!token) return false;
   if (!refreshPromise) {
     refreshPromise = fetch(`${API_URL}/auth/refresh`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refreshToken: token }),
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken: token }),
     }).then(async (response) => {
       const body = await response.json().catch(() => null);
-      if (!response.ok || !body?.data?.accessToken) return false;
+      if (!response.ok || !body?.data?.accessToken) {
+        if (response.status === 401 || response.status === 403) {
+          return false;
+        }
+        return false;
+      }
       accessToken = body.data.accessToken;
       localStorage.setItem('timelogic_admin_access', body.data.accessToken);
+      if (body.data.refreshToken) {
+        localStorage.setItem('timelogic_admin_refresh', body.data.refreshToken);
+      }
       return true;
-    }).catch(() => false).finally(() => { refreshPromise = null; });
+    }).catch(() => {
+      return false;
+    }).finally(() => {
+      refreshPromise = null;
+    });
   }
   return refreshPromise;
 }
 
 async function request<T>(path: string, options: RequestInit = {}, retry = true): Promise<T> {
+  const currentToken = getAccessToken();
   let response: Response;
   try {
     response = await fetch(`${API_URL}${path}`, {
@@ -35,7 +76,7 @@ async function request<T>(path: string, options: RequestInit = {}, retry = true)
       headers: {
         'Content-Type': 'application/json',
         'Cache-Control': 'no-cache',
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        ...(currentToken ? { Authorization: `Bearer ${currentToken}` } : {}),
         ...(options.headers || {}),
       },
     });
@@ -45,8 +86,11 @@ async function request<T>(path: string, options: RequestInit = {}, retry = true)
   const body = await response.json().catch(() => null);
   if (response.status === 401 && retry && !path.includes('/auth/')) {
     if (await refresh()) return request<T>(path, options, false);
-    clearSession();
-    throw new Error('Your session expired. Please sign in again.');
+    if (navigator.onLine) {
+      clearSession();
+      throw new Error('Your session expired. Please sign in again.');
+    }
+    throw new Error('Unable to connect to TimeLogic services. Offline mode active.');
   }
   if (response.status === 403 && body?.code === 'SUBSCRIPTION_EXPIRED') {
     window.dispatchEvent(new CustomEvent('kiosk:subscription_expired', { detail: body }));
@@ -95,15 +139,6 @@ export function getKioskDeviceMeta() {
   };
 }
 
-import {
-  cacheStationAuth,
-  verifyOfflineStationAuth,
-  cacheRosterAndSessions,
-  getCachedRoster,
-  findEmployeeOffline,
-  queueOfflineAttendance,
-} from './offline/db';
-
 export async function login(identifier: string, password: string): Promise<AdminUser> {
   const meta = getKioskDeviceMeta();
   const body = identifier.includes('@')
@@ -117,8 +152,11 @@ export async function login(identifier: string, password: string): Promise<Admin
     localStorage.setItem('timelogic_admin_access', response.data.accessToken);
     localStorage.setItem('timelogic_admin_refresh', response.data.refreshToken);
 
-    // Cache credentials for offline emergency unlocking
-    await cacheStationAuth(response.data.user, identifier, password);
+    // Cache credentials and tokens for offline emergency unlocking and persistence
+    await cacheStationAuth(response.data.user, identifier, password, {
+      accessToken: response.data.accessToken,
+      refreshToken: response.data.refreshToken,
+    });
 
     return response.data.user;
   } catch (error: any) {
@@ -146,7 +184,23 @@ export interface ActionResult { record?: Attendance; status?: string; penalty?: 
 export interface BreakRecord { id: string; employeeId: string; breakType: string; startTime: string; endTime?: string | null; durationMinutes?: number | null; lifecycleStatus?: string }
 export interface Student { id: string; firstName: string; lastName: string; studentCode: string; className?: string | null; status: string; todayAttendance?: { id: string; checkInTime: string; checkOutTime?: string | null } | null }
 
-export async function getMe() { return (await api.get<{ data: AdminUser }>('/auth/me')).data; }
+export async function getMe() {
+  if (!accessToken) {
+    accessToken = localStorage.getItem('timelogic_admin_access');
+    if (!accessToken) {
+      const cached = await getStationAuthCache().catch(() => null);
+      if (cached?.accessToken) {
+        accessToken = cached.accessToken;
+        localStorage.setItem('timelogic_admin_access', cached.accessToken);
+        if (cached.refreshToken) {
+          localStorage.setItem('timelogic_admin_refresh', cached.refreshToken);
+        }
+      }
+    }
+  }
+  return (await api.get<{ data: AdminUser }>('/auth/me')).data;
+}
+
 export async function getDashboard(sessionId?: string, search?: string): Promise<Dashboard> {
   const query = new URLSearchParams({ page: '1', limit: '200' });
   if (sessionId) query.set('sessionId', sessionId);
@@ -156,6 +210,28 @@ export async function getDashboard(sessionId?: string, search?: string): Promise
     const data = (await api.get<{ data: Dashboard }>(`/admin/manual-attendance?${query}`)).data;
     if (data && Array.isArray(data.employees)) {
       cacheRosterAndSessions(data.employees, data.activeSessions || []).catch(() => {});
+
+      // Overlay any still-pending outbox items so local headcount never flickers
+      const { getPendingOutbox } = await import('./offline/db');
+      const pending = await getPendingOutbox().catch(() => []);
+      for (const item of pending) {
+        const emp = data.employees.find((e) => e.id === item.employeeId);
+        if (emp) {
+          if (item.type === 'check_in') {
+            emp.attendance = {
+              ...(emp.attendance || {}),
+              sessionId: item.sessionId || emp.attendance?.sessionId,
+              clockInTime: item.timestamp,
+              clockOutTime: null,
+              status: 'PRESENT',
+            };
+          } else if (item.type === 'check_out') {
+            if (emp.attendance) {
+              emp.attendance.clockOutTime = item.timestamp;
+            }
+          }
+        }
+      }
     }
     return data;
   } catch (err: any) {

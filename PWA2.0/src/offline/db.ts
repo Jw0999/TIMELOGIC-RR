@@ -28,6 +28,8 @@ export interface CachedAuth {
   identifier: string;
   passwordHash: string; // SHA-256 hash for offline verification
   cachedAt: number;
+  accessToken?: string;
+  refreshToken?: string;
 }
 
 let dbInstance: IDBDatabase | null = null;
@@ -87,7 +89,12 @@ async function hashCredential(input: string): Promise<string> {
 }
 
 // ─── Station Auth Cache ─────────────────────────────────────────────────────
-export async function cacheStationAuth(user: AdminUser, identifier: string, password: string): Promise<void> {
+export async function cacheStationAuth(
+  user: AdminUser,
+  identifier: string,
+  password: string,
+  tokens?: { accessToken?: string; refreshToken?: string }
+): Promise<void> {
   try {
     const db = await getDB();
     const passwordHash = await hashCredential(password);
@@ -96,6 +103,8 @@ export async function cacheStationAuth(user: AdminUser, identifier: string, pass
       user,
       identifier: identifier.trim().toLowerCase(),
       passwordHash,
+      accessToken: tokens?.accessToken || localStorage.getItem('timelogic_admin_access') || undefined,
+      refreshToken: tokens?.refreshToken || localStorage.getItem('timelogic_admin_refresh') || undefined,
       cachedAt: Date.now(),
     };
     return new Promise((resolve, reject) => {
@@ -106,6 +115,20 @@ export async function cacheStationAuth(user: AdminUser, identifier: string, pass
     });
   } catch (err) {
     console.warn('[OfflineDB] Could not cache station auth:', err);
+  }
+}
+
+export async function getStationAuthCache(): Promise<CachedAuth | null> {
+  try {
+    const db = await getDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('auth_cache', 'readonly');
+      const req = tx.objectStore('auth_cache').get('current_station');
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(tx.error);
+    });
+  } catch {
+    return null;
   }
 }
 
@@ -135,6 +158,8 @@ export async function verifyOfflineStationAuth(identifier: string, password: str
 
     const hash = await hashCredential(password);
     if (hash === entry.passwordHash) {
+      if (entry.accessToken) localStorage.setItem('timelogic_admin_access', entry.accessToken);
+      if (entry.refreshToken) localStorage.setItem('timelogic_admin_refresh', entry.refreshToken);
       return entry.user;
     }
     return null;
@@ -148,6 +173,27 @@ export async function verifyOfflineStationAuth(identifier: string, password: str
 export async function cacheRosterAndSessions(employees: Employee[], sessions: Session[]): Promise<void> {
   if (!Array.isArray(employees)) return;
   try {
+    const pending = await getPendingOutbox();
+    // Do not overwrite pending outbox items with stale server attendance states
+    for (const item of pending) {
+      const emp = employees.find((e) => e.id === item.employeeId);
+      if (emp) {
+        if (item.type === 'check_in') {
+          emp.attendance = {
+            ...(emp.attendance || {}),
+            sessionId: item.sessionId || emp.attendance?.sessionId,
+            clockInTime: item.timestamp,
+            clockOutTime: null,
+            status: 'PRESENT',
+          };
+        } else if (item.type === 'check_out') {
+          if (emp.attendance) {
+            emp.attendance.clockOutTime = item.timestamp;
+          }
+        }
+      }
+    }
+
     const db = await getDB();
     const tx = db.transaction(['roster', 'sessions'], 'readwrite');
     const rosterStore = tx.objectStore('roster');
@@ -176,7 +222,7 @@ export async function cacheRosterAndSessions(employees: Employee[], sessions: Se
 export async function getCachedRoster(): Promise<{ employees: Employee[]; sessions: Session[] }> {
   try {
     const db = await getDB();
-    const tx = db.transaction(['roster', 'sessions'], 'readonly');
+    const tx = db.transaction(['roster', 'sessions', 'outbox'], 'readonly');
 
     const employeesPromise = new Promise<Employee[]>((resolve, reject) => {
       const req = tx.objectStore('roster').getAll();
@@ -190,7 +236,36 @@ export async function getCachedRoster(): Promise<{ employees: Employee[]; sessio
       req.onerror = () => reject(tx.error);
     });
 
-    const [employees, sessions] = await Promise.all([employeesPromise, sessionsPromise]);
+    const outboxPromise = new Promise<OutboxRecord[]>((resolve, reject) => {
+      const req = tx.objectStore('outbox').getAll();
+      req.onsuccess = () => {
+        const items = (req.result || []) as OutboxRecord[];
+        resolve(items.filter((i) => i.status === 'PENDING'));
+      };
+      req.onerror = () => reject(tx.error);
+    });
+
+    const [employees, sessions, outbox] = await Promise.all([employeesPromise, sessionsPromise, outboxPromise]);
+
+    // Overlay pending outbox records onto employees so count is 100% accurate
+    for (const item of outbox) {
+      const emp = employees.find((e) => e.id === item.employeeId);
+      if (emp) {
+        if (item.type === 'check_in') {
+          emp.attendance = {
+            sessionId: item.sessionId || emp.attendance?.sessionId,
+            clockInTime: item.timestamp,
+            clockOutTime: null,
+            status: 'PRESENT',
+          };
+        } else if (item.type === 'check_out') {
+          if (emp.attendance) {
+            emp.attendance.clockOutTime = item.timestamp;
+          }
+        }
+      }
+    }
+
     return { employees, sessions };
   } catch (err) {
     console.error('[OfflineDB] Could not retrieve cached roster:', err);
@@ -226,13 +301,15 @@ export async function queueOfflineAttendance(action: {
     ? crypto.randomUUID()
     : `evt-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
+  const timestamp = action.timestamp || new Date().toISOString();
+
   const record: OutboxRecord = {
     clientEventId,
     employeeId: action.employeeId,
     employeeName: action.employeeName,
     type: action.type,
     sessionId: action.sessionId,
-    timestamp: action.timestamp || new Date().toISOString(),
+    timestamp,
     password: action.password,
     faceImage: action.faceImage,
     status: 'PENDING',
@@ -240,8 +317,33 @@ export async function queueOfflineAttendance(action: {
   };
 
   return new Promise((resolve, reject) => {
-    const tx = db.transaction('outbox', 'readwrite');
+    const tx = db.transaction(['outbox', 'roster'], 'readwrite');
     tx.objectStore('outbox').put(record);
+
+    // Update employee record directly in local roster store so getCachedRoster() reflects it immediately!
+    const rosterStore = tx.objectStore('roster');
+    const empReq = rosterStore.get(action.employeeId);
+    empReq.onsuccess = () => {
+      const emp = empReq.result;
+      if (emp) {
+        if (action.type === 'check_in') {
+          emp.attendance = {
+            ...(emp.attendance || {}),
+            sessionId: action.sessionId || emp.attendance?.sessionId,
+            clockInTime: timestamp,
+            clockOutTime: null,
+            status: 'PRESENT',
+          };
+        } else if (action.type === 'check_out') {
+          emp.attendance = {
+            ...(emp.attendance || {}),
+            clockOutTime: timestamp,
+          };
+        }
+        rosterStore.put(emp);
+      }
+    };
+
     tx.oncomplete = () => {
       window.dispatchEvent(new CustomEvent('timelogic:outbox_changed'));
       resolve(record);

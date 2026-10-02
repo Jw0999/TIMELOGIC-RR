@@ -446,11 +446,17 @@ function App() {
         setNotice(`✓ Synced ${e.detail.synced} offline attendance record(s) to cloud!`);
       }
       refreshOutbox();
+      void load(true);
+    };
+
+    const onReloadDashboard = () => {
+      void load(true);
     };
 
     window.addEventListener('timelogic:outbox_changed', onOutboxChanged);
     window.addEventListener('timelogic:sync_status', onSyncStatus);
     window.addEventListener('timelogic:sync_complete', onSyncComplete);
+    window.addEventListener('timelogic:reload_dashboard', onReloadDashboard);
 
     return () => {
       window.removeEventListener('online', updateOnline);
@@ -458,6 +464,7 @@ function App() {
       window.removeEventListener('timelogic:outbox_changed', onOutboxChanged);
       window.removeEventListener('timelogic:sync_status', onSyncStatus);
       window.removeEventListener('timelogic:sync_complete', onSyncComplete);
+      window.removeEventListener('timelogic:reload_dashboard', onReloadDashboard);
     };
   }, []);
 
@@ -554,31 +561,57 @@ function App() {
 
   // Initial authentication check
   useEffect(() => {
-    if (!getAccessToken()) {
-      setBooting(false);
-      return;
-    }
-    getMe()
-      .then(setUser)
-      .catch(async (err) => {
-        if (!navigator.onLine || err?.message?.includes('Unable to connect') || err?.message?.includes('Failed to fetch')) {
-          const { getCachedRoster } = await import('./offline/db');
-          const cached = await getCachedRoster();
-          if (cached.employees.length > 0) {
+    async function initAuth() {
+      try {
+        let token = getAccessToken();
+        if (!token) {
+          const { getStationAuthCache } = await import('./offline/db');
+          const cachedAuth = await getStationAuthCache();
+          if (cachedAuth?.user) {
             setUser({
-              id: 'offline-admin',
-              firstName: 'Station',
-              lastName: 'Operator',
-              role: 'ADMIN',
-              orgId: 'offline-org',
-              isOffline: true,
+              ...cachedAuth.user,
+              isOffline: !navigator.onLine,
             });
             return;
           }
+          setBooting(false);
+          return;
         }
-        clearSession();
-      })
-      .finally(() => setBooting(false));
+
+        try {
+          const me = await getMe();
+          setUser(me);
+        } catch (err: any) {
+          if (!navigator.onLine || err?.message?.includes('Unable to connect') || err?.message?.includes('Failed to fetch')) {
+            const { getStationAuthCache, getCachedRoster } = await import('./offline/db');
+            const cachedAuth = await getStationAuthCache();
+            if (cachedAuth?.user) {
+              setUser({ ...cachedAuth.user, isOffline: true });
+              return;
+            }
+            const cached = await getCachedRoster();
+            if (cached.employees.length > 0) {
+              setUser({
+                id: 'offline-admin',
+                firstName: 'Station',
+                lastName: 'Operator',
+                role: 'ADMIN',
+                orgId: 'offline-org',
+                isOffline: true,
+              });
+              return;
+            }
+          }
+          if (navigator.onLine && err?.status === 401) {
+            clearSession();
+          }
+        }
+      } finally {
+        setBooting(false);
+      }
+    }
+
+    initAuth();
   }, []);
 
   // Dashboard Loader
@@ -803,7 +836,9 @@ function App() {
       setResetCountdown(7);
 
       closeModal();
-      await load(true);
+      if (!result.isOffline) {
+        await load(true);
+      }
     } catch (e: unknown) {
       const err = e as Error & { code?: string };
       if (err.code === 'FACE_NOT_ENROLLED') {
