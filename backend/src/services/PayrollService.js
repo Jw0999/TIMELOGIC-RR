@@ -29,6 +29,15 @@ class PayrollService {
   }
 
   /**
+   * Format currency numbers cleanly for PDFKit to prevent character encoding glitches
+   */
+  formatMoneyPdf(amount, currency = 'NGN') {
+    const num = Number(amount || 0);
+    const code = currency || 'NGN';
+    return `${code} ${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+
+  /**
    * Get start and end date boundaries for a given year and month
    */
   getMonthDateRange(year, month) {
@@ -523,161 +532,184 @@ class PayrollService {
 
       // ── HEADER BANNER (TimeLogic Deep Navy) ──
       doc.rect(40, 40, 515, 65).fill('#0a1638');
+      doc.rect(40, 40, 515, 3).fill('#2563eb');
 
-      doc.fillColor('#f59e0b').fontSize(10).font('Helvetica-Bold')
-        .text('TIMELOGIC ENTERPRISE ATTENDANCE & PAYROLL', 55, 52, { letterSpacing: 1.5 });
+      doc.fillColor('#f59e0b').fontSize(8.5).font('Helvetica-Bold')
+        .text('TIMELOGIC ENTERPRISE ATTENDANCE & PAYROLL', 55, 52, { letterSpacing: 1.2 });
 
-      doc.fillColor('#ffffff').fontSize(18).font('Helvetica-Bold')
-        .text('OFFICIAL EMPLOYEE PAYSLIP', 55, 70);
+      doc.fillColor('#ffffff').fontSize(16).font('Helvetica-Bold')
+        .text('OFFICIAL EMPLOYEE PAYSLIP', 55, 68);
 
-      doc.fillColor('#94a3b8').fontSize(9).font('Helvetica')
-        .text(`Pay Period: ${monthStr}`, 410, 56, { align: 'right' });
-      doc.text(`Status: Verified`, 410, 72, { align: 'right' });
+      doc.fillColor('#cbd5e1').fontSize(8.5).font('Helvetica')
+        .text(`Pay Period: ${monthStr}`, 350, 54, { width: 190, align: 'right' });
+      doc.fillColor('#38bdf8').font('Helvetica-Bold')
+        .text('Status: Verified & Processed', 350, 68, { width: 190, align: 'right' });
 
       // ── COMPANY & EMPLOYEE INFO GRID ──
-      doc.rect(40, 115, 515, 95).strokeColor('#e2e8f0').lineWidth(1).stroke();
+      doc.rect(40, 115, 515, 88).fill('#f8fafc');
+      doc.rect(40, 115, 515, 88).strokeColor('#e2e8f0').lineWidth(1).stroke();
 
       // Column 1: Organization
-      doc.fillColor('#64748b').fontSize(8).font('Helvetica-Bold').text('ORGANIZATION / EMPLOYER', 55, 125);
-      doc.fillColor('#0f172a').fontSize(12).font('Helvetica-Bold').text(orgName, 55, 137);
-      doc.fillColor('#64748b').fontSize(9).font('Helvetica')
-        .text(`Timezone: ${payslip.organization.timezone || 'Africa/Lagos'}`, 55, 155)
-        .text(`Generated: ${new Date().toISOString().split('T')[0]}`, 55, 170);
+      doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold').text('ORGANIZATION / EMPLOYER', 55, 126);
+      doc.fillColor('#0f172a').fontSize(11).font('Helvetica-Bold').text(orgName, 55, 138, { width: 230 });
+      doc.fillColor('#64748b').fontSize(8.5).font('Helvetica')
+        .text(`Timezone: ${payslip.organization.timezone || 'Africa/Lagos'}`, 55, 168)
+        .text(`Generated: ${new Date().toISOString().split('T')[0]}`, 55, 181);
+
+      // Divider line
+      doc.moveTo(295, 125).lineTo(295, 193).strokeColor('#e2e8f0').stroke();
 
       // Column 2: Employee
-      doc.fillColor('#64748b').fontSize(8).font('Helvetica-Bold').text('EMPLOYEE DETAILS', 300, 125);
-      doc.fillColor('#0f172a').fontSize(12).font('Helvetica-Bold').text(empName, 300, 137);
-      doc.fillColor('#64748b').fontSize(9).font('Helvetica')
-        .text(`Staff ID: ${empCode}  |  Dept: ${payslip.employee.department?.name || 'General'}`, 300, 155)
-        .text(`Phone: ${payslip.employee.phone || 'N/A'}  |  Email: ${payslip.employee.email}`, 300, 170);
+      doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold').text('EMPLOYEE DETAILS', 310, 126);
+      doc.fillColor('#0f172a').fontSize(11).font('Helvetica-Bold').text(empName, 310, 138, { width: 230 });
+      doc.fillColor('#475569').fontSize(8.5).font('Helvetica')
+        .text(`Staff ID: ${empCode}   |   Dept: ${payslip.employee.department?.name || 'General'}`, 310, 155)
+        .text(`Phone: ${payslip.employee.phone || 'N/A'}`, 310, 168)
+        .text(`Email: ${payslip.employee.email}`, 310, 181);
 
       // ── WORK & ATTENDANCE SUMMARY METRICS ──
-      doc.rect(40, 220, 515, 45).fill('#f8fafc');
-      doc.rect(40, 220, 515, 45).strokeColor('#e2e8f0').stroke();
+      doc.rect(40, 212, 515, 46).fill('#ffffff');
+      doc.rect(40, 212, 515, 46).strokeColor('#e2e8f0').stroke();
 
       const metricColW = 515 / 4;
       const metrics = [
         { label: 'DAYS PRESENT', val: `${payslip.totalPresentDays} Days` },
         { label: 'WORK DURATION', val: `${payslip.totalWorkHours} Hours` },
         { label: 'LATE INSTANCES', val: `${payslip.totalLateDays} Days` },
-        { label: 'PENALTIES APPLIED', val: `${this.formatMoney(payslip.totalDeductions, currency)}` },
+        { label: 'PENALTIES APPLIED', val: this.formatMoneyPdf(payslip.totalDeductions, currency), isAlert: payslip.totalDeductions > 0 },
       ];
 
       metrics.forEach((m, idx) => {
         const x = 40 + idx * metricColW;
-        doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold')
-          .text(m.label, x + 10, 228);
-        doc.fillColor('#0f172a').fontSize(11).font('Helvetica-Bold')
-          .text(m.val, x + 10, 243);
+        if (idx > 0) {
+          doc.moveTo(x, 216).lineTo(x, 254).strokeColor('#f1f5f9').stroke();
+        }
+        doc.fillColor('#64748b').fontSize(7).font('Helvetica-Bold')
+          .text(m.label, x + 8, 222, { width: metricColW - 16 });
+        doc.fillColor(m.isAlert ? '#ef4444' : '#0f172a').fontSize(10.5).font('Helvetica-Bold')
+          .text(m.val, x + 8, 236, { width: metricColW - 16 });
       });
 
       // ── SALARY & DEDUCTIONS BREAKDOWN TABLE ──
-      let yPos = 280;
+      let yPos = 268;
 
       // Table Header
       doc.rect(40, yPos, 515, 24).fill('#0f172a');
-      doc.fillColor('#ffffff').fontSize(9).font('Helvetica-Bold')
-        .text('DESCRIPTION', 55, yPos + 7)
-        .text('EARNINGS', 340, yPos + 7, { align: 'right' })
-        .text('DEDUCTIONS', 470, yPos + 7, { align: 'right' });
+      doc.fillColor('#ffffff').fontSize(8.5).font('Helvetica-Bold')
+        .text('DESCRIPTION', 55, yPos + 7, { width: 260 })
+        .text('EARNINGS', 320, yPos + 7, { width: 105, align: 'right' })
+        .text('DEDUCTIONS', 430, yPos + 7, { width: 110, align: 'right' });
       yPos += 24;
 
       // Base Salary Row
       doc.rect(40, yPos, 515, 26).fill('#ffffff');
       doc.rect(40, yPos, 515, 26).strokeColor('#f1f5f9').stroke();
-      doc.fillColor('#0f172a').fontSize(9.5).font('Helvetica')
-        .text(`Basic Monthly Salary (${monthStr})`, 55, yPos + 8);
+      doc.fillColor('#0f172a').fontSize(9).font('Helvetica')
+        .text(`Basic Monthly Salary (${monthStr})`, 55, yPos + 8, { width: 260 });
       doc.fillColor('#10b981').font('Helvetica-Bold')
-        .text(`+${this.formatMoney(payslip.baseSalary, currency)}`, 340, yPos + 8, { align: 'right' });
-      doc.fillColor('#94a3b8').text('-', 470, yPos + 8, { align: 'right' });
+        .text(`+${this.formatMoneyPdf(payslip.baseSalary, currency)}`, 320, yPos + 8, { width: 105, align: 'right' });
+      doc.fillColor('#94a3b8').font('Helvetica')
+        .text('—', 430, yPos + 8, { width: 110, align: 'right' });
       yPos += 26;
 
       // Attendance Penalties Row
-      doc.rect(40, yPos, 515, 26).fill('#fafafa');
+      doc.rect(40, yPos, 515, 26).fill('#f8fafc');
       doc.rect(40, yPos, 515, 26).strokeColor('#f1f5f9').stroke();
-      doc.fillColor('#0f172a').fontSize(9.5).font('Helvetica')
-        .text('Attendance Lateness / Absence Deductions', 55, yPos + 8);
-      doc.fillColor('#94a3b8').text('-', 340, yPos + 8, { align: 'right' });
+      doc.fillColor('#0f172a').fontSize(9).font('Helvetica')
+        .text('Attendance Lateness / Absence Deductions', 55, yPos + 8, { width: 260 });
+      doc.fillColor('#94a3b8').font('Helvetica')
+        .text('—', 320, yPos + 8, { width: 105, align: 'right' });
       doc.fillColor('#ef4444').font('Helvetica-Bold')
         .text(
-          payslip.attendancePenalties > 0 ? `-${this.formatMoney(payslip.attendancePenalties, currency)}` : '₦0.00',
-          470,
+          payslip.attendancePenalties > 0 ? `-${this.formatMoneyPdf(payslip.attendancePenalties, currency)}` : `${currency} 0.00`,
+          430,
           yPos + 8,
-          { align: 'right' }
+          { width: 110, align: 'right' }
         );
       yPos += 26;
 
       // Manual Penalties Row
       doc.rect(40, yPos, 515, 26).fill('#ffffff');
       doc.rect(40, yPos, 515, 26).strokeColor('#f1f5f9').stroke();
-      doc.fillColor('#0f172a').fontSize(9.5).font('Helvetica')
-        .text('HR Administrative / Disciplinary Penalties', 55, yPos + 8);
-      doc.fillColor('#94a3b8').text('-', 340, yPos + 8, { align: 'right' });
+      doc.fillColor('#0f172a').fontSize(9).font('Helvetica')
+        .text('HR Administrative / Disciplinary Penalties', 55, yPos + 8, { width: 260 });
+      doc.fillColor('#94a3b8').font('Helvetica')
+        .text('—', 320, yPos + 8, { width: 105, align: 'right' });
       doc.fillColor('#ef4444').font('Helvetica-Bold')
         .text(
-          payslip.manualPenalties > 0 ? `-${this.formatMoney(payslip.manualPenalties, currency)}` : '₦0.00',
-          470,
+          payslip.manualPenalties > 0 ? `-${this.formatMoneyPdf(payslip.manualPenalties, currency)}` : `${currency} 0.00`,
+          430,
           yPos + 8,
-          { align: 'right' }
+          { width: 110, align: 'right' }
         );
       yPos += 26;
+
+      // Subtotal Row
+      doc.rect(40, yPos, 515, 22).fill('#f1f5f9');
+      doc.rect(40, yPos, 515, 22).strokeColor('#e2e8f0').stroke();
+      doc.fillColor('#475569').fontSize(8.5).font('Helvetica-Bold')
+        .text('TOTAL GROSS & DEDUCTIONS', 55, yPos + 6, { width: 260 });
+      doc.fillColor('#10b981').font('Helvetica-Bold')
+        .text(`+${this.formatMoneyPdf(payslip.baseSalary, currency)}`, 320, yPos + 6, { width: 105, align: 'right' });
+      doc.fillColor('#ef4444').font('Helvetica-Bold')
+        .text(`-${this.formatMoneyPdf(payslip.totalDeductions, currency)}`, 430, yPos + 6, { width: 110, align: 'right' });
+      yPos += 22;
 
       // ── NET PAYOUT CALLOUT BOX ──
       yPos += 14;
       doc.rect(40, yPos, 515, 56).fill('#0a1638');
-      doc.rect(40, yPos, 5, 56).fill('#2563eb');
+      doc.rect(40, yPos, 4, 56).fill('#2563eb');
 
-      doc.fillColor('#f59e0b').fontSize(8.5).font('Helvetica-Bold')
-        .text('FINAL NET PAYABLE (DISBURSED)', 60, yPos + 12);
-      doc.fillColor('#ffffff').fontSize(18).font('Helvetica-Bold')
-        .text(this.formatMoney(payslip.netSalary, currency), 60, yPos + 26);
+      doc.fillColor('#f59e0b').fontSize(8).font('Helvetica-Bold')
+        .text('FINAL NET PAYABLE (DISBURSED)', 55, yPos + 12);
+      doc.fillColor('#ffffff').fontSize(17).font('Helvetica-Bold')
+        .text(this.formatMoneyPdf(payslip.netSalary, currency), 55, yPos + 26);
 
       if (payslip.employee.bankName && payslip.employee.accountNumber) {
+        doc.fillColor('#38bdf8').fontSize(8.5).font('Helvetica-Bold')
+          .text(`Disbursement Bank: ${payslip.employee.bankName}`, 280, yPos + 14, { width: 260, align: 'right' });
         doc.fillColor('#cbd5e1').fontSize(8.5).font('Helvetica')
-          .text(
-            `Bank: ${payslip.employee.bankName}  |  Acc: ${payslip.employee.accountNumber}`,
-            410,
-            yPos + 22,
-            { align: 'right' }
-          );
+          .text(`Account Number: ${payslip.employee.accountNumber}   |   Verified`, 280, yPos + 28, { width: 260, align: 'right' });
       }
       yPos += 68;
 
       // ── ITEMIZED PENALTIES AUDIT LIST ──
       const breakdown = Array.isArray(payslip.breakdownJson) ? payslip.breakdownJson : [];
       if (breakdown.length > 0) {
-        doc.fillColor('#0f172a').fontSize(10).font('Helvetica-Bold')
+        doc.fillColor('#0f172a').fontSize(9.5).font('Helvetica-Bold')
           .text('ITEMIZED DEDUCTIONS & PENALTIES AUDIT TRAIL', 40, yPos);
         yPos += 16;
 
         breakdown.slice(0, 5).forEach((item) => {
-          doc.rect(40, yPos, 515, 20).fill('#f8fafc');
-          doc.fillColor('#64748b').fontSize(8).font('Helvetica')
-            .text(`• ${item.date}: ${item.reason || item.type}`, 50, yPos + 5);
+          doc.rect(40, yPos, 515, 22).fill('#f8fafc');
+          doc.fillColor('#475569').fontSize(8).font('Helvetica')
+            .text(`• ${item.date}: ${item.reason || item.type}`, 52, yPos + 6, { width: 360 });
           doc.fillColor('#ef4444').font('Helvetica-Bold')
-            .text(`-${this.formatMoney(item.amount, currency)}`, 470, yPos + 5, { align: 'right' });
-          yPos += 22;
+            .text(`-${this.formatMoneyPdf(item.amount, currency)}`, 420, yPos + 6, { width: 120, align: 'right' });
+          yPos += 24;
         });
 
         if (breakdown.length > 5) {
           doc.fillColor('#64748b').fontSize(8).font('Helvetica-Oblique')
-            .text(`+ and ${breakdown.length - 5} more penalty records on file.`, 50, yPos + 2);
+            .text(`+ and ${breakdown.length - 5} more penalty records on file.`, 52, yPos + 2);
           yPos += 16;
         }
       }
 
       // ── FOOTER & CRYPTOGRAPHIC VERIFICATION ──
-      doc.rect(40, 750, 515, 40).strokeColor('#e2e8f0').stroke();
+      doc.rect(40, 750, 515, 42).strokeColor('#e2e8f0').stroke();
       doc.fillColor('#64748b').fontSize(7.5).font('Helvetica')
         .text(
           `TimeLogic ID: ${payslip.id}  •  Tamper-Evident Verification Hash: ${Buffer.from(payslip.id).toString('base64').slice(0, 16)}`,
           50,
-          758
+          758,
+          { width: 495 }
         )
         .text(
-          'This is a computer-generated statutory payroll document. No physical signature required.',
+          'This is a computer-generated statutory payroll document processed by TimeLogic Enterprise Systems. No physical signature required.',
           50,
-          770
+          770,
+          { width: 495 }
         );
 
       doc.end();
