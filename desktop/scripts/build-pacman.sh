@@ -8,6 +8,9 @@ UNPACKED_DIR="${RELEASE_DIR}/linux-unpacked"
 ICON_FILE="$(cd "${DESKTOP_DIR}/../mobile/assets" && pwd)/icon.png"
 PKG_VER="$(node -p "require('${DESKTOP_DIR}/package.json').version")"
 
+echo "==> Compiling latest desktop assets and linux-unpacked binaries..."
+(cd "${DESKTOP_DIR}" && npm run build && npx electron-builder --linux dir --x64)
+
 if [ ! -d "${UNPACKED_DIR}" ]; then
   echo "Error: ${UNPACKED_DIR} does not exist. Run electron-builder first." >&2
   exit 1

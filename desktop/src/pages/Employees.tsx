@@ -313,6 +313,42 @@ function EditCheckInMethodModal({
             </select>
           </div>
 
+          {/* Facial Biometric Status & Management */}
+          <div className="rounded-2xl border border-[var(--border)] p-3.5 bg-[var(--hover-bg)] flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold text-[var(--text-main)] flex items-center gap-1.5">
+                {employee.profileImageUrl ? '🔒 Face Biometric Enrolled' : '⚠ No Face Biometric Enrolled'}
+              </p>
+              <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                {employee.profileImageUrl
+                  ? 'Face biometric is locked for station check-in. Click Release Face to clear and allow a new photo.'
+                  : 'Employee must register their face photo before station check-in.'}
+              </p>
+            </div>
+            {employee.profileImageUrl && (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!window.confirm(
+                    `Release face photo for ${employee.firstName} ${employee.lastName}?\n\n` +
+                    `This will clear their stored biometric face data and unlock the face enrollment slot so a new face photo can be registered.`
+                  )) return;
+                  try {
+                    await releaseEmployeeFace(employee.id);
+                    employee.profileImageUrl = null;
+                    onSaved();
+                    alert(`✓ Face photo released for ${employee.firstName} ${employee.lastName}.`);
+                  } catch (err: any) {
+                    alert(err?.response?.data?.message || err?.message || 'Could not release face.');
+                  }
+                }}
+                className="text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 shadow-sm flex-shrink-0">
+                <Trash2 size={13} />
+                Release Face
+              </button>
+            )}
+          </div>
+
           <div className="rounded-xl bg-[var(--hover-bg)] p-3 text-xs text-[var(--text-muted)]">
             Employee attendance is recorded at the designated PWA 2.0 station for their assigned office.
           </div>
@@ -555,8 +591,8 @@ function EmployeeDetailModal({ emp: initialEmp, onClose, onRefresh }: { emp: any
               type="button"
               onClick={handleReleaseFace}
               disabled={releasing || uploading}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 text-sm font-semibold rounded-xl hover:bg-rose-100 dark:hover:bg-rose-900/30 border border-rose-200 dark:border-rose-800 transition disabled:opacity-50">
-              <Trash2 size={15} />
+              className="flex-1 flex items-center justify-center gap-2 py-3 bg-rose-600 hover:bg-rose-700 text-white text-sm font-bold rounded-xl shadow-md transition disabled:opacity-50">
+              <Trash2 size={16} />
               {releasing ? 'Releasing Face...' : 'Release Face (Allow New Photo)'}
             </button>
           ) : (
@@ -756,9 +792,10 @@ export default function Employees() {
                       </td>
                       <td className="px-4 py-3">
                         {e.profileImageUrl ? (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-semibold text-emerald-600">✓ Registered</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">✓ Registered</span>
                             <button
+                              type="button"
                               onClick={async () => {
                                 if (!window.confirm(
                                   `Release face photo for ${e.firstName} ${e.lastName}?\n\n` +
@@ -772,17 +809,20 @@ export default function Employees() {
                                   alert(err?.response?.data?.message || err?.message || 'Could not release face.');
                                 }
                               }}
-                              className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 dark:bg-rose-900/20 hover:bg-rose-100 px-1.5 py-0.5 rounded border border-rose-200 dark:border-rose-800 transition"
-                              title="Release face photo">
+                              className="text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 px-2.5 py-1 rounded-lg transition flex items-center gap-1 shadow-sm active:scale-95 whitespace-nowrap"
+                              title="Release face photo (allow re-enrollment)">
+                              <Trash2 size={12} />
                               Release Face
                             </button>
                           </div>
                         ) : (
                           <button
+                            type="button"
                             onClick={() => setViewEmp(e)}
-                            className="text-xs font-semibold text-amber-600 hover:text-amber-700 underline cursor-pointer"
-                            title="Click to enroll face">
-                            ⚠ Not set (Enroll)
+                            className="text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30 hover:bg-amber-100 border border-amber-300 dark:border-amber-700 px-2.5 py-1 rounded-lg transition flex items-center gap-1 shadow-sm cursor-pointer whitespace-nowrap"
+                            title="Click to enroll face photo">
+                            <Camera size={12} />
+                            Enroll Face
                           </button>
                         )}
                       </td>
