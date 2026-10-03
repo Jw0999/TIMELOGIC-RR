@@ -309,24 +309,29 @@ export default function Salary() {
   };
 
   const handleDownloadPdf = async (emp: EmployeePayroll) => {
-    if (!emp.payslipId) {
+    setDownloadingId(emp.id);
+    try {
+      // Ensure current month payroll is synchronized with live attendance & deductions
+      let payslipId = emp.payslipId;
       try {
         await calculatePayroll({ year: selectedYear, month: selectedMonth });
         const res = await fetchPayrollOverview(selectedYear, selectedMonth);
-        const updated = res.employees.find((e: any) => e.id === emp.id);
-        if (updated?.payslipId) emp = updated;
-      } catch (e: any) {
-        alert('Could not prepare payslip: ' + e.message);
-        return;
+        if (res?.employees) {
+          setEmployees(res.employees);
+          if (res.summary) setSummary(res.summary);
+          const updated = res.employees.find((e: any) => e.id === emp.id);
+          if (updated?.payslipId) payslipId = updated.payslipId;
+        }
+      } catch (calcErr) {
+        console.warn('Live calculation before download:', calcErr);
       }
-    }
 
-    if (!emp.payslipId) return;
+      if (!payslipId) {
+        throw new Error('Unable to find or generate payslip record.');
+      }
 
-    setDownloadingId(emp.id);
-    try {
       const fileName = `Payslip-${emp.employeeCode || emp.firstName}-${monthNames[selectedMonth - 1]}-${selectedYear}.pdf`;
-      await downloadPayslipPdf(emp.payslipId, fileName);
+      await downloadPayslipPdf(payslipId, fileName);
     } catch (err: any) {
       alert(err?.message || 'Failed to download PDF payslip');
     } finally {
@@ -340,32 +345,37 @@ export default function Salary() {
       return;
     }
 
-    if (!emp.payslipId) {
+    setSendingId(emp.id);
+    try {
+      // Ensure current month payroll is synchronized with live attendance & deductions
+      let payslipId = emp.payslipId;
       try {
         await calculatePayroll({ year: selectedYear, month: selectedMonth });
         const res = await fetchPayrollOverview(selectedYear, selectedMonth);
-        const updated = res.employees.find((e: any) => e.id === emp.id);
-        if (updated?.payslipId) emp = updated;
-      } catch (e: any) {
-        alert('Could not prepare payslip: ' + e.message);
-        return;
+        if (res?.employees) {
+          setEmployees(res.employees);
+          if (res.summary) setSummary(res.summary);
+          const updated = res.employees.find((e: any) => e.id === emp.id);
+          if (updated?.payslipId) payslipId = updated.payslipId;
+        }
+      } catch (calcErr) {
+        console.warn('Live calculation before send:', calcErr);
       }
-    }
 
-    if (!emp.payslipId) return;
+      if (!payslipId) {
+        throw new Error('Unable to find or generate payslip record.');
+      }
 
-    setSendingId(emp.id);
-    try {
       // 1. Auto-download official PDF to local device so admin has the file ready in Downloads
       try {
         const fileName = `Payslip-${emp.employeeCode || emp.firstName}-${monthNames[selectedMonth - 1]}-${selectedYear}.pdf`;
-        await downloadPayslipPdf(emp.payslipId, fileName);
+        await downloadPayslipPdf(payslipId, fileName);
       } catch (pdfErr) {
         console.warn('Auto PDF download skipped:', pdfErr);
       }
 
       // 2. Dispatch/prepare WhatsApp message
-      const res = await sendPayslipWhatsApp(emp.payslipId);
+      const res = await sendPayslipWhatsApp(payslipId);
       if (res?.directUrl && settingsData.whatsappProvider === 'WEB_LINK') {
         const opened = await (window as any).electronAPI?.openExternal?.(res.directUrl);
         if (!opened) {

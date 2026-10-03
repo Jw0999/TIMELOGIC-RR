@@ -667,53 +667,140 @@ class PayrollService {
 
     if (!payslip) throw new Error('Payslip record not found');
 
-    // Ensure metrics accurately reflect all check-ins (present, late, completely late)
-    let displayPresentDays = payslip.totalPresentDays || 0;
-    let displayLateDays = payslip.totalLateDays || 0;
-    let displayWorkHours = payslip.totalWorkHours || 0;
-
-    let periodStart = payslip.periodStart;
-    let periodEnd = payslip.periodEnd;
-    if (!periodStart || !periodEnd) {
-      const range = this.getMonthDateRange(payslip.year, payslip.month, payslip.organization?.salaryPayoutDay || 28);
-      periodStart = range.startDate;
-      periodEnd = range.endDate;
-    }
+    const payoutDay = payslip.organization?.salaryPayoutDay ?? 28;
+    const { startDate, endDate } = this.getMonthDateRange(payslip.year, payslip.month, payoutDay);
+    const periodStart = startDate;
+    const periodEnd = endDate;
     const periodLabel = this.formatPeriodLabel(periodStart, periodEnd);
 
-    try {
-      const atts = await prisma.attendanceRecord.findMany({
+    // Live query attendance, break records, and manual penalties for this employee within the active pay cycle
+    const [atts, breaks, manuals] = await Promise.all([
+      prisma.attendanceRecord.findMany({
         where: {
           employeeId: payslip.employeeId,
           date: { gte: periodStart, lte: periodEnd },
         },
         select: {
+          id: true,
+          date: true,
           status: true,
-          clockInTime: true,
+          penalty: true,
           totalWorkHours: true,
+          clockInTime: true,
+        },
+        orderBy: { date: 'asc' },
+      }),
+      prisma.breakRecord.findMany({
+        where: {
+          employeeId: payslip.employeeId,
+          startTime: { gte: periodStart, lte: periodEnd },
+        },
+        select: {
+          id: true,
+          penalty: true,
+          breakType: true,
+          startTime: true,
+        },
+        orderBy: { startTime: 'asc' },
+      }),
+      prisma.manualPenalty.findMany({
+        where: {
+          employeeId: payslip.employeeId,
+          createdAt: { gte: periodStart, lte: periodEnd },
+        },
+        select: {
+          id: true,
+          amount: true,
+          reason: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'asc' },
+      }),
+    ]);
+
+    let displayPresentDays = 0;
+    let displayLateDays = 0;
+    let displayWorkHours = 0;
+    let attendancePenalties = 0;
+    const itemizedDeductions = [];
+
+    for (const a of atts) {
+      const hasCheckedIn = Boolean(a.clockInTime) || ['PRESENT', 'LATE', 'COMPLETELY_LATE', 'HALF_DAY', 'REVIEW_REQUIRED'].includes(a.status);
+      if (hasCheckedIn && a.status !== 'ABSENT') {
+        displayPresentDays += 1;
+      }
+      if (a.status === 'LATE' || a.status === 'COMPLETELY_LATE') {
+        displayLateDays += 1;
+      }
+      displayWorkHours += a.totalWorkHours || 0;
+      const pen = Number(a.penalty || 0);
+      if (pen > 0) {
+        attendancePenalties += pen;
+        itemizedDeductions.push({
+          date: a.date.toISOString().split('T')[0],
+          type: 'ATTENDANCE_PENALTY',
+          status: a.status,
+          amount: pen,
+          reason: a.status === 'COMPLETELY_LATE' ? 'Exceeded late threshold' : 'Late check-in',
+        });
+      }
+    }
+
+    let breakPenalties = 0;
+    for (const b of breaks) {
+      const pen = Number(b.penalty || 0);
+      if (pen > 0) {
+        breakPenalties += pen;
+        itemizedDeductions.push({
+          date: b.startTime.toISOString().split('T')[0],
+          type: 'BREAK_PENALTY',
+          amount: pen,
+          reason: `Break overstay penalty (${b.breakType || 'Break'})`,
+        });
+      }
+    }
+
+    let manualPenalties = 0;
+    for (const m of manuals) {
+      const amt = Number(m.amount || 0);
+      manualPenalties += amt;
+      itemizedDeductions.push({
+        date: m.createdAt.toISOString().split('T')[0],
+        type: 'MANUAL_PENALTY',
+        amount: amt,
+        reason: m.reason || 'HR Administrative penalty',
+      });
+    }
+
+    // Sort all itemized penalties chronologically
+    itemizedDeductions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    const baseSalary = Number(payslip.employee?.baseSalary || payslip.baseSalary || 0);
+    const totalDeductions = attendancePenalties + breakPenalties + manualPenalties;
+    const netSalary = Math.max(0, baseSalary - totalDeductions);
+    const roundedWorkHours = Math.round(displayWorkHours * 10) / 10;
+
+    // Persist live recalculated metrics to PayslipRecord
+    try {
+      await prisma.payslipRecord.update({
+        where: { id: payslip.id },
+        data: {
+          periodStart,
+          periodEnd,
+          baseSalary,
+          totalWorkHours: roundedWorkHours,
+          totalPresentDays: displayPresentDays,
+          totalLateDays: displayLateDays,
+          attendancePenalties,
+          breakPenalties,
+          manualPenalties,
+          totalDeductions,
+          netSalary,
+          breakdownJson: itemizedDeductions,
         },
       });
-
-      if (atts && atts.length > 0) {
-        let livePresent = 0;
-        let liveLate = 0;
-        let liveHours = 0;
-        for (const a of atts) {
-          const hasCheckedIn = Boolean(a.clockInTime) || ['PRESENT', 'LATE', 'COMPLETELY_LATE', 'HALF_DAY', 'REVIEW_REQUIRED'].includes(a.status);
-          if (hasCheckedIn && a.status !== 'ABSENT') {
-            livePresent += 1;
-          }
-          if (a.status === 'LATE' || a.status === 'COMPLETELY_LATE') {
-            liveLate += 1;
-          }
-          liveHours += a.totalWorkHours || 0;
-        }
-        displayPresentDays = Math.max(displayPresentDays, livePresent);
-        displayLateDays = Math.max(displayLateDays, liveLate);
-        displayWorkHours = Math.round((Math.max(displayWorkHours, liveHours)) * 10) / 10;
-      }
-    } catch (attErr) {
-      logger.warn('Failed to query live attendance metrics for PDF:', attErr);
+    } catch (updErr) {
+      logger.warn('Failed to update payslip record cache during PDF generation:', updErr);
     }
 
     const uploadsDir = path.join(__dirname, '../../uploads/payslips');
@@ -791,9 +878,9 @@ class PayrollService {
       const metricColW = 515 / 4;
       const metrics = [
         { label: 'DAYS PRESENT', val: `${displayPresentDays} Days` },
-        { label: 'WORK DURATION', val: `${displayWorkHours} Hours` },
+        { label: 'WORK DURATION', val: `${roundedWorkHours} Hours` },
         { label: 'LATE INSTANCES', val: `${displayLateDays} ${displayLateDays === 1 ? 'Instance' : 'Instances'}` },
-        { label: 'PENALTIES APPLIED', val: this.formatMoneyPdf(payslip.totalDeductions, currency), isAlert: payslip.totalDeductions > 0 },
+        { label: 'PENALTIES APPLIED', val: this.formatMoneyPdf(totalDeductions, currency), isAlert: totalDeductions > 0 },
       ];
 
       metrics.forEach((m, idx) => {
@@ -824,7 +911,7 @@ class PayrollService {
       doc.fillColor('#0f172a').fontSize(9).font('Helvetica')
         .text(`Basic Monthly Salary (${periodLabel})`, 55, yPos + 8, { width: 260 });
       doc.fillColor('#10b981').font('Helvetica-Bold')
-        .text(`+${this.formatMoneyPdf(payslip.baseSalary, currency)}`, 320, yPos + 8, { width: 105, align: 'right' });
+        .text(`+${this.formatMoneyPdf(baseSalary, currency)}`, 320, yPos + 8, { width: 105, align: 'right' });
       doc.fillColor('#94a3b8').font('Helvetica')
         .text('—', 430, yPos + 8, { width: 110, align: 'right' });
       yPos += 26;
@@ -838,7 +925,7 @@ class PayrollService {
         .text('—', 320, yPos + 8, { width: 105, align: 'right' });
       doc.fillColor('#ef4444').font('Helvetica-Bold')
         .text(
-          payslip.attendancePenalties > 0 ? `-${this.formatMoneyPdf(payslip.attendancePenalties, currency)}` : `${currency} 0.00`,
+          attendancePenalties > 0 ? `-${this.formatMoneyPdf(attendancePenalties, currency)}` : `${currency} 0.00`,
           430,
           yPos + 8,
           { width: 110, align: 'right' }
@@ -854,7 +941,7 @@ class PayrollService {
         .text('—', 320, yPos + 8, { width: 105, align: 'right' });
       doc.fillColor('#ef4444').font('Helvetica-Bold')
         .text(
-          (payslip.breakPenalties || 0) > 0 ? `-${this.formatMoneyPdf(payslip.breakPenalties, currency)}` : `${currency} 0.00`,
+          breakPenalties > 0 ? `-${this.formatMoneyPdf(breakPenalties, currency)}` : `${currency} 0.00`,
           430,
           yPos + 8,
           { width: 110, align: 'right' }
@@ -870,7 +957,7 @@ class PayrollService {
         .text('—', 320, yPos + 8, { width: 105, align: 'right' });
       doc.fillColor('#ef4444').font('Helvetica-Bold')
         .text(
-          payslip.manualPenalties > 0 ? `-${this.formatMoneyPdf(payslip.manualPenalties, currency)}` : `${currency} 0.00`,
+          manualPenalties > 0 ? `-${this.formatMoneyPdf(manualPenalties, currency)}` : `${currency} 0.00`,
           430,
           yPos + 8,
           { width: 110, align: 'right' }
@@ -883,9 +970,9 @@ class PayrollService {
       doc.fillColor('#475569').fontSize(8.5).font('Helvetica-Bold')
         .text('TOTAL GROSS & DEDUCTIONS', 55, yPos + 6, { width: 260 });
       doc.fillColor('#10b981').font('Helvetica-Bold')
-        .text(`+${this.formatMoneyPdf(payslip.baseSalary, currency)}`, 320, yPos + 6, { width: 105, align: 'right' });
+        .text(`+${this.formatMoneyPdf(baseSalary, currency)}`, 320, yPos + 6, { width: 105, align: 'right' });
       doc.fillColor('#ef4444').font('Helvetica-Bold')
-        .text(`-${this.formatMoneyPdf(payslip.totalDeductions, currency)}`, 430, yPos + 6, { width: 110, align: 'right' });
+        .text(`-${this.formatMoneyPdf(totalDeductions, currency)}`, 430, yPos + 6, { width: 110, align: 'right' });
       yPos += 22;
 
       // ── NET PAYOUT CALLOUT BOX ──
@@ -896,7 +983,7 @@ class PayrollService {
       doc.fillColor('#f59e0b').fontSize(8).font('Helvetica-Bold')
         .text('FINAL NET PAYABLE (DISBURSED)', 55, yPos + 12);
       doc.fillColor('#ffffff').fontSize(17).font('Helvetica-Bold')
-        .text(this.formatMoneyPdf(payslip.netSalary, currency), 55, yPos + 26);
+        .text(this.formatMoneyPdf(netSalary, currency), 55, yPos + 26);
 
       if (payslip.employee.bankName && payslip.employee.accountNumber) {
         doc.fillColor('#38bdf8').fontSize(8.5).font('Helvetica-Bold')
@@ -907,41 +994,63 @@ class PayrollService {
       yPos += 68;
 
       // ── ITEMIZED PENALTIES AUDIT LIST ──
-      const breakdown = Array.isArray(payslip.breakdownJson) ? payslip.breakdownJson : [];
-      if (breakdown.length > 0) {
+      if (itemizedDeductions.length > 0) {
         doc.fillColor('#0f172a').fontSize(9.5).font('Helvetica-Bold')
           .text('ITEMIZED DEDUCTIONS & PENALTIES AUDIT TRAIL', 40, yPos);
         yPos += 16;
 
-        breakdown.slice(0, 5).forEach((item) => {
-          doc.rect(40, yPos, 515, 22).fill('#f8fafc');
+        for (let i = 0; i < itemizedDeductions.length; i++) {
+          const item = itemizedDeductions[i];
+          // Check if row exceeds safe page boundary before footer
+          if (yPos + 24 > 720) {
+            doc.addPage();
+            // Continuation Header
+            doc.rect(40, 40, 515, 30).fill('#0a1638');
+            doc.rect(40, 40, 515, 2).fill('#2563eb');
+            doc.fillColor('#ffffff').fontSize(9).font('Helvetica-Bold')
+              .text('ITEMIZED DEDUCTIONS & PENALTIES AUDIT TRAIL (CONTINUED)', 55, 49);
+            doc.fillColor('#cbd5e1').fontSize(8).font('Helvetica')
+              .text(`${empName}  •  Staff ID: ${empCode}  •  ${monthStr}`, 280, 49, { width: 260, align: 'right' });
+            yPos = 85;
+          }
+
+          const isEven = i % 2 === 0;
+          doc.rect(40, yPos, 515, 22).fill(isEven ? '#f8fafc' : '#ffffff');
+          doc.rect(40, yPos, 515, 22).strokeColor('#f1f5f9').lineWidth(0.5).stroke();
+
           doc.fillColor('#475569').fontSize(8).font('Helvetica')
             .text(`• ${item.date}: ${item.reason || item.type}`, 52, yPos + 6, { width: 360 });
           doc.fillColor('#ef4444').font('Helvetica-Bold')
             .text(`-${this.formatMoneyPdf(item.amount, currency)}`, 420, yPos + 6, { width: 120, align: 'right' });
           yPos += 24;
-        });
-
-        if (breakdown.length > 5) {
-          doc.fillColor('#64748b').fontSize(8).font('Helvetica-Oblique')
-            .text(`+ and ${breakdown.length - 5} more penalty records on file.`, 52, yPos + 2);
-          yPos += 16;
         }
+      } else {
+        doc.rect(40, yPos, 515, 28).fill('#f8fafc');
+        doc.rect(40, yPos, 515, 28).strokeColor('#e2e8f0').stroke();
+        doc.fillColor('#10b981').fontSize(8.5).font('Helvetica-Bold')
+          .text('✓ NO STATUTORY DEDUCTIONS OR DISCIPLINARY PENALTIES RECORDED FOR THIS PAY CYCLE', 55, yPos + 10);
+        yPos += 36;
+      }
+
+      // Check if footer fits on current page
+      if (yPos > 730) {
+        doc.addPage();
       }
 
       // ── FOOTER & CRYPTOGRAPHIC VERIFICATION ──
-      doc.rect(40, 750, 515, 42).strokeColor('#e2e8f0').stroke();
+      const footerY = 750;
+      doc.rect(40, footerY, 515, 42).strokeColor('#e2e8f0').lineWidth(1).stroke();
       doc.fillColor('#64748b').fontSize(7.5).font('Helvetica')
         .text(
           `TimeLogic ID: ${payslip.id}  •  Tamper-Evident Verification Hash: ${Buffer.from(payslip.id).toString('base64').slice(0, 16)}`,
           50,
-          758,
+          footerY + 8,
           { width: 495 }
         )
         .text(
           'This is a computer-generated statutory payroll document processed by TimeLogic Enterprise Systems. No physical signature required.',
           50,
-          770,
+          footerY + 20,
           { width: 495 }
         );
 
@@ -992,40 +1101,46 @@ class PayrollService {
       };
     }
 
+    // Always regenerate the fresh PDF to ensure up-to-date metrics and live recalculated deductions
+    const generated = await this.generatePayslipPdf(payslip.id);
+    const pdfPath = generated.filePath;
+
+    // Reload freshly updated payslip record from DB
+    const freshPayslip = (await prisma.payslipRecord.findUnique({
+      where: { id: payslip.id },
+      include: {
+        organization: true,
+        employee: true,
+      },
+    })) || payslip;
+
     const monthNames = [
       'January', 'February', 'March', 'April', 'May', 'June',
       'July', 'August', 'September', 'October', 'November', 'December'
     ];
-    const monthStr = `${monthNames[payslip.month - 1]} ${payslip.year}`;
-    const currency = payslip.currency || 'NGN';
-    const companyName = payslip.organization.name || 'TimeLogic Enterprise';
-    const empName = `${payslip.employee.firstName} ${payslip.employee.lastName}`;
+    const monthStr = `${monthNames[freshPayslip.month - 1]} ${freshPayslip.year}`;
+    const currency = freshPayslip.currency || 'NGN';
+    const companyName = freshPayslip.organization.name || 'TimeLogic Enterprise';
+    const empName = `${freshPayslip.employee.firstName} ${freshPayslip.employee.lastName}`;
 
-    let periodStart = payslip.periodStart;
-    let periodEnd = payslip.periodEnd;
+    let periodStart = freshPayslip.periodStart;
+    let periodEnd = freshPayslip.periodEnd;
     if (!periodStart || !periodEnd) {
-      const range = this.getMonthDateRange(payslip.year, payslip.month, payslip.organization?.salaryPayoutDay || 28);
+      const range = this.getMonthDateRange(freshPayslip.year, freshPayslip.month, freshPayslip.organization?.salaryPayoutDay || 28);
       periodStart = range.startDate;
       periodEnd = range.endDate;
     }
     const periodLabel = this.formatPeriodLabel(periodStart, periodEnd);
 
-    // Ensure PDF is generated
-    let pdfPath = payslip.pdfPath;
-    if (!pdfPath || !fs.existsSync(pdfPath)) {
-      const generated = await this.generatePayslipPdf(payslip.id);
-      pdfPath = generated.filePath;
-    }
-
     const messageText = [
       `📄 *TIMELOGIC OFFICIAL PAYSLIP*`,
       `🏢 *Company:* ${companyName}`,
-      `👤 *Employee:* ${empName} (${payslip.employee.employeeCode || 'TL-EMP'})`,
+      `👤 *Employee:* ${empName} (${freshPayslip.employee.employeeCode || 'TL-EMP'})`,
       `📅 *Pay Period:* ${periodLabel} (${monthStr})`,
       ``,
-      `💰 *Base Salary:* ${this.formatMoney(payslip.baseSalary, currency)}`,
-      `⚠️ *Total Penalties & Deductions:* -${this.formatMoney(payslip.totalDeductions, currency)}`,
-      `💵 *NET PAYABLE:* *${this.formatMoney(payslip.netSalary, currency)}*`,
+      `💰 *Base Salary:* ${this.formatMoney(freshPayslip.baseSalary, currency)}`,
+      `⚠️ *Total Penalties & Deductions:* -${this.formatMoney(freshPayslip.totalDeductions, currency)}`,
+      `💵 *NET PAYABLE:* *${this.formatMoney(freshPayslip.netSalary, currency)}*`,
       ``,
       `Your itemized attendance record and payslip PDF have been processed.`,
       `Verified by TimeLogic Enterprise Systems.`,
