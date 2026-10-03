@@ -1,4 +1,6 @@
 const { prisma } = require('../config/database');
+const { redis } = require('../config/redis');
+const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const EmergencyControlService = require('../services/EmergencyControlService');
 const AttendanceService = require('../services/AttendanceService');
@@ -15,10 +17,13 @@ const logger = require('../config/logger');
 // ── Organization / Office / Department ────────────────────────────────────────
 
 const resolveAdminOrgId = async (req) => {
+  if (req.user?.role !== 'SUPER_ADMIN') {
+    return req.user?.orgId;
+  }
   const headerOrgId = req.headers['x-organization-id'];
   if (headerOrgId) return headerOrgId;
   if (req.query.orgId) return req.query.orgId;
-  if (req.user.role === 'SUPER_ADMIN' && req.user.orgId === 'platform-org') {
+  if (req.user.orgId === 'platform-org') {
     const orgWithUsers = await prisma.organization.findFirst({
       where: { id: { not: 'platform-org' } },
       orderBy: { users: { _count: 'desc' } },
@@ -401,8 +406,6 @@ const emergencyRevert = async (req, res, next) => {
     res.json({ success: true, data: control });
   } catch (err) { next(err); }
 };
-
-const bcrypt = require('bcryptjs');
 
 const getNotifications = async (req, res, next) => {
   try {
