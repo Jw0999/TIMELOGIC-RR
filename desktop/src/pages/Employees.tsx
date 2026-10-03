@@ -192,7 +192,7 @@ function EditCheckInMethodModal({
   const [officeId, setOfficeId] = useState(employee.officeId ?? employee.office?.id ?? (offices[0]?.id || ''));
   const [shiftType, setShiftType] = useState(employee.shiftType ?? 'FULL_TIME');
   const [method, setMethod] = useState<EmployeeCheckInMethod>(() => (
-    current && methods.includes(current) ? current : defaultMethod(organization)
+    (employee.checkInMethod as EmployeeCheckInMethod) || 'MANUAL'
   ));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -220,7 +220,7 @@ function EditCheckInMethodModal({
         email: email.trim().toLowerCase(),
         phone: phone.trim() ? phone.trim() : undefined,
         password: password.trim() ? password.trim() : undefined,
-        checkInMethod: method,
+        checkInMethod: method !== employee.checkInMethod ? method : undefined,
         departmentId: departmentId || undefined,
         officeId: officeId || undefined,
         shiftType,

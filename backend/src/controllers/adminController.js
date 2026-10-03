@@ -168,7 +168,7 @@ const updateUser = async (req, res, next) => {
   try {
     // Tenant isolation: the target must belong to the admin's own organization
     const target = await prisma.user.findUnique({
-      where: { id: req.params.userId }, select: { orgId: true, role: true, email: true },
+      where: { id: req.params.userId }, select: { orgId: true, role: true, email: true, checkInMethod: true },
     });
     if (!target || target.orgId !== req.user.orgId) {
       return res.status(404).json({ success: false, message: 'User not found' });
@@ -217,11 +217,15 @@ const updateUser = async (req, res, next) => {
       if (!office) return res.status(400).json({ success: false, message: 'Office does not belong to your organization.' });
     }
     let allowedMethod;
-    if (checkInMethod !== undefined) {
+    if (checkInMethod !== undefined && checkInMethod !== target.checkInMethod) {
       const org = await EmployeePolicy.getOrganizationPolicy(req.user.orgId);
       allowedMethod = EmployeePolicy.assertMethodAllowed(org, checkInMethod);
       const openRecord = await prisma.attendanceRecord.findFirst({
-        where: { employeeId: req.params.userId, clockOutTime: null },
+        where: {
+          employeeId: req.params.userId,
+          clockInTime: { not: null },
+          clockOutTime: null,
+        },
         select: { checkInSource: true },
       });
       const nextCapabilities = EmployeePolicy.methodCapabilities(allowedMethod);
@@ -231,6 +235,8 @@ const updateUser = async (req, res, next) => {
       ) {
         return res.status(409).json({ success: false, message: 'Check this employee out before changing their check-in method.' });
       }
+    } else if (checkInMethod !== undefined) {
+      allowedMethod = target.checkInMethod;
     }
 
     const cleanPhone = phone !== undefined ? (phone ? String(phone).trim() : null) : undefined;
