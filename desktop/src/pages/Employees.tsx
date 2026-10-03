@@ -274,9 +274,9 @@ function EditCheckInMethodModal({
               <p className="text-[11px] text-[var(--text-muted)] mt-1">Used for WhatsApp payslip delivery.</p>
             </div>
             <div>
-              <label className={labelCls}>New Password / PIN</label>
-              <input className={inputCls} type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Keep blank to retain" />
-              <p className="text-[11px] text-[var(--text-muted)] mt-1">Any format (numbers only, PIN, or text).</p>
+              <label className={labelCls}>New Password / PIN (Optional)</label>
+              <input className={inputCls} type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Leave blank to keep existing password" />
+              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1">Leave blank to keep current password unchanged. Only type here if setting a new password.</p>
             </div>
           </div>
           

@@ -1384,11 +1384,23 @@ class PayrollService {
         });
       }
 
+      // Automatically BCC sender/HR address so organization retains a live copy in Zoho Mail
+      let bccAddress = null;
+      const rawFrom = org.smtpFrom || process.env.SMTP_FROM;
+      if (rawFrom) {
+        const match = rawFrom.match(/<([^>]+)>/);
+        bccAddress = match ? match[1].trim() : (rawFrom.includes('@') ? rawFrom.trim() : null);
+      }
+      if (!bccAddress && org.smtpUser && org.smtpUser.includes('@') && !org.smtpUser.includes('smtp-brevo.com')) {
+        bccAddress = org.smtpUser.trim();
+      }
+
       const mailOptions = {
         from: org.smtpFrom || process.env.SMTP_FROM || `"${companyName} Payroll" <payroll@timelogic.app>`,
         to: email,
         subject,
         html: htmlBody,
+        ...(bccAddress && bccAddress.toLowerCase() !== email.toLowerCase() ? { bcc: bccAddress } : {}),
         attachments: [
           {
             filename: `Payslip-${freshPayslip.employee.employeeCode || freshPayslip.employee.firstName}-${monthStr}.pdf`,
@@ -1401,7 +1413,7 @@ class PayrollService {
       const info = await transporter.sendMail(mailOptions);
       emailSent = true;
       messageId = info.messageId || `EMAIL_${Date.now()}`;
-      logger.info(`Payslip email dispatched successfully to ${email} for payslip ${freshPayslip.id}`);
+      logger.info(`Payslip email dispatched successfully to ${email} (BCC: ${bccAddress || 'none'}) for payslip ${freshPayslip.id}`);
     } catch (mailErr) {
       errorDetail = mailErr.message;
       logger.error(`Error sending payslip email to ${email}:`, mailErr);
