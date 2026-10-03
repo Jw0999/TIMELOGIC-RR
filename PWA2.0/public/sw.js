@@ -3,7 +3,7 @@
 // Enables offline boot, asset caching, and zero-downtime kiosk operation.
 // ============================================================================
 
-const CACHE_NAME = 'timelogic-station-cache-v5';
+const CACHE_NAME = 'timelogic-station-cache-v6';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
