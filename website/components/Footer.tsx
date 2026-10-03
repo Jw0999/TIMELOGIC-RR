@@ -128,8 +128,10 @@ export function Footer() {
 
         {/* Bottom Bar with Back to Top */}
         <div className="mt-14 pt-6 border-t border-white/[0.08] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
-          <div>
-            © {new Date().getFullYear()} TimeLogic Systems Inc. All rights reserved.
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <span>© {new Date().getFullYear()} TimeLogic Systems Inc. All rights reserved.</span>
+            <Link href="/privacy" className="text-slate-300 hover:text-white transition-colors">Privacy Policy</Link>
+            <Link href="/terms" className="text-slate-300 hover:text-white transition-colors">Terms of Service</Link>
           </div>
 
           <div className="flex items-center gap-6">

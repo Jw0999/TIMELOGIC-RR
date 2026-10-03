@@ -188,6 +188,14 @@ function LoginScreen({ onLogin }: { onLogin: (user: AdminUser) => void }) {
             Use your organization email and the Station Password configured in the Desktop App Settings.
           </p>
         </form>
+
+        <footer className="station-legal-footer dark">
+          <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+          <span className="station-legal-sep">·</span>
+          <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+          <span className="station-legal-sep">·</span>
+          <span>&copy; 2026 TimeLogic</span>
+        </footer>
       </section>
     </main>
   );
@@ -1411,6 +1419,14 @@ function App() {
                         <span>Supervisor Mode: Show Full Roster</span>
                       </button>
                     </div>
+
+                    <footer className="station-legal-footer" style={{ marginTop: '1.25rem', paddingBottom: 0 }}>
+                      <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+                      <span className="station-legal-sep">·</span>
+                      <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+                      <span className="station-legal-sep">·</span>
+                      <span>GDPR Ready</span>
+                    </footer>
                   </div>
                 </div>
               ) : (
@@ -1988,6 +2004,14 @@ function App() {
             </div>
           </div>
         )}
+
+        <footer className="station-legal-footer" style={{ marginTop: '2.5rem', borderTop: '1px solid #e2e8f0' }}>
+          <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+          <span className="station-legal-sep">·</span>
+          <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+          <span className="station-legal-sep">·</span>
+          <span>&copy; 2026 TimeLogic Enterprise Systems · GDPR Compliant</span>
+        </footer>
       </main>
 
       {/* ====================================================================

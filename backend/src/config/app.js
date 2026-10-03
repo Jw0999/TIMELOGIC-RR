@@ -36,6 +36,14 @@ function createApp() {
   // Security headers
   app.use(helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' }, // allow /uploads images in apps
+    hsts: {
+      maxAge: 63072000,
+      includeSubDomains: true,
+      preload: true,
+    },
+    frameguard: {
+      action: 'deny',
+    },
   }));
   app.use(cors({
     // Allow the whitelisted web origins, plus native clients with no Origin and
@@ -116,6 +124,14 @@ function createApp() {
 
   // Health check (unauthenticated)
   app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
+
+  // GDPR compliance redirects to published policies
+  app.get(['/privacy', '/privacy-policy'], (req, res) => {
+    res.redirect(301, 'https://timelogic-desktopadmin.pages.dev/privacy');
+  });
+  app.get(['/terms', '/terms-of-service'], (req, res) => {
+    res.redirect(301, 'https://timelogic-desktopadmin.pages.dev/terms');
+  });
 
   // API routes
   app.use('/api/auth',       authRoutes);

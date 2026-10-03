@@ -6,12 +6,21 @@
     <meta name="theme-color" content="#0b1f33" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https://timelogic-api-fbd3128caa55.herokuapp.com; connect-src 'self' https://timelogic-api-fbd3128caa55.herokuapp.com wss://timelogic-api-fbd3128caa55.herokuapp.com https://*.pages.dev; media-src 'self' blob:; base-uri 'self'; form-action 'self';" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icon-192.png" />
     <title>TimeLogic Attendance Station</title>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <div style="padding: 2rem; text-align: center; color: #fff; background: #0b1329;">
+        <h1>TimeLogic Attendance Station</h1>
+        <p>JavaScript is required to operate this biometric attendance station.</p>
+        <p><a href="/privacy" style="color: #38bdf8;">Privacy Policy</a> · <a href="/terms" style="color: #38bdf8;">Terms of Service</a></p>
+      </div>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
     <script>
       if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));
