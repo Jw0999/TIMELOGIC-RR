@@ -3,9 +3,10 @@
 // Enables offline boot, asset caching, and zero-downtime kiosk operation.
 // ============================================================================
 
-const CACHE_NAME = 'timelogic-station-cache-v3';
+const CACHE_NAME = 'timelogic-station-cache-v5';
 
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll([
@@ -23,7 +24,7 @@ self.addEventListener('install', (event) => {
         '/terms/index.html',
         '/terms-of-service',
       ]).catch((err) => console.warn('[SW] Cache addAll warning:', err));
-    }).then(() => self.skipWaiting())
+    })
   );
 });
 
@@ -45,9 +46,24 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Network-First for HTML navigation so updates load immediately on refresh
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match('/') || caches.match('/index.html'))
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      // Stale-while-revalidate: return cached if available, update cache in background
       const fetchPromise = fetch(event.request)
         .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
@@ -56,12 +72,7 @@ self.addEventListener('fetch', (event) => {
           }
           return networkResponse;
         })
-        .catch(() => {
-          if (event.request.mode === 'navigate') {
-            return caches.match('/') || caches.match('/index.html');
-          }
-          return cachedResponse;
-        });
+        .catch(() => cachedResponse);
 
       return cachedResponse || fetchPromise;
     })

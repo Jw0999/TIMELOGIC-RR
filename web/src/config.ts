@@ -1,7 +1,4 @@
-const configuredApiUrl = import.meta.env.VITE_API_URL?.trim().replace(/\/$/, '');
-const localApiUrl = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname)
-	? 'http://localhost:5000/api'
-	: '';
-export const API_URL = configuredApiUrl || localApiUrl || '/api';
-export const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || (localApiUrl ? 'http://localhost:5000' : 'https://timelogic-api-fbd3128caa55.herokuapp.com');
+const isLocal = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+export const API_URL = isLocal ? 'http://localhost:5000/api' : '/api';
+export const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || (isLocal ? 'http://localhost:5000' : 'https://timelogic-api-fbd3128caa55.herokuapp.com');
 

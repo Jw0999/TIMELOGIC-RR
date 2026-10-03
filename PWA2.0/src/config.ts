@@ -1,5 +1,3 @@
-const configuredApiUrl = import.meta.env.VITE_API_URL?.trim().replace(/\/$/, '');
-const localApiUrl = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname)
-  ? 'http://localhost:5000/api'
-  : '';
-export const API_URL = configuredApiUrl || localApiUrl || '/api';
+const isLocal = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+export const API_URL = isLocal ? 'http://localhost:5000/api' : '/api';
+

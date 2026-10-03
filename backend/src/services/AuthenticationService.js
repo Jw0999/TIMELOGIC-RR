@@ -197,17 +197,20 @@ class AuthenticationService {
         throw Object.assign(new Error('Invalid Super Admin credentials.'), { status: 401 });
       }
     } else {
-      // For Organization Admin: check org.kioskPasswordHash first
+      // For Organization Admin: check org.kioskPasswordHash first, with fallback to Admin account password
       if (user.organization?.kioskPasswordHash) {
         const match = await bcrypt.compare(password, user.organization.kioskPasswordHash);
         if (!match) {
-          throw Object.assign(new Error('Invalid station password. Please enter the station password configured in the Desktop App Settings.'), { status: 401 });
+          const adminMatch = await bcrypt.compare(password, user.passwordHash);
+          if (!adminMatch) {
+            throw Object.assign(new Error('Invalid station password. Please enter the station password configured in Desktop Settings, or your Admin account password.'), { status: 401 });
+          }
         }
       } else {
         // Fallback to admin's password if station password has not yet been set
         const match = await bcrypt.compare(password, user.passwordHash);
         if (!match) {
-          throw Object.assign(new Error('Invalid credentials. Please set a dedicated Station Password in Desktop App settings.'), { status: 401 });
+          throw Object.assign(new Error('Invalid credentials. Please enter your Admin account password.'), { status: 401 });
         }
       }
     }
