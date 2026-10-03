@@ -86,11 +86,13 @@ interface PayrollSettingsData {
   salaryPayoutDay: number;
   salaryAutomationEnabled: boolean;
   salaryCurrency: string;
-  whatsappProvider: string;
-  whatsappPhoneId?: string | null;
-  whatsappSenderNumber?: string | null;
-  whatsappApiToken?: string | null;
-  hasWhatsappToken?: boolean;
+  smtpHost?: string | null;
+  smtpPort?: number | null;
+  smtpUser?: string | null;
+  smtpPass?: string | null;
+  smtpFrom?: string | null;
+  smtpSecure?: boolean;
+  hasSmtpCredentials?: boolean;
 }
 
 export default function Salary() {
@@ -125,11 +127,13 @@ export default function Salary() {
     salaryPayoutDay: 28,
     salaryAutomationEnabled: true,
     salaryCurrency: 'NGN',
-    whatsappProvider: 'WEB_LINK',
-    whatsappPhoneId: '',
-    whatsappSenderNumber: '',
-    whatsappApiToken: '',
-    hasWhatsappToken: false,
+    smtpHost: '',
+    smtpPort: 587,
+    smtpUser: '',
+    smtpPass: '',
+    smtpFrom: '',
+    smtpSecure: false,
+    hasSmtpCredentials: false,
   });
   const [savingSettings, setSavingSettings] = useState<boolean>(false);
 
@@ -192,11 +196,13 @@ export default function Salary() {
           salaryPayoutDay: payoutDay,
           salaryAutomationEnabled: res.salaryAutomationEnabled ?? true,
           salaryCurrency: res.salaryCurrency || 'NGN',
-          whatsappProvider: res.whatsappProvider || 'WEB_LINK',
-          whatsappPhoneId: res.whatsappPhoneId || '',
-          whatsappSenderNumber: res.whatsappSenderNumber || '',
-          whatsappApiToken: res.whatsappApiToken || '',
-          hasWhatsappToken: res.hasWhatsappToken ?? false,
+          smtpHost: res.smtpHost || '',
+          smtpPort: res.smtpPort ?? 587,
+          smtpUser: res.smtpUser || '',
+          smtpPass: res.smtpPass || '',
+          smtpFrom: res.smtpFrom || '',
+          smtpSecure: res.smtpSecure ?? false,
+          hasSmtpCredentials: res.hasSmtpCredentials ?? false,
         });
 
         if (!hasUserNavigated) {
@@ -1091,6 +1097,112 @@ export default function Salary() {
                 <p className="text-xs text-[var(--text-muted)] leading-relaxed">
                   When payout is completed (either manually via <strong>Complete Payout</strong> or automatically on the scheduled payday), official PDF payslips featuring itemized penalty calculations and attendance performance grades are automatically emailed to each employee&apos;s registered email address.
                 </p>
+              </div>
+
+              {/* Custom SMTP Configuration */}
+              <div className="p-4 bg-[var(--hover-bg)] rounded-2xl border border-[var(--border)] space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Mail size={16} className="text-primary-600" />
+                    <span className="text-xs font-bold text-[var(--text-main)]">
+                      Organization SMTP Email Configuration
+                    </span>
+                  </div>
+                  {settingsData.hasSmtpCredentials && (
+                    <span className="text-[10px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-full">
+                      Custom SMTP Active
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
+                  Configure your company&apos;s mail server (Gmail App Password, Outlook 365, Brevo, SendGrid, or private SMTP) to dispatch official payslip PDFs directly from your own domain. Leave blank to use system defaults.
+                </p>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-2">
+                    <label className={labelCls}>SMTP Host / Server</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. smtp.gmail.com"
+                      value={settingsData.smtpHost || ''}
+                      onChange={(e) =>
+                        setSettingsData((prev) => ({ ...prev, smtpHost: e.target.value }))
+                      }
+                      className={inputCls}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Port</label>
+                    <input
+                      type="number"
+                      placeholder="587"
+                      value={settingsData.smtpPort || 587}
+                      onChange={(e) =>
+                        setSettingsData((prev) => ({
+                          ...prev,
+                          smtpPort: parseInt(e.target.value, 10) || 587,
+                        }))
+                      }
+                      className={inputCls}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelCls}>SMTP Username / Email</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. payroll@company.com"
+                      value={settingsData.smtpUser || ''}
+                      onChange={(e) =>
+                        setSettingsData((prev) => ({ ...prev, smtpUser: e.target.value }))
+                      }
+                      className={inputCls}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls}>SMTP Password / App Password</label>
+                    <input
+                      type="password"
+                      placeholder={settingsData.hasSmtpCredentials ? '•••••••• (leave blank to keep)' : 'App Password'}
+                      value={settingsData.smtpPass || ''}
+                      onChange={(e) =>
+                        setSettingsData((prev) => ({ ...prev, smtpPass: e.target.value }))
+                      }
+                      className={inputCls}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 items-center">
+                  <div>
+                    <label className={labelCls}>Sender Name & Email (From)</label>
+                    <input
+                      type="text"
+                      placeholder='e.g. "Acme Payroll" <payroll@company.com>'
+                      value={settingsData.smtpFrom || ''}
+                      onChange={(e) =>
+                        setSettingsData((prev) => ({ ...prev, smtpFrom: e.target.value }))
+                      }
+                      className={inputCls}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 pt-4">
+                    <input
+                      type="checkbox"
+                      id="smtpSecureToggle"
+                      checked={Boolean(settingsData.smtpSecure)}
+                      onChange={(e) =>
+                        setSettingsData((prev) => ({ ...prev, smtpSecure: e.target.checked }))
+                      }
+                      className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500 cursor-pointer"
+                    />
+                    <label htmlFor="smtpSecureToggle" className="text-xs text-[var(--text-main)] cursor-pointer">
+                      Use SSL/TLS (Port 465)
+                    </label>
+                  </div>
+                </div>
               </div>
             </div>
 

@@ -375,18 +375,20 @@ class PayrollService {
         salaryPayoutDay: true,
         salaryAutomationEnabled: true,
         salaryCurrency: true,
-        whatsappProvider: true,
-        whatsappPhoneId: true,
-        whatsappSenderNumber: true,
-        whatsappApiToken: true,
+        smtpHost: true,
+        smtpPort: true,
+        smtpUser: true,
+        smtpPass: true,
+        smtpFrom: true,
+        smtpSecure: true,
       },
     });
     if (!org) throw new Error('Organization not found');
 
     return {
       ...org,
-      hasWhatsappToken: Boolean(org.whatsappApiToken),
-      whatsappApiToken: org.whatsappApiToken ? '••••••••' + org.whatsappApiToken.slice(-4) : null,
+      smtpPass: org.smtpPass ? '••••••••' : null,
+      hasSmtpCredentials: Boolean(org.smtpHost && org.smtpUser && org.smtpPass),
     };
   }
 
@@ -402,17 +404,24 @@ class PayrollService {
     if (data.salaryCurrency) {
       updateData.salaryCurrency = data.salaryCurrency.toUpperCase();
     }
-    if (data.whatsappProvider) {
-      updateData.whatsappProvider = data.whatsappProvider;
+    // SMTP email configuration
+    if (data.smtpHost !== undefined) {
+      updateData.smtpHost = data.smtpHost || null;
     }
-    if (data.whatsappPhoneId !== undefined) {
-      updateData.whatsappPhoneId = data.whatsappPhoneId;
+    if (data.smtpPort !== undefined) {
+      updateData.smtpPort = parseInt(data.smtpPort, 10) || 587;
     }
-    if (data.whatsappSenderNumber !== undefined) {
-      updateData.whatsappSenderNumber = data.whatsappSenderNumber;
+    if (data.smtpUser !== undefined) {
+      updateData.smtpUser = data.smtpUser || null;
     }
-    if (data.whatsappApiToken && !data.whatsappApiToken.includes('••••')) {
-      updateData.whatsappApiToken = data.whatsappApiToken;
+    if (data.smtpPass && !data.smtpPass.includes('••••')) {
+      updateData.smtpPass = data.smtpPass;
+    }
+    if (data.smtpFrom !== undefined) {
+      updateData.smtpFrom = data.smtpFrom || null;
+    }
+    if (data.smtpSecure !== undefined) {
+      updateData.smtpSecure = Boolean(data.smtpSecure);
     }
 
     const org = await prisma.organization.update({
@@ -424,9 +433,11 @@ class PayrollService {
         salaryPayoutDay: true,
         salaryAutomationEnabled: true,
         salaryCurrency: true,
-        whatsappProvider: true,
-        whatsappPhoneId: true,
-        whatsappSenderNumber: true,
+        smtpHost: true,
+        smtpPort: true,
+        smtpUser: true,
+        smtpFrom: true,
+        smtpSecure: true,
       },
     });
 
@@ -960,7 +971,7 @@ class PayrollService {
       doc.moveTo(297.5, tblY).lineTo(297.5, tblY + 20).lineWidth(0.75).strokeColor('#cbd5e1').stroke();
 
       doc.fillColor('#1e293b').fontSize(8).font('Helvetica-Bold')
-        .text('EARNINGS & ALLOWANCES', 50, tblY + 6)
+        .text('EARNINGS', 50, tblY + 6)
         .text('AMOUNT', 215, tblY + 6, { width: 72, align: 'right' })
         .text('DEDUCTIONS & PENALTIES', 308, tblY + 6)
         .text('AMOUNT', 470, tblY + 6, { width: 75, align: 'right' });
@@ -1151,30 +1162,7 @@ class PayrollService {
       }
 
       // ─────────────────────────────────────────────────────────────
-      // 7. HUMAN SIGNATURES & AUTHORIZATION BLOCK
-      // ─────────────────────────────────────────────────────────────
-      let sigY = 705;
-      if (currentY > 670) {
-        doc.addPage();
-        sigY = 100;
-      }
-
-      // Prepared by
-      doc.moveTo(40, sigY).lineTo(235, sigY).lineWidth(0.75).strokeColor('#94a3b8').stroke();
-      doc.fillColor('#334155').fontSize(7.5).font('Helvetica-Bold')
-        .text('Prepared & Verified by: Payroll Officer', 40, sigY + 6);
-      doc.fillColor('#64748b').fontSize(7).font('Helvetica')
-        .text(`Date: ${new Date().toISOString().split('T')[0]}   |   TimeLogic Engine`, 40, sigY + 16);
-
-      // Authorized by
-      doc.moveTo(360, sigY).lineTo(555, sigY).lineWidth(0.75).strokeColor('#94a3b8').stroke();
-      doc.fillColor('#334155').fontSize(7.5).font('Helvetica-Bold')
-        .text('Authorized by: HR & Finance Management', 360, sigY + 6);
-      doc.fillColor('#64748b').fontSize(7).font('Helvetica')
-        .text('Official Disbursement Approval', 360, sigY + 16);
-
-      // ─────────────────────────────────────────────────────────────
-      // 8. FORMAL FOOTER
+      // 7. FORMAL FOOTER
       // ─────────────────────────────────────────────────────────────
       const footerY = 750;
       doc.moveTo(40, footerY).lineTo(555, footerY).lineWidth(0.5).strokeColor('#e2e8f0').stroke();
@@ -1352,8 +1340,13 @@ class PayrollService {
         </div>
       </div>
 
+      <div style="background-color: #f1f5f9; border-radius: 8px; padding: 14px 16px; margin: 18px 0; border: 1px solid #e2e8f0;">
+        <div style="font-size: 13px; font-weight: bold; color: #0f172a; margin-bottom: 4px;">📎 Official PDF Payslip Attached</div>
+        <div style="font-size: 12px; color: #64748b; line-height: 1.5;">Your itemized payslip is attached directly to this email as <strong>Payslip-${freshPayslip.employee.employeeCode || freshPayslip.employee.firstName}-${monthStr}.pdf</strong>. You can open, save, or print it right from your inbox without needing to access any external links.</div>
+      </div>
+
       <div class="notice">
-        Please find attached your official payslip statement and itemized attendance record for this pay cycle. If you have any inquiries regarding your remuneration or deductions, please contact the HR / Accounts Department.
+        For any inquiries regarding your remuneration, attendance, or deductions, please contact the HR / Accounts Department.
         <br><br>
         <strong>${companyName}</strong> • TimeLogic Payroll Systems
       </div>
@@ -1369,16 +1362,19 @@ class PayrollService {
 
     try {
       let transporter;
-      const smtpHost = process.env.SMTP_HOST;
-      const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
-      const smtpUser = process.env.SMTP_USER;
-      const smtpPass = process.env.SMTP_PASS;
+      // Priority: 1. Org-specific SMTP → 2. Global env SMTP → 3. jsonTransport (dev fallback)
+      const org = freshPayslip.organization;
+      const smtpHost = org.smtpHost || process.env.SMTP_HOST;
+      const smtpPort = parseInt(org.smtpPort || process.env.SMTP_PORT || '587', 10);
+      const smtpUser = org.smtpUser || process.env.SMTP_USER;
+      const smtpPass = org.smtpPass || process.env.SMTP_PASS;
+      const smtpSecure = org.smtpSecure || smtpPort === 465;
 
       if (smtpHost && smtpUser && smtpPass) {
         transporter = nodemailer.createTransport({
           host: smtpHost,
           port: smtpPort,
-          secure: smtpPort === 465,
+          secure: smtpSecure,
           auth: { user: smtpUser, pass: smtpPass },
         });
       } else {
@@ -1389,7 +1385,7 @@ class PayrollService {
       }
 
       const mailOptions = {
-        from: process.env.SMTP_FROM || `"${companyName} Payroll" <payroll@timelogic.app>`,
+        from: org.smtpFrom || process.env.SMTP_FROM || `"${companyName} Payroll" <payroll@timelogic.app>`,
         to: email,
         subject,
         html: htmlBody,

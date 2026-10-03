@@ -62,6 +62,8 @@ const listOrgs = async (req, res, next) => {
       const sub = getOrgSubscriptionStatus(org);
       return {
         ...org,
+        smtpPass: org.smtpPass ? '••••••••' : null,
+        hasSmtpCredentials: Boolean(org.smtpHost && org.smtpUser && org.smtpPass),
         subscription: sub,
         subscriptionStatus: sub.status,
         subscriptionExpiresAt: sub.subscriptionExpiresAt,
@@ -138,6 +140,14 @@ const createOrg = async (req, res, next) => {
           openingTime,
           timezone,
           shiftSchedules: shiftSchedules || defaultShiftSchedules(),
+          ...(req.body.smtpHost ? { smtpHost: String(req.body.smtpHost).trim() } : {}),
+          ...(req.body.smtpPort ? { smtpPort: parseInt(req.body.smtpPort, 10) || 587 } : {}),
+          ...(req.body.smtpUser ? { smtpUser: String(req.body.smtpUser).trim() } : {}),
+          ...(req.body.smtpPass ? { smtpPass: String(req.body.smtpPass).trim() } : {}),
+          ...(req.body.smtpFrom ? { smtpFrom: String(req.body.smtpFrom).trim() } : {}),
+          ...(req.body.smtpSecure !== undefined ? { smtpSecure: Boolean(req.body.smtpSecure) } : {}),
+          ...(req.body.salaryPayoutDay ? { salaryPayoutDay: parseInt(req.body.salaryPayoutDay, 10) || 28 } : {}),
+          ...(req.body.salaryCurrency ? { salaryCurrency: String(req.body.salaryCurrency).toUpperCase() } : {}),
         },
       });
 
@@ -322,6 +332,15 @@ const updateOrg = async (req, res, next) => {
           ...(openingTime !== undefined ? { openingTime } : {}),
           ...(timezone !== undefined ? { timezone } : {}),
           ...(shiftSchedules !== undefined ? { shiftSchedules } : {}),
+          ...(req.body.smtpHost !== undefined ? { smtpHost: req.body.smtpHost ? String(req.body.smtpHost).trim() : null } : {}),
+          ...(req.body.smtpPort !== undefined ? { smtpPort: parseInt(req.body.smtpPort, 10) || 587 } : {}),
+          ...(req.body.smtpUser !== undefined ? { smtpUser: req.body.smtpUser ? String(req.body.smtpUser).trim() : null } : {}),
+          ...(req.body.smtpPass !== undefined && !String(req.body.smtpPass).includes('••••') ? { smtpPass: req.body.smtpPass ? String(req.body.smtpPass).trim() : null } : {}),
+          ...(req.body.smtpFrom !== undefined ? { smtpFrom: req.body.smtpFrom ? String(req.body.smtpFrom).trim() : null } : {}),
+          ...(req.body.smtpSecure !== undefined ? { smtpSecure: Boolean(req.body.smtpSecure) } : {}),
+          ...(req.body.salaryPayoutDay !== undefined ? { salaryPayoutDay: parseInt(req.body.salaryPayoutDay, 10) || 28 } : {}),
+          ...(req.body.salaryAutomationEnabled !== undefined ? { salaryAutomationEnabled: Boolean(req.body.salaryAutomationEnabled) } : {}),
+          ...(req.body.salaryCurrency !== undefined ? { salaryCurrency: String(req.body.salaryCurrency).toUpperCase() } : {}),
         },
       });
 

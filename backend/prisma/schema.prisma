@@ -45,6 +45,12 @@ model Organization {
   whatsappPhoneId          String?
   whatsappApiToken         String?
   whatsappSenderNumber     String?
+  smtpHost                 String?
+  smtpPort                 Int?              @default(587)
+  smtpUser                 String?
+  smtpPass                 String?
+  smtpFrom                 String?
+  smtpSecure               Boolean?          @default(false)
   payslipRecords           PayslipRecord[]
 
   @@map("organizations")
