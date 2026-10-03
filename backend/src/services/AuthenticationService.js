@@ -233,10 +233,11 @@ class AuthenticationService {
     const accessToken = this._signAccess(user, '30d');
     const refreshToken = await this._createRefreshToken(user.id, '90d');
 
+    const { kioskPasswordHash: _kph, ...safeOrg } = user.organization || {};
     return {
       accessToken,
       refreshToken,
-      user: { ...this._safeUser(user), lastLoginAt: loginAt, organization: user.organization },
+      user: { ...this._safeUser(user), lastLoginAt: loginAt, organization: safeOrg },
       boundDevice: boundKioskDevice,
     };
   }
