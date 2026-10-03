@@ -71,27 +71,35 @@ class PayrollController {
     }
   }
 
-  async sendWhatsApp(req, res) {
+  async sendEmail(req, res) {
     try {
       const payslipId = req.params.id;
-      const data = await PayrollService.sendPayslipWhatsApp(payslipId);
+      const data = await PayrollService.sendPayslipEmail(payslipId);
       res.json({ status: 'success', data });
     } catch (err) {
-      logger.error('Error sending WhatsApp payslip:', err);
+      logger.error('Error sending payslip email:', err);
       res.status(500).json({ status: 'error', message: err.message });
     }
   }
 
-  async batchSendWhatsApp(req, res) {
+  async completePayout(req, res) {
     try {
       const orgId = req.user.orgId;
       const { year, month } = req.body;
-      const data = await PayrollService.batchSendMonthlyWhatsApp(orgId, year, month);
+      const data = await PayrollService.completeMonthlyPayout(orgId, year, month);
       res.json({ status: 'success', data });
     } catch (err) {
-      logger.error('Error in batch WhatsApp send:', err);
+      logger.error('Error in complete payout dispatch:', err);
       res.status(500).json({ status: 'error', message: err.message });
     }
+  }
+
+  async sendWhatsApp(req, res) {
+    return this.sendEmail(req, res);
+  }
+
+  async batchSendWhatsApp(req, res) {
+    return this.completePayout(req, res);
   }
 }
 

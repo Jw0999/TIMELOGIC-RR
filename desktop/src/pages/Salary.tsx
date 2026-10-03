@@ -10,7 +10,7 @@ import {
   FileText,
   Filter,
   Info,
-  MessageCircle,
+  Mail,
   Pencil,
   Plus,
   RefreshCw,
@@ -33,8 +33,8 @@ import {
   fetchPayrollSettings,
   updatePayrollSettings,
   calculatePayroll,
-  sendPayslipWhatsApp,
-  batchSendWhatsApp,
+  sendPayslipEmail,
+  completePayout,
   downloadPayslipPdf,
 } from '../services';
 
@@ -295,7 +295,7 @@ export default function Salary() {
     setSavingSettings(true);
     try {
       await updatePayrollSettings(settingsData);
-      setSuccessMsg('Automated payday schedule and WhatsApp dispatch settings saved.');
+      setSuccessMsg('Automated payday schedule and email payout settings saved.');
       setSettingsModalOpen(false);
       // Recalculate current month with new payday cutoff
       await calculatePayroll({ year: selectedYear, month: selectedMonth });
@@ -339,9 +339,9 @@ export default function Salary() {
     }
   };
 
-  const handleSendWhatsApp = async (emp: EmployeePayroll) => {
-    if (!emp.phone) {
-      alert(`Cannot send WhatsApp: ${emp.name} does not have a registered phone number.`);
+  const handleSendEmail = async (emp: EmployeePayroll) => {
+    if (!emp.email || !emp.email.includes('@')) {
+      alert(`Cannot send email: ${emp.name} does not have a valid registered email address.`);
       return;
     }
 
@@ -359,40 +359,29 @@ export default function Salary() {
           if (updated?.payslipId) payslipId = updated.payslipId;
         }
       } catch (calcErr) {
-        console.warn('Live calculation before send:', calcErr);
+        console.warn('Live calculation before email dispatch:', calcErr);
       }
 
       if (!payslipId) {
         throw new Error('Unable to find or generate payslip record.');
       }
 
-      // 1. Auto-download official PDF to local device so admin has the file ready in Downloads
-      try {
-        const fileName = `Payslip-${emp.employeeCode || emp.firstName}-${monthNames[selectedMonth - 1]}-${selectedYear}.pdf`;
-        await downloadPayslipPdf(payslipId, fileName);
-      } catch (pdfErr) {
-        console.warn('Auto PDF download skipped:', pdfErr);
+      const res = await sendPayslipEmail(payslipId);
+      if (res?.success) {
+        setSuccessMsg(`Official payslip PDF emailed successfully to ${emp.name} (${emp.email}).`);
+      } else {
+        alert(res?.error || 'Failed to dispatch email.');
       }
-
-      // 2. Dispatch/prepare WhatsApp message
-      const res = await sendPayslipWhatsApp(payslipId);
-      if (res?.directUrl && settingsData.whatsappProvider === 'WEB_LINK') {
-        const opened = await (window as any).electronAPI?.openExternal?.(res.directUrl);
-        if (!opened) {
-          window.open(res.directUrl, '_blank');
-        }
-      }
-      setSuccessMsg(`WhatsApp opened for ${emp.name}. PDF saved to Downloads — drag & drop it into the chat.`);
       await loadPayroll();
     } catch (err: any) {
-      alert(err?.message || 'Failed to dispatch WhatsApp notification');
+      alert(err?.message || 'Failed to dispatch email payslip');
     } finally {
       setSendingId(null);
     }
   };
 
-  const handleBatchSendWhatsApp = async () => {
-    if (!window.confirm(`Are you sure you want to dispatch WhatsApp payslips to all employees for ${monthLabel}?`)) {
+  const handleCompletePayout = async () => {
+    if (!window.confirm(`Are you sure you want to complete payout and dispatch official payslips via email to all employees for ${monthLabel}?`)) {
       return;
     }
 
@@ -401,11 +390,11 @@ export default function Salary() {
     setSuccessMsg('');
     try {
       await calculatePayroll({ year: selectedYear, month: selectedMonth });
-      const res = await batchSendWhatsApp({ year: selectedYear, month: selectedMonth });
-      setSuccessMsg(`Batch WhatsApp completed: ${res.sent || 0} sent, ${res.skipped || 0} skipped.`);
+      const res = await completePayout({ year: selectedYear, month: selectedMonth });
+      setSuccessMsg(`Complete Payout finalized! ${res.sent || 0} payslip(s) emailed to employees, ${res.skipped || 0} skipped.`);
       await loadPayroll();
     } catch (err: any) {
-      setErrorMsg(err?.message || 'Failed to complete batch WhatsApp send');
+      setErrorMsg(err?.message || 'Failed to complete payout dispatch');
     } finally {
       setBatchSending(false);
     }
@@ -460,12 +449,13 @@ export default function Salary() {
             </button>
 
             <button
-              onClick={handleBatchSendWhatsApp}
+              onClick={handleCompletePayout}
               disabled={batchSending}
               className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition shadow-sm disabled:opacity-60"
+              title="Finalize payroll and complete payout by emailing official payslip PDFs to all employees"
             >
-              <MessageCircle size={14} />
-              <span>{batchSending ? 'Sending...' : 'Batch WhatsApp'}</span>
+              <CheckCircle2 size={14} className={batchSending ? 'animate-spin' : ''} />
+              <span>{batchSending ? 'Dispatching...' : 'Complete Payout'}</span>
             </button>
           </div>
         }
@@ -635,7 +625,7 @@ export default function Salary() {
             <div>
               <h2 className="font-bold text-[var(--text-main)]">Employee Compensation & Deductions</h2>
               <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                Manage base salary rates, view attendance lateness & HR deductions, generate payslips, and dispatch via WhatsApp.
+                Manage base salary rates, view attendance lateness & HR deductions, generate payslips, and complete payout via email.
               </p>
             </div>
 
@@ -688,7 +678,7 @@ export default function Salary() {
                     <th className="text-center text-xs font-semibold text-[var(--text-muted)] px-4 py-3">Attendance</th>
                     <th className="text-left text-xs font-semibold text-[var(--text-muted)] px-4 py-3">Deductions</th>
                     <th className="text-left text-xs font-semibold text-[var(--text-muted)] px-4 py-3">Net Payable</th>
-                    <th className="text-center text-xs font-semibold text-[var(--text-muted)] px-4 py-3">WhatsApp</th>
+                    <th className="text-center text-xs font-semibold text-[var(--text-muted)] px-4 py-3">Email Delivery</th>
                     <th className="sticky right-0 bg-[var(--hover-bg)] text-right text-xs font-semibold text-[var(--text-muted)] px-4 py-3 shadow-[-4px_0_6px_rgba(0,0,0,0.06)] z-10">
                       Actions
                     </th>
@@ -807,15 +797,19 @@ export default function Salary() {
                             </span>
                           </td>
 
-                          {/* WhatsApp Status */}
+                          {/* Email Delivery Status */}
                           <td className="px-4 py-3 text-center">
                             {emp.whatsappStatus === 'SENT' ? (
                               <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded-full text-[10px] font-semibold">
-                                <CheckCircle2 size={11} /> Sent
+                                <CheckCircle2 size={11} /> Emailed
                               </span>
                             ) : emp.whatsappStatus === 'FAILED' ? (
                               <span className="inline-flex items-center gap-1 text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 px-2 py-0.5 rounded-full text-[10px] font-semibold">
                                 <ShieldAlert size={11} /> Failed
+                              </span>
+                            ) : emp.whatsappStatus === 'SKIPPED' || !emp.email ? (
+                              <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-full text-[10px] font-semibold">
+                                <AlertTriangle size={11} /> No Email
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 text-[var(--text-muted)] bg-[var(--hover-bg)] px-2 py-0.5 rounded-full text-[10px]">
@@ -847,14 +841,14 @@ export default function Salary() {
                                 <Download size={14} className={downloadingId === emp.id ? 'animate-bounce text-primary-600' : ''} />
                               </button>
 
-                              {/* WhatsApp Dispatch */}
+                              {/* Email Dispatch */}
                               <button
-                                onClick={() => handleSendWhatsApp(emp)}
+                                onClick={() => handleSendEmail(emp)}
                                 disabled={sendingId === emp.id}
-                                className="p-1.5 rounded-xl border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition shadow-sm disabled:opacity-50"
-                                title="Send payslip summary to employee via WhatsApp"
+                                className="p-1.5 rounded-xl border border-blue-300 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition shadow-sm disabled:opacity-50"
+                                title="Email official PDF payslip directly to employee"
                               >
-                                <Send size={14} className={sendingId === emp.id ? 'animate-spin' : ''} />
+                                <Mail size={14} className={sendingId === emp.id ? 'animate-spin' : ''} />
                               </button>
                             </div>
                           </td>
@@ -1007,15 +1001,15 @@ export default function Salary() {
         </div>
       )}
 
-      {/* ── MODAL: PAYDAY & WHATSAPP SETTINGS ── */}
+      {/* ── MODAL: PAYDAY & EMAIL PAYOUT SETTINGS ── */}
       {settingsModalOpen && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border)]">
               <div>
-                <h2 className="text-lg font-bold text-[var(--text-main)]">Payday & WhatsApp Settings</h2>
+                <h2 className="text-lg font-bold text-[var(--text-main)]">Payday & Payout Settings</h2>
                 <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                  Configure the recurring monthly payout schedule and notification channels.
+                  Configure the recurring monthly payout schedule and automated email dispatch.
                 </p>
               </div>
               <button
@@ -1070,7 +1064,7 @@ export default function Salary() {
                 <div>
                   <p className="font-semibold text-sm text-[var(--text-main)]">Enable Automated Payday Processing</p>
                   <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                    Automatically computes penalties, generates PDFs, and triggers WhatsApp on the payout day.
+                    Automatically computes penalties, generates official payslips with performance reviews, and dispatches via email on the payout day.
                   </p>
                 </div>
                 <input
@@ -1086,52 +1080,18 @@ export default function Salary() {
                 />
               </div>
 
-              {/* WhatsApp Provider */}
-              <div>
-                <label className={labelCls}>WhatsApp Delivery Provider</label>
-                <select
-                  value={settingsData.whatsappProvider}
-                  onChange={(e) =>
-                    setSettingsData((prev) => ({ ...prev, whatsappProvider: e.target.value }))
-                  }
-                  className={inputCls}
-                >
-                  <option value="WEB_LINK">WhatsApp Web / Click-to-Chat (1-Click Instant)</option>
-                  <option value="META">Meta WhatsApp Business Cloud API</option>
-                </select>
-              </div>
-
-              {settingsData.whatsappProvider === 'META' && (
-                <div className="space-y-3 p-4 bg-[var(--hover-bg)] rounded-2xl border border-[var(--border)]">
-                  <span className="block text-xs font-semibold text-[var(--text-main)]">
-                    Meta Cloud API Credentials
+              {/* Email Delivery Info Box */}
+              <div className="p-4 bg-[var(--hover-bg)] rounded-2xl border border-[var(--border)] space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <Mail size={16} className="text-primary-600" />
+                  <span className="text-xs font-bold text-[var(--text-main)]">
+                    Automated Email Payout Dispatch
                   </span>
-                  <div>
-                    <label className={labelCls}>Phone Number ID</label>
-                    <input
-                      type="text"
-                      value={settingsData.whatsappPhoneId || ''}
-                      onChange={(e) =>
-                        setSettingsData((prev) => ({ ...prev, whatsappPhoneId: e.target.value }))
-                      }
-                      placeholder="e.g. 104829104820194"
-                      className={inputCls}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Permanent System User Access Token</label>
-                    <input
-                      type="password"
-                      value={settingsData.whatsappApiToken || ''}
-                      onChange={(e) =>
-                        setSettingsData((prev) => ({ ...prev, whatsappApiToken: e.target.value }))
-                      }
-                      placeholder="EAAB..."
-                      className={inputCls}
-                    />
-                  </div>
                 </div>
-              )}
+                <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                  When payout is completed (either manually via <strong>Complete Payout</strong> or automatically on the scheduled payday), official PDF payslips featuring itemized penalty calculations and clickable employee performance review links are automatically emailed to each employee&apos;s registered email address.
+                </p>
+              </div>
             </div>
 
             <div className="flex justify-end gap-3 px-6 pb-6 pt-3 border-t border-[var(--border)]">

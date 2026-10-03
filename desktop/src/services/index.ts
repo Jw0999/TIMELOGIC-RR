@@ -202,11 +202,18 @@ export const updatePayrollSettings = (body: any) =>
 export const calculatePayroll = (body?: { year?: number; month?: number }) =>
   api.post<any>('/payroll/calculate', body || {}).then((r) => r.data ?? r);
 
+export const sendPayslipEmail = (payslipId: string) =>
+  api.post<any>(`/payroll/payslips/${payslipId}/email`, {}).then((r) => r.data ?? r);
+
+export const completePayout = (body: { year: number; month: number }) =>
+  api.post<any>('/payroll/complete-payout', body).then((r) => r.data ?? r);
+
+// Backwards-compatible aliases
 export const sendPayslipWhatsApp = (payslipId: string) =>
-  api.post<any>(`/payroll/payslips/${payslipId}/whatsapp`, {}).then((r) => r.data ?? r);
+  sendPayslipEmail(payslipId);
 
 export const batchSendWhatsApp = (body: { year: number; month: number }) =>
-  api.post<any>('/payroll/batch-whatsapp', body).then((r) => r.data ?? r);
+  completePayout(body);
 
 export const downloadPayslipPdf = async (payslipId: string, fileName = 'payslip.pdf') => {
   const res = await authenticatedFetch(`${API_URL}/payroll/payslips/${payslipId}/pdf`);

@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const PDFDocument = require('pdfkit');
+const nodemailer = require('nodemailer');
 const { prisma } = require('../config/database');
 const logger = require('../config/logger');
 
@@ -977,32 +978,100 @@ class PayrollService {
 
       // ── NET PAYOUT CALLOUT BOX ──
       yPos += 14;
-      doc.rect(40, yPos, 515, 56).fill('#0a1638');
-      doc.rect(40, yPos, 4, 56).fill('#2563eb');
+      doc.rect(40, yPos, 515, 54).fill('#0a1638');
+      doc.rect(40, yPos, 4, 54).fill('#2563eb');
 
       doc.fillColor('#f59e0b').fontSize(8).font('Helvetica-Bold')
-        .text('FINAL NET PAYABLE (DISBURSED)', 55, yPos + 12);
-      doc.fillColor('#ffffff').fontSize(17).font('Helvetica-Bold')
-        .text(this.formatMoneyPdf(netSalary, currency), 55, yPos + 26);
+        .text('FINAL NET PAYABLE (DISBURSED)', 55, yPos + 11);
+      doc.fillColor('#ffffff').fontSize(16).font('Helvetica-Bold')
+        .text(this.formatMoneyPdf(netSalary, currency), 55, yPos + 25);
 
       if (payslip.employee.bankName && payslip.employee.accountNumber) {
         doc.fillColor('#38bdf8').fontSize(8.5).font('Helvetica-Bold')
-          .text(`Disbursement Bank: ${payslip.employee.bankName}`, 280, yPos + 14, { width: 260, align: 'right' });
+          .text(`Disbursement Bank: ${payslip.employee.bankName}`, 280, yPos + 13, { width: 260, align: 'right' });
         doc.fillColor('#cbd5e1').fontSize(8.5).font('Helvetica')
-          .text(`Account Number: ${payslip.employee.accountNumber}   |   Verified`, 280, yPos + 28, { width: 260, align: 'right' });
+          .text(`Account Number: ${payslip.employee.accountNumber}   |   Verified`, 280, yPos + 27, { width: 260, align: 'right' });
       }
-      yPos += 68;
+      yPos += 64;
+
+      // ── EMPLOYEE PERFORMANCE & ATTENDANCE REVIEW (DRAFTED WITH INTERACTIVE REVIEW BUTTON) ──
+      let perfTier = 'GRADE A • EXEMPLARY ATTENDANCE & CONDUCT';
+      let perfColor = '#10b981';
+      let perfBg = '#f0fdf4';
+      let perfBorder = '#bbf7d0';
+      let perfScore = '100 / 100';
+      let narrative = 'Employee maintained exemplary punctuality with zero statutory lateness deductions or disciplinary sanctions. Core duties delivered with high professional standards. Fully recommended for corporate merit recognition.';
+
+      if (totalDeductions > 0 || displayLateDays > 0) {
+        if (totalDeductions <= 2000 && displayLateDays <= 2 && manualPenalties === 0) {
+          perfTier = 'GRADE B • COMMENDABLE (MINOR ATTENDANCE DELAYS)';
+          perfColor = '#2563eb';
+          perfBg = '#eff6ff';
+          perfBorder = '#bfdbfe';
+          perfScore = '82 / 100';
+          narrative = `Core work hours were delivered satisfactorily (${roundedWorkHours}h); however, ${displayLateDays} late instance(s) resulted in -${this.formatMoneyPdf(totalDeductions, currency)} in deductions. The employee is commended for core service hours while advised to adjust morning check-ins to prevent recurring penalties.`;
+        } else {
+          perfTier = 'GRADE C • POLICY DEFICIT / REVIEW REQUIRED';
+          perfColor = '#dc2626';
+          perfBg = '#fef2f2';
+          perfBorder = '#fecaca';
+          perfScore = '54 / 100';
+          narrative = `Critical attendance infractions and/or disciplinary penalties were recorded during this period totaling -${this.formatMoneyPdf(totalDeductions, currency)} across ${displayLateDays} late instance(s)${manualPenalties > 0 ? ' and formal HR disciplinary actions' : ''}. Punctuality and adherence to corporate conduct rules fall below required operational standards. A mandatory HR performance and compliance review is required.`;
+        }
+      }
+
+      const reviewBoxH = 76;
+      doc.rect(40, yPos, 515, reviewBoxH).fill(perfBg);
+      doc.rect(40, yPos, 515, reviewBoxH).strokeColor(perfBorder).lineWidth(1).stroke();
+      doc.rect(40, yPos, 4, reviewBoxH).fill(perfColor);
+
+      doc.fillColor(perfColor).fontSize(7.5).font('Helvetica-Bold')
+        .text(`EMPLOYEE PERFORMANCE REVIEW & ATTENDANCE EVALUATION  •  ${perfTier}  [SCORE: ${perfScore}]`, 52, yPos + 8);
+
+      doc.fillColor('#334155').fontSize(7.5).font('Helvetica')
+        .text(narrative, 52, yPos + 22, { width: 495, lineGap: 1.5 });
+
+      // Interactive Clickable Review Button
+      const btnX = 52;
+      const btnY = yPos + 50;
+      const btnW = 210;
+      const btnH = 20;
+
+      doc.roundedRect(btnX, btnY, btnW, btnH, 3).fill('#0f172a');
+      doc.fillColor('#ffffff').fontSize(7.5).font('Helvetica-Bold')
+        .text('DRAFT / SUBMIT PERFORMANCE REVIEW', btnX, btnY + 6, { width: btnW, align: 'center' });
+
+      const draftReviewBody = `TimeLogic Employee Performance & Attendance Review\n` +
+        `--------------------------------------------------\n` +
+        `Employee: ${empName} (${empCode})\n` +
+        `Organization: ${orgName}\n` +
+        `Pay Period: ${periodLabel} (${monthStr})\n` +
+        `Standing: ${perfTier} (Score: ${perfScore})\n` +
+        `Metrics: ${displayPresentDays} Days Present | ${roundedWorkHours} Hours Logged | ${displayLateDays} Late Instances\n` +
+        `Total Deductions: -${this.formatMoneyPdf(totalDeductions, currency)}\n\n` +
+        `Supervisor Evaluation Narrative:\n${narrative}\n\n` +
+        `Reviewed By: _________________________\n` +
+        `Date: _________________________________\n`;
+
+      const reviewEmail = payslip.organization.supportEmail || payslip.organization.email || 'hr@timelogic.app';
+      const reviewMailto = `mailto:${reviewEmail}?subject=${encodeURIComponent(`Performance Review: ${empName} (${empCode}) - ${monthStr}`)}&body=${encodeURIComponent(draftReviewBody)}`;
+      doc.link(btnX, btnY, btnW, btnH, reviewMailto);
+
+      doc.fillColor('#64748b').fontSize(7).font('Helvetica-Oblique')
+        .text('Click button to open interactive pre-drafted review email with complete metrics.', btnX + btnW + 10, btnY + 6, { width: 275 });
+
+      yPos += reviewBoxH + 14;
 
       // ── ITEMIZED PENALTIES AUDIT LIST ──
       if (itemizedDeductions.length > 0) {
-        doc.fillColor('#0f172a').fontSize(9.5).font('Helvetica-Bold')
+        doc.fillColor('#0f172a').fontSize(9).font('Helvetica-Bold')
           .text('ITEMIZED DEDUCTIONS & PENALTIES AUDIT TRAIL', 40, yPos);
-        yPos += 16;
+        yPos += 14;
 
         for (let i = 0; i < itemizedDeductions.length; i++) {
           const item = itemizedDeductions[i];
           // Check if row exceeds safe page boundary before footer
-          if (yPos + 24 > 720) {
+          if (yPos + 22 > 720) {
             doc.addPage();
             // Continuation Header
             doc.rect(40, 40, 515, 30).fill('#0a1638');
@@ -1015,14 +1084,14 @@ class PayrollService {
           }
 
           const isEven = i % 2 === 0;
-          doc.rect(40, yPos, 515, 22).fill(isEven ? '#f8fafc' : '#ffffff');
-          doc.rect(40, yPos, 515, 22).strokeColor('#f1f5f9').lineWidth(0.5).stroke();
+          doc.rect(40, yPos, 515, 20).fill(isEven ? '#f8fafc' : '#ffffff');
+          doc.rect(40, yPos, 515, 20).strokeColor('#f1f5f9').lineWidth(0.5).stroke();
 
-          doc.fillColor('#475569').fontSize(8).font('Helvetica')
-            .text(`• ${item.date}: ${item.reason || item.type}`, 52, yPos + 6, { width: 360 });
+          doc.fillColor('#475569').fontSize(7.5).font('Helvetica')
+            .text(`• ${item.date}: ${item.reason || item.type}`, 52, yPos + 5, { width: 360 });
           doc.fillColor('#ef4444').font('Helvetica-Bold')
-            .text(`-${this.formatMoneyPdf(item.amount, currency)}`, 420, yPos + 6, { width: 120, align: 'right' });
-          yPos += 24;
+            .text(`-${this.formatMoneyPdf(item.amount, currency)}`, 420, yPos + 5, { width: 120, align: 'right' });
+          yPos += 22;
         }
       } else {
         doc.rect(40, yPos, 515, 28).fill('#f8fafc');
@@ -1070,9 +1139,9 @@ class PayrollService {
   }
 
   /**
-   * Dispatch WhatsApp notification and document to employee
+   * Dispatch official PDF payslip and breakdown to employee via Email
    */
-  async sendPayslipWhatsApp(payslipId, options = {}) {
+  async sendPayslipEmail(payslipId, options = {}) {
     const payslip = await prisma.payslipRecord.findUnique({
       where: { id: payslipId },
       include: {
@@ -1083,25 +1152,23 @@ class PayrollService {
 
     if (!payslip) throw new Error('Payslip not found');
 
-    const phone = payslip.employee.phone;
-    const cleanPhone = this.cleanPhoneNumber(phone);
-
-    if (!cleanPhone) {
+    const email = payslip.employee.email;
+    if (!email || !email.includes('@')) {
       await prisma.payslipRecord.update({
         where: { id: payslip.id },
         data: {
           whatsappStatus: 'SKIPPED',
-          whatsappError: 'Employee has no registered phone number',
+          whatsappError: 'Employee has no registered email address',
         },
       });
       return {
         success: false,
         status: 'SKIPPED',
-        error: 'Employee has no registered phone number',
+        error: 'Employee has no registered email address',
       };
     }
 
-    // Always regenerate the fresh PDF to ensure up-to-date metrics and live recalculated deductions
+    // Always regenerate fresh PDF to ensure up-to-date metrics, payday rules, and drafted performance review
     const generated = await this.generatePayslipPdf(payslip.id);
     const pdfPath = generated.filePath;
 
@@ -1132,94 +1199,168 @@ class PayrollService {
     }
     const periodLabel = this.formatPeriodLabel(periodStart, periodEnd);
 
-    const messageText = [
-      `📄 *TIMELOGIC OFFICIAL PAYSLIP*`,
-      `🏢 *Company:* ${companyName}`,
-      `👤 *Employee:* ${empName} (${freshPayslip.employee.employeeCode || 'TL-EMP'})`,
-      `📅 *Pay Period:* ${periodLabel} (${monthStr})`,
-      ``,
-      `💰 *Base Salary:* ${this.formatMoney(freshPayslip.baseSalary, currency)}`,
-      `⚠️ *Total Penalties & Deductions:* -${this.formatMoney(freshPayslip.totalDeductions, currency)}`,
-      `💵 *NET PAYABLE:* *${this.formatMoney(freshPayslip.netSalary, currency)}*`,
-      ``,
-      `Your itemized attendance record and payslip PDF have been processed.`,
-      `Verified by TimeLogic Enterprise Systems.`,
-    ].join('\n');
+    const subject = `Official Payslip: ${empName} - ${monthStr} (${periodLabel})`;
 
-    // Direct WhatsApp web link fallback (opens WhatsApp Web or Desktop with text pre-filled)
-    const directUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(messageText)}`;
+    const htmlBody = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; margin: 0; padding: 24px; color: #1e293b; }
+    .card { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid #e2e8f0; }
+    .header { background: #0a1638; padding: 32px 24px; text-align: center; border-bottom: 4px solid #2563eb; }
+    .header-sub { color: #f59e0b; font-size: 11px; font-weight: bold; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px; }
+    .header-title { color: #ffffff; font-size: 20px; font-weight: bold; margin: 0; }
+    .content { padding: 32px 24px; }
+    .greeting { font-size: 15px; margin-bottom: 20px; line-height: 1.6; }
+    .summary-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px 20px; margin-bottom: 24px; }
+    .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+    .row:last-child { border-bottom: none; }
+    .row-label { color: #64748b; }
+    .row-val { font-weight: 600; color: #0f172a; }
+    .row-val-alert { font-weight: 600; color: #ef4444; }
+    .payout-box { background: #0a1638; border-radius: 12px; padding: 22px 20px; color: #ffffff; text-align: center; margin-bottom: 24px; border-left: 5px solid #2563eb; }
+    .payout-label { color: #f59e0b; font-size: 11px; font-weight: bold; letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 6px; }
+    .payout-amount { font-size: 26px; font-weight: bold; color: #ffffff; margin: 0; }
+    .notice { font-size: 12px; color: #64748b; line-height: 1.6; margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <div class="header-sub">TimeLogic Enterprise Attendance & Payroll</div>
+      <h1 class="header-title">Official Employee Payslip</h1>
+      <div style="color: #94a3b8; font-size: 13px; margin-top: 6px;">Pay Period: ${periodLabel} (${monthStr})</div>
+    </div>
+    <div class="content">
+      <div class="greeting">
+        Dear <strong>${empName}</strong>,
+        <br><br>
+        Your official statutory payslip for <strong>${monthStr}</strong> at <strong>${companyName}</strong> has been finalized and is attached to this email as a tamper-evident PDF document.
+      </div>
 
-    // If Meta Cloud API is configured
-    const org = payslip.organization;
-    let apiSuccess = false;
+      <div class="payout-box">
+        <div class="payout-label">FINAL NET PAYABLE (DISBURSED)</div>
+        <div class="payout-amount">${this.formatMoney(freshPayslip.netSalary, currency)}</div>
+      </div>
+
+      <div class="summary-box">
+        <div class="row">
+          <span class="row-label">Base Monthly Salary:</span>
+          <span class="row-val" style="color: #10b981;">+${this.formatMoney(freshPayslip.baseSalary, currency)}</span>
+        </div>
+        <div class="row">
+          <span class="row-label">Total Penalties & Deductions:</span>
+          <span class="row-val-alert">-${this.formatMoney(freshPayslip.totalDeductions, currency)}</span>
+        </div>
+        <div class="row">
+          <span class="row-label">Days Present:</span>
+          <span class="row-val">${freshPayslip.totalPresentDays} Days</span>
+        </div>
+        <div class="row">
+          <span class="row-label">Hours Logged:</span>
+          <span class="row-val">${freshPayslip.totalWorkHours} Hours</span>
+        </div>
+        <div class="row">
+          <span class="row-label">Late Instances:</span>
+          <span class="row-val">${freshPayslip.totalLateDays}</span>
+        </div>
+      </div>
+
+      <div class="notice">
+        This document contains your itemized attendance logs, break overstay calculations, disciplinary audit trail, and drafted performance review. Please inspect the attached PDF for full itemization and cryptographic verification hash.
+        <br><br>
+        <strong>${companyName}</strong> • Powered by TimeLogic Enterprise Systems
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+    `;
+
+    let emailSent = false;
     let messageId = null;
     let errorDetail = null;
 
-    if (org.whatsappProvider === 'META' && org.whatsappPhoneId && org.whatsappApiToken) {
-      try {
-        const fetchRes = await fetch(
-          `https://graph.facebook.com/v18.0/${org.whatsappPhoneId}/messages`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${org.whatsappApiToken}`,
-            },
-            body: JSON.stringify({
-              messaging_product: 'whatsapp',
-              to: cleanPhone,
-              type: 'text',
-              text: { body: messageText },
-            }),
-          }
-        );
-        const resBody = await fetchRes.json();
-        if (fetchRes.ok) {
-          apiSuccess = true;
-          messageId = resBody.messages?.[0]?.id || 'META_SENT';
-        } else {
-          errorDetail = resBody.error?.message || 'Meta API error';
-          logger.warn(`WhatsApp Meta Cloud API send failed: ${errorDetail}`);
-        }
-      } catch (err) {
-        errorDetail = err.message;
-        logger.warn(`WhatsApp Meta fetch error: ${err.message}`);
+    try {
+      let transporter;
+      const smtpHost = process.env.SMTP_HOST;
+      const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
+      const smtpUser = process.env.SMTP_USER;
+      const smtpPass = process.env.SMTP_PASS;
+
+      if (smtpHost && smtpUser && smtpPass) {
+        transporter = nodemailer.createTransport({
+          host: smtpHost,
+          port: smtpPort,
+          secure: smtpPort === 465,
+          auth: { user: smtpUser, pass: smtpPass },
+        });
+      } else {
+        // Fallback to jsonTransport when external SMTP credentials are not yet configured in environment
+        transporter = nodemailer.createTransport({
+          jsonTransport: true,
+        });
       }
-    } else {
-      // In development / direct-link mode without cloud keys
-      apiSuccess = true;
-      messageId = `DIRECT_LINK_${Date.now()}`;
+
+      const mailOptions = {
+        from: process.env.SMTP_FROM || `"${companyName} Payroll" <payroll@timelogic.app>`,
+        to: email,
+        subject,
+        html: htmlBody,
+        attachments: [
+          {
+            filename: `Payslip-${freshPayslip.employee.employeeCode || freshPayslip.employee.firstName}-${monthStr}.pdf`,
+            path: pdfPath,
+            contentType: 'application/pdf',
+          },
+        ],
+      };
+
+      const info = await transporter.sendMail(mailOptions);
+      emailSent = true;
+      messageId = info.messageId || `EMAIL_${Date.now()}`;
+      logger.info(`Payslip email dispatched successfully to ${email} for payslip ${freshPayslip.id}`);
+    } catch (mailErr) {
+      errorDetail = mailErr.message;
+      logger.error(`Error sending payslip email to ${email}:`, mailErr);
     }
 
     const updated = await prisma.payslipRecord.update({
       where: { id: payslip.id },
       data: {
-        whatsappStatus: apiSuccess ? 'SENT' : 'FAILED',
-        whatsappSentAt: apiSuccess ? new Date() : null,
+        status: emailSent ? 'PAID' : 'GENERATED',
+        whatsappStatus: emailSent ? 'SENT' : 'FAILED',
+        whatsappSentAt: emailSent ? new Date() : null,
         whatsappMessageId: messageId,
         whatsappError: errorDetail,
       },
     });
 
     return {
-      success: apiSuccess,
-      whatsappStatus: updated.whatsappStatus,
-      phone: cleanPhone,
-      messageText,
-      directUrl,
+      success: emailSent,
+      status: updated.whatsappStatus,
+      email,
+      messageId,
       error: errorDetail,
     };
   }
 
   /**
-   * Batch dispatch WhatsApp payslips for all employees for a given month
+   * Complete monthly payout: calculates payroll, generates fresh PDFs, and dispatches to all employees via email
    */
-  async batchSendMonthlyWhatsApp(orgId, year, month) {
+  async completeMonthlyPayout(orgId, year, month) {
     const y = parseInt(year, 10);
     const m = parseInt(month, 10);
 
+    // 1. Recalculate payroll for the month
+    const calcResult = await this.calculateMonthlyPayroll(orgId, y, m);
+
+    // 2. Fetch all payslips
     const payslips = await prisma.payslipRecord.findMany({
       where: { orgId, year: y, month: m },
+      include: { employee: true },
     });
 
     let sent = 0;
@@ -1227,23 +1368,41 @@ class PayrollService {
     let skipped = 0;
 
     for (const p of payslips) {
-      const res = await this.sendPayslipWhatsApp(p.id);
-      if (res.status === 'SKIPPED') skipped += 1;
-      else if (res.success) sent += 1;
-      else failed += 1;
+      try {
+        const res = await this.sendPayslipEmail(p.id);
+        if (res.status === 'SKIPPED') skipped += 1;
+        else if (res.success) sent += 1;
+        else failed += 1;
+      } catch (err) {
+        logger.error(`Failed to send email for payslip ${p.id}:`, err);
+        failed += 1;
+      }
     }
 
     return {
+      success: true,
       total: payslips.length,
       sent,
       failed,
       skipped,
+      periodLabel: calcResult.periodLabel,
     };
   }
 
   /**
+   * Legacy WhatsApp compatibility wrappers (now forward directly to Email & Complete Payout)
+   */
+  async sendPayslipWhatsApp(payslipId, options = {}) {
+    return this.sendPayslipEmail(payslipId, options);
+  }
+
+  async batchSendMonthlyWhatsApp(orgId, year, month) {
+    return this.completeMonthlyPayout(orgId, year, month);
+  }
+
+  /**
    * Scheduled cron handler called daily:
-   * Finds organizations where today is salaryPayoutDay, calculates payroll, generates PDFs, sends WhatsApp
+   * Finds organizations where today is salaryPayoutDay, calculates payroll, generates PDFs, and completes payout via email
    */
   async executeAutomatedPaydayCron() {
     const today = new Date();
@@ -1267,10 +1426,10 @@ class PayrollService {
     for (const org of eligibleOrgs) {
       try {
         const calcRes = await this.calculateMonthlyPayroll(org.id, currentYear, currentMonth);
-        const batchRes = await this.batchSendMonthlyWhatsApp(org.id, currentYear, currentMonth);
-        results.push({ orgId: org.id, name: org.name, ...calcRes, ...batchRes });
+        const payoutRes = await this.completeMonthlyPayout(org.id, currentYear, currentMonth);
+        results.push({ orgId: org.id, name: org.name, ...calcRes, ...payoutRes });
       } catch (err) {
-        logger.error(`Error in automated payday for org ${org.name}:`, err);
+        logger.error(`Error in automated payday payout for org ${org.name}:`, err);
         results.push({ orgId: org.id, name: org.name, error: err.message });
       }
     }

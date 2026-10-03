@@ -98,21 +98,43 @@ router.get(
 );
 
 /**
- * POST /api/payroll/payslips/:id/whatsapp
- * Dispatch WhatsApp payslip notification to employee
+ * POST /api/payroll/payslips/:id/email
+ * Dispatch official payslip PDF to employee via email
+ */
+router.post(
+  '/payslips/:id/email',
+  isAdmin,
+  [param('id').isUUID()],
+  validate,
+  ctrl.sendEmail
+);
+
+/**
+ * POST /api/payroll/complete-payout
+ * Finalize monthly payout and dispatch official payslip PDFs to all employees via email
+ */
+router.post(
+  '/complete-payout',
+  isAdmin,
+  [
+    body('year').isInt({ min: 2020, max: 2100 }),
+    body('month').isInt({ min: 1, max: 12 }),
+  ],
+  validate,
+  ctrl.completePayout
+);
+
+/**
+ * Legacy aliases for backwards compatibility
  */
 router.post(
   '/payslips/:id/whatsapp',
   isAdmin,
   [param('id').isUUID()],
   validate,
-  ctrl.sendWhatsApp
+  ctrl.sendEmail
 );
 
-/**
- * POST /api/payroll/batch-whatsapp
- * Batch dispatch WhatsApp payslips to all employees for a given month
- */
 router.post(
   '/batch-whatsapp',
   isAdmin,
@@ -121,7 +143,7 @@ router.post(
     body('month').isInt({ min: 1, max: 12 }),
   ],
   validate,
-  ctrl.batchSendWhatsApp
+  ctrl.completePayout
 );
 
 module.exports = router;
