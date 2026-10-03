@@ -3,10 +3,12 @@ const { validationResult } = require('express-validator');
 function validate(req, res, next) {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    const errorArray = errors.array().map((e) => ({ field: e.path, message: e.msg }));
+    const primaryMessage = errorArray[0]?.message || 'Validation failed';
     return res.status(422).json({
       success: false,
-      message: 'Validation failed',
-      errors: errors.array().map((e) => ({ field: e.path, message: e.msg })),
+      message: primaryMessage,
+      errors: errorArray,
     });
   }
   next();

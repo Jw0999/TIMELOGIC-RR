@@ -164,7 +164,7 @@ const updateUser = async (req, res, next) => {
   try {
     // Tenant isolation: the target must belong to the admin's own organization
     const target = await prisma.user.findUnique({
-      where: { id: req.params.userId }, select: { orgId: true, role: true },
+      where: { id: req.params.userId }, select: { orgId: true, role: true, email: true },
     });
     if (!target || target.orgId !== req.user.orgId) {
       return res.status(404).json({ success: false, message: 'User not found' });
@@ -173,7 +173,33 @@ const updateUser = async (req, res, next) => {
       return res.status(403).json({ success: false, message: 'Only employee accounts can be modified here.' });
     }
 
-    const { firstName, lastName, status, departmentId, officeId, shiftType, checkInMethod, phone } = req.body;
+    const { firstName, lastName, email, password, phone, status, departmentId, officeId, shiftType, checkInMethod } = req.body;
+
+    let cleanEmail;
+    if (email !== undefined && email !== null) {
+      cleanEmail = String(email).trim().toLowerCase();
+      if (!cleanEmail) {
+        return res.status(400).json({ success: false, message: 'Email address cannot be empty.' });
+      }
+      if (cleanEmail !== target.email.toLowerCase()) {
+        const existing = await prisma.user.findFirst({
+          where: {
+            email: { equals: cleanEmail, mode: 'insensitive' },
+            id: { not: req.params.userId },
+          },
+          select: { id: true },
+        });
+        if (existing) {
+          return res.status(409).json({ success: false, message: 'An account with this email address already exists.' });
+        }
+      }
+    }
+
+    let passwordHash;
+    if (password !== undefined && password !== null && String(password).trim().length > 0) {
+      passwordHash = await bcrypt.hash(String(password).trim(), +(env.BCRYPT_ROUNDS || 12));
+    }
+
     if (departmentId) {
       const department = await prisma.department.findFirst({
         where: { id: departmentId, orgId: req.user.orgId }, select: { id: true },
@@ -202,24 +228,36 @@ const updateUser = async (req, res, next) => {
         return res.status(409).json({ success: false, message: 'Check this employee out before changing their check-in method.' });
       }
     }
+
+    const cleanPhone = phone !== undefined ? (phone ? String(phone).trim() : null) : undefined;
+
     const user = await prisma.user.update({
       where: { id: req.params.userId },
       data: {
-        ...(firstName !== undefined ? { firstName } : {}),
-        ...(lastName !== undefined ? { lastName } : {}),
+        ...(firstName !== undefined ? { firstName: String(firstName).trim() } : {}),
+        ...(lastName !== undefined ? { lastName: String(lastName).trim() } : {}),
+        ...(cleanEmail !== undefined ? { email: cleanEmail } : {}),
+        ...(passwordHash ? { passwordHash } : {}),
+        ...(cleanPhone !== undefined ? { phone: cleanPhone } : {}),
         ...(status !== undefined ? { status } : {}),
         ...(departmentId !== undefined ? { departmentId: departmentId || null } : {}),
         ...(officeId !== undefined ? { officeId: officeId || null } : {}),
         ...(shiftType !== undefined ? { shiftType } : {}),
         ...(allowedMethod !== undefined ? { checkInMethod: allowedMethod } : {}),
-        ...(phone !== undefined ? { phone: phone || null } : {}),
       },
       select: {
         id: true, firstName: true, lastName: true, email: true, role: true, status: true,
-        checkInMethod: true, phone: true, shiftType: true, officeId: true,
+        checkInMethod: true, phone: true, shiftType: true, officeId: true, departmentId: true,
+        department: { select: { id: true, name: true } },
         office: { select: { id: true, name: true } },
       },
     });
+
+    if (passwordHash || cleanEmail) {
+      await prisma.refreshToken.deleteMany({ where: { userId: req.params.userId } }).catch(() => {});
+      await redis.set(`tl:revoked:${req.params.userId}`, String(Date.now()), 'EX', 86400 * 7).catch(() => {});
+    }
+
     res.json({ success: true, data: user });
   } catch (err) { next(err); }
 };

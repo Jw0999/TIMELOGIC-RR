@@ -115,7 +115,11 @@ function AddEmployeeModal({ depts, offices, organization, onClose, onSaved }: { 
             <div><label className={labelCls}>Last Name *</label><input className={inputCls} value={form.lastName} onChange={(e) => up('lastName', e.target.value)} placeholder="Last name" /></div>
           </div>
           <div><label className={labelCls}>Work Email *</label><input className={inputCls} type="email" value={form.email} onChange={(e) => up('email', e.target.value)} placeholder="employee@company.com" /></div>
-          <div><label className={labelCls}>Password * (min 8 chars)</label><input className={inputCls} type="password" value={form.password} onChange={(e) => up('password', e.target.value)} placeholder="Employee login password" /></div>
+          <div>
+            <label className={labelCls}>Password / PIN *</label>
+            <input className={inputCls} type="password" value={form.password} onChange={(e) => up('password', e.target.value)} placeholder="e.g. 1234 or personal password" />
+            <p className="text-[11px] text-[var(--text-muted)] mt-1">Can be numbers only (e.g. 1234) or any personal password.</p>
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div><label className={labelCls}>Employee Code</label><input className={inputCls} value={form.employeeCode} onChange={(e) => up('employeeCode', e.target.value)} placeholder="e.g. EMP002" /></div>
             <div><label className={labelCls}>Phone</label><input className={inputCls} value={form.phone} onChange={(e) => up('phone', e.target.value)} placeholder="+234..." /></div>
@@ -179,6 +183,11 @@ function EditCheckInMethodModal({
 }) {
   const methods = availableMethods(organization);
   const current = employee.checkInMethod as EmployeeCheckInMethod | undefined;
+  const [firstName, setFirstName] = useState(employee.firstName ?? '');
+  const [lastName, setLastName] = useState(employee.lastName ?? '');
+  const [email, setEmail] = useState(employee.email ?? '');
+  const [phone, setPhone] = useState(employee.phone ?? '');
+  const [password, setPassword] = useState('');
   const [departmentId, setDepartmentId] = useState(employee.departmentId ?? '');
   const [officeId, setOfficeId] = useState(employee.officeId ?? employee.office?.id ?? (offices[0]?.id || ''));
   const [shiftType, setShiftType] = useState(employee.shiftType ?? 'FULL_TIME');
@@ -198,10 +207,19 @@ function EditCheckInMethodModal({
   };
 
   const save = async () => {
+    if (!email.trim()) {
+      setError('Work email is required.');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
       await updateEmployee(employee.id, {
+        firstName: firstName.trim() || undefined,
+        lastName: lastName.trim() || undefined,
+        email: email.trim().toLowerCase(),
+        phone: phone.trim() ? phone.trim() : undefined,
+        password: password.trim() ? password.trim() : undefined,
         checkInMethod: method,
         departmentId: departmentId || undefined,
         officeId: officeId || undefined,
@@ -209,42 +227,74 @@ function EditCheckInMethodModal({
       });
       onSaved();
       onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not update the employee.');
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err?.message || 'Could not update the employee.');
     } finally {
       setLoading(false);
     }
   };
 
-  const inputCls = 'w-full border border-[var(--input-border)] bg-[var(--input-bg)] text-[var(--text-main)] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
+  const inputCls = 'w-full border border-[var(--input-border)] bg-[var(--input-bg)] text-[var(--text-main)] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 placeholder-[var(--text-muted)]';
   const labelCls = 'block text-xs font-semibold text-[var(--text-muted)] mb-1.5';
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border)]">
           <div>
-            <h2 className="text-lg font-bold text-[var(--text-main)]">Edit Employee Settings</h2>
-            <p className="text-xs text-[var(--text-muted)] mt-0.5">{employee.firstName} {employee.lastName}</p>
+            <h2 className="text-lg font-bold text-[var(--text-main)]">Edit Employee Details & Settings</h2>
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">{employee.firstName} {employee.lastName} ({employee.employeeCode || 'No Code'})</p>
           </div>
-          <button onClick={onClose} className="text-[var(--text-muted)]"><X size={20} /></button>
+          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-main)]"><X size={20} /></button>
         </div>
         <div className="p-6 space-y-4">
           {error && <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm text-red-700 dark:text-red-400">{error}</div>}
-          
-          <div>
-            <label className={labelCls}>Assigned Office *</label>
-            <select value={officeId} onChange={(e) => setOfficeId(e.target.value)} className={inputCls}>
-              {offices.map((office) => <option key={office.id} value={office.id}>{office.name}</option>)}
-            </select>
-            <p className="text-[11px] text-[var(--text-muted)] mt-1">Isolates check-in sessions and absence reconciliation to this office.</p>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>First Name *</label>
+              <input className={inputCls} value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" />
+            </div>
+            <div>
+              <label className={labelCls}>Last Name *</label>
+              <input className={inputCls} value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" />
+            </div>
           </div>
 
           <div>
-            <label className={labelCls}>Shift Type *</label>
-            <select value={shiftType} onChange={(e) => setShiftType(e.target.value)} className={inputCls}>
-              {SHIFTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-            </select>
+            <label className={labelCls}>Work Email *</label>
+            <input className={inputCls} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="employee@company.com" />
+            <p className="text-[11px] text-[var(--text-muted)] mt-1">Used for Kiosk station identification, login, and official payslips.</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Phone Number</label>
+              <input className={inputCls} type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="e.g. +234..." />
+              <p className="text-[11px] text-[var(--text-muted)] mt-1">Used for WhatsApp payslip delivery.</p>
+            </div>
+            <div>
+              <label className={labelCls}>New Password / PIN</label>
+              <input className={inputCls} type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Keep blank to retain" />
+              <p className="text-[11px] text-[var(--text-muted)] mt-1">Any format (numbers only, PIN, or text).</p>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Assigned Office *</label>
+              <select value={officeId} onChange={(e) => setOfficeId(e.target.value)} className={inputCls}>
+                {offices.map((office) => <option key={office.id} value={office.id}>{office.name}</option>)}
+              </select>
+              <p className="text-[11px] text-[var(--text-muted)] mt-1">Isolates check-in sessions to this office.</p>
+            </div>
+
+            <div>
+              <label className={labelCls}>Shift Type *</label>
+              <select value={shiftType} onChange={(e) => setShiftType(e.target.value)} className={inputCls}>
+                {SHIFTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+            </div>
           </div>
 
           <div>

@@ -99,10 +99,15 @@ router.post('/departments', authenticate, isAdmin, [
 // Users / Employees
 router.get('/users', authenticate, isAdmin, ctrl.listUsers);
 router.put('/users/:userId', authenticate, isAdmin, [
-  body('checkInMethod').optional().isIn(['PHONE', 'MANUAL', 'BOTH']),
-  body('officeId').optional({ nullable: true }).isUUID(),
-  body('shiftType').optional().isIn(['FULL_TIME', 'MORNING', 'EVENING', 'AFTERNOON', 'NIGHT', 'FLEXIBLE']),
+  body('email').optional().isEmail().withMessage('Valid email address is required').normalizeEmail(),
+  body('password').optional({ checkFalsy: true }).isLength({ min: 1 }).withMessage('Password cannot be empty'),
   body('phone').optional({ nullable: true }).isString(),
+  body('firstName').optional().trim().notEmpty().withMessage('First name cannot be empty'),
+  body('lastName').optional().trim().notEmpty().withMessage('Last name cannot be empty'),
+  body('departmentId').optional({ nullable: true }),
+  body('checkInMethod').optional().isIn(['PHONE', 'MANUAL', 'BOTH']),
+  body('officeId').optional({ nullable: true }),
+  body('shiftType').optional().isIn(['FULL_TIME', 'MORNING', 'EVENING', 'AFTERNOON', 'NIGHT', 'FLEXIBLE']),
 ], validate, ctrl.updateUser);
 router.get('/users/:userId/summary', authenticate, isAdmin, ctrl.employeeSummary);
 router.put('/users/:userId/suspend', authenticate, isAdmin, ctrl.suspendUser);
@@ -197,27 +202,27 @@ router.get('/notifications', authenticate, isAdmin, ctrl.getNotifications);
 // Station Password for PWA 2.0 (configured by Desktop Admin)
 router.get('/station-password', authenticate, isAdmin, ctrl.getStationPasswordStatus);
 router.put('/station-password', authenticate, isAdmin, [
-  body('stationPassword').isLength({ min: 6 }).withMessage('Station password must be at least 6 characters'),
+  body('stationPassword').isLength({ min: 4 }).withMessage('Station password must be at least 4 characters or digits'),
 ], validate, ctrl.setStationPassword);
 
 // Kiosk Devices & Hardware Binding
 router.get('/kiosk-devices', authenticate, isAdmin, ctrl.getKioskDevices);
 router.put('/kiosk-devices/:id/release', authenticate, isAdmin, ctrl.releaseKioskDevice);
 
-const { validateStrongPassword } = require('../utils/passwordPolicy');
+const { validateEmployeePassword } = require('../utils/passwordPolicy');
 
-// Create an employee user
+// Create an employee user (employees can use ANY type of password, including numbers only)
 router.post('/employees', authenticate, isAdmin, [
-  body('firstName').notEmpty(),
-  body('lastName').notEmpty(),
-  body('email').isEmail().normalizeEmail(),
+  body('firstName').notEmpty().withMessage('First name is required'),
+  body('lastName').notEmpty().withMessage('Last name is required'),
+  body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
   body('password').custom((val) => {
-    const check = validateStrongPassword(val);
+    const check = validateEmployeePassword(val);
     if (!check.valid) throw new Error(check.message);
     return true;
   }),
   body('checkInMethod').optional().isIn(['PHONE', 'MANUAL', 'BOTH']),
-  body('officeId').optional({ nullable: true }).isUUID(),
+  body('officeId').optional({ nullable: true }),
   body('shiftType').optional().isIn(['FULL_TIME', 'MORNING', 'EVENING', 'AFTERNOON', 'NIGHT', 'FLEXIBLE']),
   body('phone').optional({ nullable: true }).isString(),
 ], validate, ctrl.createEmployee);

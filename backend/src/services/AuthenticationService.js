@@ -380,13 +380,21 @@ class AuthenticationService {
       throw Object.assign(new Error('Invalid password reset token for this email.'), { status: 400 });
     }
 
-    if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 8) {
-      throw Object.assign(new Error('Password must be at least 8 characters long.'), { status: 400 });
-    }
-
     const user = await prisma.user.findUnique({ where: { id: payload.sub } });
     if (!user || user.status !== 'ACTIVE') {
       throw Object.assign(new Error('Account not found or inactive.'), { status: 404 });
+    }
+
+    if (user.role === 'SUPER_ADMIN' || user.role === 'ADMIN') {
+      const { validateStrongPassword } = require('../utils/passwordPolicy');
+      const check = validateStrongPassword(newPassword);
+      if (!check.valid) {
+        throw Object.assign(new Error(check.message), { status: 400 });
+      }
+    } else {
+      if (!newPassword || typeof newPassword !== 'string' || newPassword.trim().length === 0) {
+        throw Object.assign(new Error('Password is required.'), { status: 400 });
+      }
     }
 
     const hash = await bcrypt.hash(newPassword, env.BCRYPT_ROUNDS || 12);

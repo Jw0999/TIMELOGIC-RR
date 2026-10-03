@@ -21,9 +21,15 @@ router.post('/refresh',         [body('refreshToken').notEmpty()], validate, ctr
 router.get('/me',               authenticate, ctrl.me);
 router.put('/change-password',  authenticate, [
   body('currentPassword').notEmpty().withMessage('Current password is required'),
-  body('newPassword').custom((val) => {
-    const check = validateStrongPassword(val);
-    if (!check.valid) throw new Error(check.message);
+  body('newPassword').custom((val, { req }) => {
+    if (req.user && (req.user.role === 'SUPER_ADMIN' || req.user.role === 'ADMIN')) {
+      const check = validateStrongPassword(val);
+      if (!check.valid) throw new Error(check.message);
+    } else {
+      if (!val || typeof val !== 'string' || val.trim().length === 0) {
+        throw new Error('New password is required');
+      }
+    }
     return true;
   }),
 ], validate, ctrl.changePassword);
@@ -39,11 +45,7 @@ router.post('/forgot-password/verify', authLimiter, [
 router.post('/forgot-password/reset', authLimiter, [
   body('email').isEmail().withMessage('A valid email address is required').normalizeEmail(),
   body('resetToken').notEmpty().withMessage('Reset token is required'),
-  body('newPassword').custom((val) => {
-    const check = validateStrongPassword(val);
-    if (!check.valid) throw new Error(check.message);
-    return true;
-  }),
+  body('newPassword').notEmpty().withMessage('New password is required'),
 ], validate, ctrl.resetPasswordWithToken);
 
 module.exports = router;
