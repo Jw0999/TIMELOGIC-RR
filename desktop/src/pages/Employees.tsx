@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Search, UserPlus, Smartphone, X, Eye, Camera, Pencil, Settings2, AlertTriangle } from 'lucide-react';
+import { Search, UserPlus, Smartphone, X, Eye, Camera, Pencil, Settings2, AlertTriangle, Trash2 } from 'lucide-react';
 import Header from '../components/Header';
-import { fetchEmployees, createEmployee, updateEmployee, suspendUser, activateUser, deleteEmployee, resetDevice, fetchDepartments, fetchEmployeeSummary, fetchAdminOrg, fetchPlanInfo } from '../services';
+import { fetchEmployees, createEmployee, updateEmployee, suspendUser, activateUser, deleteEmployee, releaseEmployeeFace, resetDevice, fetchDepartments, fetchEmployeeSummary, fetchAdminOrg, fetchPlanInfo } from '../services';
 import { API_URL, SOCKET_URL } from '../config';
 import { getToken, authenticatedFetch } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -333,6 +333,7 @@ function EmployeeDetailModal({ emp: initialEmp, onClose, onRefresh }: { emp: any
   const [emp, setEmp] = useState(initialEmp);
   const [summary, setSummary] = useState<{ totalPenalty: number; attendancePenalty?: number; breakPenalty?: number; attendanceCount: number } | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [releasing, setReleasing] = useState(false);
   const [imgError, setImgError] = useState(false);
   // Stable cache-bust version — only increments when a new photo is uploaded
   const [imgVersion, setImgVersion] = useState(1);
@@ -366,7 +367,7 @@ function EmployeeDetailModal({ emp: initialEmp, onClose, onRefresh }: { emp: any
         setImgVersion((v) => v + 1);  // force browser to re-fetch the new image
         setEmp((p: any) => ({ ...p, profileImageUrl: data.data.profileImageUrl }));
         onRefresh();
-        alert('✓ Face photo saved. It is stored for display and can be uploaded normally.');
+        alert('✓ Face photo enrolled and locked. This biometric is now active for station check-ins.');
       } else {
         alert(`Upload failed: ${data.message ?? 'Unknown error'}`);
       }
@@ -374,6 +375,79 @@ function EmployeeDetailModal({ emp: initialEmp, onClose, onRefresh }: { emp: any
       alert(`Upload error: ${err?.message ?? 'Network error — is the backend running?'}`);
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleReleaseFace = async () => {
+    if (!window.confirm(
+      `Release face photo for ${emp.firstName} ${emp.lastName}?\n\n` +
+      `This will clear their stored biometric face data and unlock the face enrollment slot so a new face photo can be registered.\n\n` +
+      `Once a new photo is enrolled, it will automatically lock again.`
+    )) return;
+
+    setReleasing(true);
+    try {
+      await releaseEmployeeFace(emp.id);
+      setEmp((p: any) => ({ ...p, profileImageUrl: null }));
+      setImgError(false);
+      onRefresh();
+      alert(`✓ Face photo released for ${emp.firstName} ${emp.lastName}. Face enrollment is now open.`);
+    } catch (err: any) {
+      alert(`Failed to release face: ${err?.response?.data?.message || err?.message || 'Unknown error'}`);
+    } finally {
+      setReleasing(false);
+    }
+  };
+
+  const captureFromCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+      const video = document.createElement('video');
+      video.srcObject = stream;
+      video.playsInline = true;
+      video.muted = true;
+      await video.play();
+
+      const overlay = document.createElement('div');
+      overlay.innerHTML = `
+        <div style="position:fixed; inset:0; background:rgba(0,0,0,0.8); display:flex; align-items:center; justify-content:center; z-index:999999; font-family:Arial,sans-serif;">
+          <div style="background:#111827; border-radius:18px; padding:18px; text-align:center; color:#fff; width:min(90vw, 460px);">
+            <div style="font-size:13px; letter-spacing:0.12em; text-transform:uppercase; color:#cbd5e1; margin-bottom:10px;">Capture face</div>
+            <div id="camera-countdown" style="font-size:42px; font-weight:700; margin-bottom:12px;">5</div>
+            <video id="camera-video" autoplay playsinline muted style="width:100%; max-width:360px; border-radius:12px; display:block; margin:0 auto 12px; background:#000;"></video>
+            <button id="camera-cancel" style="border:1px solid rgba(255,255,255,0.15); background:transparent; color:#fff; border-radius:10px; padding:8px 14px; cursor:pointer;">Cancel</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      const countdown = overlay.querySelector('#camera-countdown') as HTMLElement;
+      const cameraVideo = overlay.querySelector('#camera-video') as HTMLVideoElement;
+      const cancelButton = overlay.querySelector('#camera-cancel') as HTMLButtonElement;
+      cameraVideo.srcObject = stream;
+
+      const cleanup = () => { stream.getTracks().forEach((track) => track.stop()); overlay.remove(); };
+      let cancelled = false;
+      cancelButton.addEventListener('click', () => { cancelled = true; cleanup(); }, { once: true });
+
+      for (let sec = 5; sec >= 1; sec -= 1) {
+        if (cancelled) throw new Error('Camera capture was cancelled.');
+        countdown.textContent = String(sec);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 640;
+      canvas.height = 480;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('The browser could not process the face photo.');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+      cleanup();
+      const blob = await fetch(dataUrl).then((res) => res.blob());
+      await uploadFace(new File([blob], `${emp.id}-face.jpg`, { type: 'image/jpeg' }));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Camera capture failed.');
     }
   };
 
@@ -385,7 +459,7 @@ function EmployeeDetailModal({ emp: initialEmp, onClose, onRefresh }: { emp: any
     { label: 'Check-In Method',    value: METHOD_LABEL[(emp.checkInMethod as EmployeeCheckInMethod) ?? 'PHONE'] ?? emp.checkInMethod ?? '—' },
     { label: 'Role',               value: emp.role },
     { label: 'Status',             value: emp.status },
-    { label: 'Face Registered',    value: emp.profileImageUrl ? '✓ Yes' : '✗ No (required for check-in)' },
+    { label: 'Face Registered',    value: emp.profileImageUrl ? '✓ Yes (Locked)' : '✗ No (Enrollment Open)' },
     { label: 'Last Login',         value: emp.lastLoginAt ? new Date(emp.lastLoginAt).toLocaleString() : 'Never' },
     { label: 'Joined',             value: new Date(emp.createdAt).toLocaleDateString('en-GB') },
     { label: 'Registered Devices', value: String(emp._count?.devices ?? 0) },
@@ -417,17 +491,37 @@ function EmployeeDetailModal({ emp: initialEmp, onClose, onRefresh }: { emp: any
                   <span className="text-xl font-bold text-primary-700">{emp.firstName?.[0]}{emp.lastName?.[0]}</span>
                 </div>
               )}
-              <button onClick={() => fileRef.current?.click()}
-                className="absolute -bottom-1 -right-1 w-6 h-6 bg-primary-700 rounded-full flex items-center justify-center text-white hover:bg-primary-800"
-                title="Upload face photo">
-                <Camera size={12} />
-              </button>
+              {emp.profileImageUrl ? (
+                <button
+                  type="button"
+                  onClick={handleReleaseFace}
+                  disabled={releasing}
+                  className="absolute -bottom-1 -right-1 w-6 h-6 bg-rose-600 rounded-full flex items-center justify-center text-white hover:bg-rose-700 shadow-md transition"
+                  title="Release face photo (clears face and unlocks enrollment)">
+                  <Trash2 size={12} />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={uploading}
+                  className="absolute -bottom-1 -right-1 w-6 h-6 bg-primary-700 rounded-full flex items-center justify-center text-white hover:bg-primary-800 shadow-md transition"
+                  title="Upload face photo">
+                  <Camera size={12} />
+                </button>
+              )}
             </div>
-            <div>
+            <div className="flex-1">
               <h3 className="text-xl font-bold text-[var(--text-main)]">{emp.firstName} {emp.lastName}</h3>
               <p className="text-sm text-[var(--text-muted)]">{emp.email}</p>
-              {!emp.profileImageUrl && (
-                <p className="text-xs text-amber-600 mt-0.5">⚠ No face photo — click camera icon to upload</p>
+              {!emp.profileImageUrl ? (
+                <p className="text-xs text-amber-600 font-medium mt-0.5">⚠ No face photo — click camera or use buttons below to enroll</p>
+              ) : (
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                    🔒 Face Locked & Active
+                  </span>
+                </div>
               )}
               {emp.profileImageUrl && imgError && (
                 <p className="text-xs text-red-500 mt-0.5">⚠ Photo saved but failed to display</p>
@@ -439,7 +533,11 @@ function EmployeeDetailModal({ emp: initialEmp, onClose, onRefresh }: { emp: any
             onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadFace(f); }} />
 
           {uploading && (
-            <div className="mb-3 p-2 bg-primary-50 dark:bg-primary-900/20 rounded-xl text-xs text-primary-700 text-center">Uploading face photo...</div>
+            <div className="mb-3 p-2 bg-primary-50 dark:bg-primary-900/20 rounded-xl text-xs text-primary-700 text-center font-medium">Uploading and locking face photo...</div>
+          )}
+
+          {releasing && (
+            <div className="mb-3 p-2 bg-rose-50 dark:bg-rose-900/20 rounded-xl text-xs text-rose-700 text-center font-medium">Releasing face biometric record...</div>
           )}
 
           <div className="space-y-2">
@@ -452,74 +550,35 @@ function EmployeeDetailModal({ emp: initialEmp, onClose, onRefresh }: { emp: any
           </div>
         </div>
         <div className="px-6 pb-6 flex gap-3">
-          {/* Only show upload button if no face photo is registered yet */}
-          {!emp.profileImageUrl && (
+          {emp.profileImageUrl ? (
+            <button
+              type="button"
+              onClick={handleReleaseFace}
+              disabled={releasing || uploading}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 text-sm font-semibold rounded-xl hover:bg-rose-100 dark:hover:bg-rose-900/30 border border-rose-200 dark:border-rose-800 transition disabled:opacity-50">
+              <Trash2 size={15} />
+              {releasing ? 'Releasing Face...' : 'Release Face (Allow New Photo)'}
+            </button>
+          ) : (
             <div className="flex gap-3 flex-1">
-              <button onClick={() => fileRef.current?.click()}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-primary-50 dark:bg-primary-900/20 text-primary-700 text-sm font-semibold rounded-xl hover:bg-primary-100 transition">
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 text-sm font-semibold rounded-xl hover:bg-primary-100 transition border border-primary-200 dark:border-primary-800 disabled:opacity-50">
                 <Camera size={15} />Upload Face Photo
               </button>
-              <button onClick={async () => {
-                try {
-                  const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
-                  const video = document.createElement('video');
-                  video.srcObject = stream;
-                  video.playsInline = true;
-                  video.muted = true;
-                  await video.play();
-
-                  const overlay = document.createElement('div');
-                  overlay.innerHTML = `
-                    <div style="position:fixed; inset:0; background:rgba(0,0,0,0.8); display:flex; align-items:center; justify-content:center; z-index:999999; font-family:Arial,sans-serif;">
-                      <div style="background:#111827; border-radius:18px; padding:18px; text-align:center; color:#fff; width:min(90vw, 460px);">
-                        <div style="font-size:13px; letter-spacing:0.12em; text-transform:uppercase; color:#cbd5e1; margin-bottom:10px;">Capture face</div>
-                        <div id="camera-countdown" style="font-size:42px; font-weight:700; margin-bottom:12px;">5</div>
-                        <video id="camera-video" autoplay playsinline muted style="width:100%; max-width:360px; border-radius:12px; display:block; margin:0 auto 12px; background:#000;"></video>
-                        <button id="camera-cancel" style="border:1px solid rgba(255,255,255,0.15); background:transparent; color:#fff; border-radius:10px; padding:8px 14px; cursor:pointer;">Cancel</button>
-                      </div>
-                    </div>
-                  `;
-                  document.body.appendChild(overlay);
-
-                  const countdown = overlay.querySelector('#camera-countdown') as HTMLElement;
-                  const cameraVideo = overlay.querySelector('#camera-video') as HTMLVideoElement;
-                  const cancelButton = overlay.querySelector('#camera-cancel') as HTMLButtonElement;
-                  cameraVideo.srcObject = stream;
-
-                  const cleanup = () => { stream.getTracks().forEach((track) => track.stop()); overlay.remove(); };
-                  let cancelled = false;
-                  cancelButton.addEventListener('click', () => { cancelled = true; cleanup(); }, { once: true });
-
-                  if (cancelled) {
-                    throw new Error('Camera capture was cancelled.');
-                  }
-
-                  for (let sec = 5; sec >= 1; sec -= 1) {
-                    if (cancelled) throw new Error('Camera capture was cancelled.');
-                    countdown.textContent = String(sec);
-                    await new Promise((resolve) => setTimeout(resolve, 1000));
-                  }
-
-                  const canvas = document.createElement('canvas');
-                  canvas.width = 640;
-                  canvas.height = 480;
-                  const ctx = canvas.getContext('2d');
-                  if (!ctx) throw new Error('The browser could not process the face photo.');
-                  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                  const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-                  cleanup();
-                  const blob = await fetch(dataUrl).then((res) => res.blob());
-                  await uploadFace(new File([blob], `${emp.id}-face.jpg`, { type: 'image/jpeg' }));
-                } catch (err) {
-                  alert(err instanceof Error ? err.message : 'Camera capture failed.');
-                }
-              }} className="flex items-center justify-center gap-2 py-2.5 bg-slate-800 text-white text-sm font-semibold rounded-xl hover:bg-slate-900 transition">
+              <button
+                type="button"
+                onClick={captureFromCamera}
+                disabled={uploading}
+                className="flex items-center justify-center gap-2 py-2.5 bg-slate-800 text-white text-sm font-semibold rounded-xl hover:bg-slate-900 transition px-4 disabled:opacity-50">
                 <Camera size={15} />Use Camera
               </button>
             </div>
           )}
           <button onClick={onClose}
-            className={`${!emp.profileImageUrl ? 'flex-1' : 'w-full'} py-2.5 border border-[var(--border)] text-[var(--text-main)] text-sm font-semibold rounded-xl hover:bg-[var(--hover-bg)] transition`}>
+            className={`${!emp.profileImageUrl ? 'flex-none px-5' : 'flex-none px-6'} py-2.5 border border-[var(--border)] text-[var(--text-main)] text-sm font-semibold rounded-xl hover:bg-[var(--hover-bg)] transition`}>
             Close
           </button>
         </div>
@@ -696,10 +755,36 @@ export default function Employees() {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        {e.profileImageUrl
-                          ? <span className="text-xs font-semibold text-emerald-600">✓ Registered</span>
-                          : <span className="text-xs text-amber-600">⚠ Not set</span>
-                        }
+                        {e.profileImageUrl ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-semibold text-emerald-600">✓ Registered</span>
+                            <button
+                              onClick={async () => {
+                                if (!window.confirm(
+                                  `Release face photo for ${e.firstName} ${e.lastName}?\n\n` +
+                                  `This will clear their stored biometric face data and unlock the face enrollment slot so a new face photo can be registered.`
+                                )) return;
+                                try {
+                                  await releaseEmployeeFace(e.id);
+                                  load();
+                                  alert(`✓ Face photo released for ${e.firstName} ${e.lastName}. You can now enroll a new face.`);
+                                } catch (err: any) {
+                                  alert(err?.response?.data?.message || err?.message || 'Could not release face.');
+                                }
+                              }}
+                              className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 dark:bg-rose-900/20 hover:bg-rose-100 px-1.5 py-0.5 rounded border border-rose-200 dark:border-rose-800 transition"
+                              title="Release face photo">
+                              Release Face
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setViewEmp(e)}
+                            className="text-xs font-semibold text-amber-600 hover:text-amber-700 underline cursor-pointer"
+                            title="Click to enroll face">
+                            ⚠ Not set (Enroll)
+                          </button>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_STYLE[e.status] ?? 'bg-slate-100 text-slate-500'}`}>
@@ -712,6 +797,33 @@ export default function Employees() {
                           {e.status !== 'TERMINATED' && (
                             <>
                               <button onClick={() => setEditEmp(e)} className="p-1.5 rounded-lg hover:bg-primary-100 dark:hover:bg-primary-900/20 text-primary-600 transition" title="Edit employee settings"><Pencil size={14} /></button>
+                              {e.profileImageUrl ? (
+                                <button
+                                  onClick={async () => {
+                                    if (!window.confirm(
+                                      `Release face photo for ${e.firstName} ${e.lastName}?\n\n` +
+                                      `This will clear their stored biometric face data and unlock the face enrollment slot so a new face photo can be registered.`
+                                    )) return;
+                                    try {
+                                      await releaseEmployeeFace(e.id);
+                                      load();
+                                      alert(`✓ Face photo released for ${e.firstName} ${e.lastName}. You can now enroll a new face.`);
+                                    } catch (err: any) {
+                                      alert(err?.response?.data?.message || err?.message || 'Could not release face.');
+                                    }
+                                  }}
+                                  className="p-1.5 rounded-lg hover:bg-rose-100 dark:hover:bg-rose-900/20 text-rose-600 dark:text-rose-400 transition"
+                                  title="Release face photo (allow re-enrollment)">
+                                  <Trash2 size={14} />
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => setViewEmp(e)}
+                                  className="p-1.5 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/20 text-amber-600 transition"
+                                  title="Enroll face photo">
+                                  <Camera size={14} />
+                                </button>
+                              )}
                               <button onClick={async () => { e.status === 'ACTIVE' ? await suspendUser(e.id) : await activateUser(e.id); load(); }}
                                 className={`text-xs font-semibold px-2 py-1 rounded-lg transition ${e.status === 'ACTIVE' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 hover:bg-amber-100' : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 hover:bg-emerald-100'}`}>
                                 {e.status === 'ACTIVE' ? 'Suspend' : 'Activate'}

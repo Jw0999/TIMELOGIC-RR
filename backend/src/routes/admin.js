@@ -167,6 +167,10 @@ router.post('/users/:userId/face',
   }
 );
 
+// ─── Face photo release / removal ──────────────────────────────────────────
+router.delete('/users/:userId/face', authenticate, isAdmin, ctrl.releaseEmployeeFace);
+router.post('/users/:userId/release-face', authenticate, isAdmin, ctrl.releaseEmployeeFace);
+
 // Security settings — admins may VIEW, but only SUPER_ADMIN may edit (Wi-Fi, geo, schedule)
 router.get('/offices/:officeId/settings', authenticate, isAdmin, ctrl.getSecuritySettings);
 router.put('/offices/:officeId/settings', authenticate, isSuperAdmin, ctrl.updateSecuritySettings);

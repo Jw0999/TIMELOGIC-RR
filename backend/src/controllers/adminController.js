@@ -7,6 +7,10 @@ const PlanPolicy = require('../services/PlanPolicyService');
 const AuditService = require('../services/AuditService');
 const { hasValidEnrolledFace } = require('../utils/faceVerify');
 const { getOrgSubscriptionStatus, redeemActivationCode } = require('../utils/subscription');
+const fs = require('fs');
+const path = require('path');
+const env = require('../config/env');
+const logger = require('../config/logger');
 
 // ── Organization / Office / Department ────────────────────────────────────────
 
@@ -393,7 +397,6 @@ const emergencyRevert = async (req, res, next) => {
 };
 
 const bcrypt = require('bcryptjs');
-const env = require('../config/env');
 
 const getNotifications = async (req, res, next) => {
   try {
@@ -545,6 +548,61 @@ const deleteEmployee = async (req, res, next) => {
       message: 'Employee has been terminated. They can no longer log in. All records are preserved and visible to Super Admin.',
     });
   } catch (err) { next(err); }
+};
+
+const releaseEmployeeFace = async (req, res, next) => {
+  try {
+    const where = { id: req.params.userId, role: 'EMPLOYEE' };
+    if (req.user.role !== 'SUPER_ADMIN') {
+      const targetOrgId = await resolveAdminOrgId(req);
+      where.orgId = targetOrgId;
+    }
+    const employee = await prisma.user.findFirst({
+      where,
+      select: { id: true, firstName: true, lastName: true, email: true, profileImageUrl: true, faceEncodingData: true },
+    });
+    if (!employee) {
+      return res.status(404).json({ success: false, message: 'Employee not found.' });
+    }
+
+    // Unlink local face file if it exists on disk
+    if (employee.profileImageUrl && !employee.profileImageUrl.startsWith('http://') && !employee.profileImageUrl.startsWith('https://')) {
+      const UP = env.UPLOAD_DIR || 'uploads';
+      const relative = employee.profileImageUrl.replace(/^\/uploads\//, '');
+      const absPath = path.isAbsolute(UP)
+        ? path.join(UP, relative)
+        : path.join(process.cwd(), UP, relative);
+      if (fs.existsSync(absPath)) {
+        fs.promises.unlink(absPath).catch((e) => logger.warn('Failed to delete face file:', e.message));
+      }
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: employee.id },
+      data: {
+        profileImageUrl: null,
+        faceEncodingData: null,
+        faceMismatchCount: 0,
+        faceBlockedUntil: null,
+        faceLastMismatchAt: null,
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        profileImageUrl: true,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Face photo released successfully. You can now enroll a new face.',
+      data: { ...updated, hasFaceEnrolled: false },
+    });
+  } catch (err) {
+    next(err);
+  }
 };
 
 const employeeSummary = async (req, res, next) => {
@@ -930,7 +988,7 @@ module.exports = {
   getOrg, updateOrg,
   createOffice,
   createDepartment,
-  listUsers, updateUser, suspendUser, deleteEmployee, employeeSummary, resetDevice,
+  listUsers, updateUser, suspendUser, deleteEmployee, releaseEmployeeFace, employeeSummary, resetDevice,
   getSecuritySettings, updateSecuritySettings,
   setBreakPolicy,
   emergencyStopAll, emergencyLockSystem, emergencyInvalidateQR, emergencyRevert,

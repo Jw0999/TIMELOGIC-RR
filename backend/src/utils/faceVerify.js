@@ -165,9 +165,10 @@ async function performFaceVerification(employee, faceImage) {
   // Face match check
   if (!result.verified) {
     await incrementFaceMismatch(employee.id);
+    const msg = result.error || 'Face verification failed. The camera image did not match your registered face.';
     throw Object.assign(
-      new Error('Face verification failed. The camera image did not match your registered face.'),
-      { status: 403 }
+      new Error(msg),
+      { status: 403, code: 'FACE_VERIFICATION_FAILED' }
     );
   }
 
