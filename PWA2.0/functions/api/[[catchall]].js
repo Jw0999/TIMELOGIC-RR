@@ -25,6 +25,14 @@ export async function onRequest(context) {
   responseHeaders.set('Access-Control-Allow-Origin', url.origin);
   responseHeaders.set('Access-Control-Allow-Credentials', 'true');
 
+  // Strip backend infrastructure headers so Heroku/router is completely invisible
+  responseHeaders.delete('server');
+  responseHeaders.delete('via');
+  responseHeaders.delete('nel');
+  responseHeaders.delete('report-to');
+  responseHeaders.delete('reporting-endpoints');
+  responseHeaders.delete('x-powered-by');
+
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
