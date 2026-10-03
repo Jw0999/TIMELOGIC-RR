@@ -76,6 +76,10 @@ interface PayrollSummary {
   totalNetPayout: number;
   salaryPayoutDay: number;
   currency: string;
+  periodStart?: string;
+  periodEnd?: string;
+  periodLabel?: string;
+  cycleStatus?: 'ACTIVE' | 'COMPLETED' | 'UPCOMING';
 }
 
 interface PayrollSettingsData {
@@ -93,6 +97,7 @@ export default function Salary() {
   const currentDate = new Date();
   const [selectedYear, setSelectedYear] = useState<number>(currentDate.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number>(currentDate.getMonth() + 1);
+  const [hasUserNavigated, setHasUserNavigated] = useState<boolean>(false);
 
   const [employees, setEmployees] = useState<EmployeePayroll[]>([]);
   const [summary, setSummary] = useState<PayrollSummary | null>(null);
@@ -141,28 +146,50 @@ export default function Salary() {
     return `${symbol}${Number(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }, []);
 
-  const loadPayroll = useCallback(async () => {
+  const getActiveCycle = useCallback((payoutDay: number) => {
+    const now = new Date();
+    let y = now.getFullYear();
+    let m = now.getMonth() + 1;
+    if (now.getDate() > payoutDay) {
+      if (m === 12) {
+        y += 1;
+        m = 1;
+      } else {
+        m += 1;
+      }
+    }
+    return { year: y, month: m };
+  }, []);
+
+  const loadPayroll = useCallback(async (overrideYear?: number, overrideMonth?: number) => {
     setLoading(true);
     setErrorMsg('');
     try {
-      const res = await fetchPayrollOverview(selectedYear, selectedMonth);
+      const y = overrideYear ?? selectedYear;
+      const m = overrideMonth ?? selectedMonth;
+      const res = await fetchPayrollOverview(y, m);
       if (res) {
         setEmployees(res.employees || []);
         setSummary(res.summary || null);
+        if (res.year && res.month && !hasUserNavigated && (res.year !== selectedYear || res.month !== selectedMonth)) {
+          setSelectedYear(res.year);
+          setSelectedMonth(res.month);
+        }
       }
     } catch (err: any) {
       setErrorMsg(err?.message || 'Could not load payroll overview.');
     } finally {
       setLoading(false);
     }
-  }, [selectedYear, selectedMonth]);
+  }, [selectedYear, selectedMonth, hasUserNavigated]);
 
   const loadSettings = useCallback(async () => {
     try {
       const res = await fetchPayrollSettings();
       if (res) {
+        const payoutDay = res.salaryPayoutDay ?? 28;
         setSettingsData({
-          salaryPayoutDay: res.salaryPayoutDay ?? 28,
+          salaryPayoutDay: payoutDay,
           salaryAutomationEnabled: res.salaryAutomationEnabled ?? true,
           salaryCurrency: res.salaryCurrency || 'NGN',
           whatsappProvider: res.whatsappProvider || 'WEB_LINK',
@@ -171,11 +198,19 @@ export default function Salary() {
           whatsappApiToken: res.whatsappApiToken || '',
           hasWhatsappToken: res.hasWhatsappToken ?? false,
         });
+
+        if (!hasUserNavigated) {
+          const active = getActiveCycle(payoutDay);
+          if (active.year !== selectedYear || active.month !== selectedMonth) {
+            setSelectedYear(active.year);
+            setSelectedMonth(active.month);
+          }
+        }
       }
     } catch (err: any) {
       console.warn('Failed to load payroll settings:', err);
     }
-  }, []);
+  }, [hasUserNavigated, getActiveCycle, selectedYear, selectedMonth]);
 
   useEffect(() => {
     loadPayroll();
@@ -183,6 +218,7 @@ export default function Salary() {
   }, [loadPayroll, loadSettings]);
 
   const handlePrevMonth = () => {
+    setHasUserNavigated(true);
     if (selectedMonth === 1) {
       setSelectedMonth(12);
       setSelectedYear((prev) => prev - 1);
@@ -192,6 +228,7 @@ export default function Salary() {
   };
 
   const handleNextMonth = () => {
+    setHasUserNavigated(true);
     if (selectedMonth === 12) {
       setSelectedMonth(1);
       setSelectedYear((prev) => prev + 1);
@@ -260,6 +297,8 @@ export default function Salary() {
       await updatePayrollSettings(settingsData);
       setSuccessMsg('Automated payday schedule and WhatsApp dispatch settings saved.');
       setSettingsModalOpen(false);
+      // Recalculate current month with new payday cutoff
+      await calculatePayroll({ year: selectedYear, month: selectedMonth });
       await loadPayroll();
       await loadSettings();
     } catch (err: any) {
@@ -390,7 +429,7 @@ export default function Salary() {
       {/* TimeLogic Standard App Header */}
       <Header
         title="Salary & Payroll"
-        subtitle={`Automated monthly compensation, deductions & payslip dispatch · ${monthLabel}`}
+        subtitle={`Automated monthly compensation, deductions & payslip dispatch · ${summary?.periodLabel ? `Pay Period: ${summary.periodLabel} (${monthLabel})` : monthLabel}`}
         action={
           <div className="flex items-center gap-2 flex-wrap">
             <button
@@ -446,7 +485,7 @@ export default function Salary() {
 
         {/* Month Selector Bar & Quick Stats */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-[var(--card-bg)] p-3 rounded-2xl border border-[var(--border)] shadow-sm">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center bg-[var(--hover-bg)] rounded-xl p-1 border border-[var(--border)]">
               <button
                 onClick={handlePrevMonth}
@@ -469,13 +508,46 @@ export default function Salary() {
             </div>
 
             <button
-              onClick={loadPayroll}
+              onClick={() => loadPayroll()}
               disabled={loading}
               className="p-2 border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--hover-bg)] rounded-xl transition"
               title="Refresh Payroll"
             >
               <RefreshCw size={15} className={loading ? 'animate-spin text-primary-600' : ''} />
             </button>
+
+            {summary?.periodLabel && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary-50 dark:bg-primary-950/40 border border-primary-200 dark:border-primary-800/60 text-xs font-semibold text-primary-700 dark:text-primary-300">
+                <Clock size={13} className="text-primary-600 dark:text-primary-400" />
+                <span>Cycle: {summary.periodLabel}</span>
+              </div>
+            )}
+
+            {summary?.cycleStatus === 'ACTIVE' ? (
+              <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                Active Cycle (Cutoff on {settingsData.salaryPayoutDay || 28}th)
+              </span>
+            ) : summary?.cycleStatus === 'COMPLETED' ? (
+              <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 flex items-center gap-1">
+                <CheckCircle2 size={11} className="text-slate-500" />
+                Completed Cycle
+              </span>
+            ) : null}
+
+            {summary?.cycleStatus !== 'ACTIVE' && (
+              <button
+                onClick={() => {
+                  const active = getActiveCycle(settingsData.salaryPayoutDay || 28);
+                  setSelectedYear(active.year);
+                  setSelectedMonth(active.month);
+                  setHasUserNavigated(true);
+                }}
+                className="text-xs font-semibold text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-1 ml-1"
+              >
+                Go to Active Cycle →
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
@@ -518,7 +590,9 @@ export default function Salary() {
             <p className="text-xl font-bold text-red-600 dark:text-red-400 mt-2">
               -{formatMoney(summary?.totalDeductions || 0, currency)}
             </p>
-            <p className="text-[11px] text-[var(--text-muted)] mt-1">Lateness + Disciplinary</p>
+            <p className="text-[11px] text-[var(--text-muted)] mt-1 truncate" title={summary?.periodLabel ? `Cutoff: ${summary.periodLabel}` : 'Lateness + Disciplinary'}>
+              {summary?.periodLabel ? `Cutoff: ${summary.periodLabel}` : 'Lateness + Disciplinary'}
+            </p>
           </div>
 
           <div className="bg-[var(--card-bg)] p-4 rounded-2xl border border-[var(--border)] shadow-sm">
@@ -959,7 +1033,9 @@ export default function Salary() {
                     }
                     className={`${inputCls} font-semibold`}
                   />
-                  <p className="text-[11px] text-[var(--text-muted)] mt-1">e.g. 28th of every month</p>
+                  <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                    e.g. 3rd of every month. Penalties are calculated up to this payday cutoff, resetting for the next cycle afterward while preserving historical payroll records.
+                  </p>
                 </div>
 
                 <div>

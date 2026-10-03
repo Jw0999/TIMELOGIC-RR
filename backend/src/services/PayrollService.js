@@ -38,13 +38,55 @@ class PayrollService {
   }
 
   /**
-   * Get start and end date boundaries for a given year and month
+   * Format start and end dates as a clean human-readable period label
+   * e.g. "04 Sep 2026 – 03 Oct 2026"
    */
-  getMonthDateRange(year, month) {
+  formatPeriodLabel(startDate, endDate) {
+    if (!startDate || !endDate) return '';
+    const s = new Date(startDate);
+    const e = new Date(endDate);
+    const sStr = s.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
+    const eStr = e.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
+    return `${sStr} – ${eStr}`;
+  }
+
+  /**
+   * Get start and end date boundaries for a given year, month, and organization salaryPayoutDay.
+   * If payday is D (e.g. 3rd):
+   * - Pay cycle ends on target year/month on day D (or last day of month if D > daysInMonth) at 23:59:59.999 UTC.
+   * - Pay cycle starts on the day after the previous month's payout day at 00:00:00.000 UTC.
+   * Example: For payday = 3, month = October 2026:
+   *   endDate = 2026-10-03 23:59:59.999 UTC
+   *   startDate = 2026-09-04 00:00:00.000 UTC
+   * Example: For payday = 3, month = November 2026:
+   *   endDate = 2026-11-03 23:59:59.999 UTC
+   *   startDate = 2026-10-04 00:00:00.000 UTC (Penalties reset after the 3rd!)
+   */
+  getMonthDateRange(year, month, salaryPayoutDay = 28) {
     const y = parseInt(year, 10);
     const m = parseInt(month, 10);
-    const startDate = new Date(Date.UTC(y, m - 1, 1, 0, 0, 0));
-    const endDate = new Date(Date.UTC(y, m, 0, 23, 59, 59, 999));
+    const day = Math.min(Math.max(1, parseInt(salaryPayoutDay, 10) || 28), 31);
+
+    // Number of days in target month m of year y (0-indexed in JS Date)
+    const maxDaysInTargetMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    const endDay = Math.min(day, maxDaysInTargetMonth);
+    const endDate = new Date(Date.UTC(y, m - 1, endDay, 23, 59, 59, 999));
+
+    // Previous month payout day
+    const prevMonthDate = new Date(Date.UTC(y, m - 2, 1));
+    const prevY = prevMonthDate.getUTCFullYear();
+    const prevM = prevMonthDate.getUTCMonth() + 1; // 1 to 12
+    const maxDaysInPrevMonth = new Date(Date.UTC(prevY, prevM, 0)).getUTCDate();
+    const prevEndDay = Math.min(day, maxDaysInPrevMonth);
+
+    let startDate;
+    if (prevEndDay >= maxDaysInPrevMonth) {
+      // Payout in prev month was on the last day, so this cycle begins on 1st of current month
+      startDate = new Date(Date.UTC(y, m - 1, 1, 0, 0, 0));
+    } else {
+      startDate = new Date(Date.UTC(prevY, prevM - 1, prevEndDay + 1, 0, 0, 0));
+    }
+
     return { startDate, endDate };
   }
 
@@ -52,24 +94,43 @@ class PayrollService {
    * Fetch all employees in an organization with their salary info and current month calculations
    */
   async getEmployeesWithSalary(orgId, year, month) {
-    const y = parseInt(year || new Date().getFullYear(), 10);
-    const m = parseInt(month || new Date().getMonth() + 1, 10);
-    const { startDate, endDate } = this.getMonthDateRange(y, m);
+    const org = await prisma.organization.findUnique({
+      where: { id: orgId },
+      select: {
+        id: true,
+        name: true,
+        salaryPayoutDay: true,
+        salaryAutomationEnabled: true,
+        salaryCurrency: true,
+        whatsappProvider: true,
+        whatsappPhoneId: true,
+        whatsappSenderNumber: true,
+      },
+    });
 
-    const [org, employees, attendanceRecords, manualPenalties, breakRecords, existingPayslips] = await Promise.all([
-      prisma.organization.findUnique({
-        where: { id: orgId },
-        select: {
-          id: true,
-          name: true,
-          salaryPayoutDay: true,
-          salaryAutomationEnabled: true,
-          salaryCurrency: true,
-          whatsappProvider: true,
-          whatsappPhoneId: true,
-          whatsappSenderNumber: true,
-        },
-      }),
+    const payoutDay = org?.salaryPayoutDay ?? 28;
+    const now = new Date();
+
+    let y = year ? parseInt(year, 10) : null;
+    let m = month ? parseInt(month, 10) : null;
+
+    // If year or month not explicitly requested, determine current active cycle based on salaryPayoutDay
+    if (!y || !m) {
+      y = now.getUTCFullYear();
+      m = now.getUTCMonth() + 1;
+      if (now.getUTCDate() > payoutDay) {
+        if (m === 12) {
+          y += 1;
+          m = 1;
+        } else {
+          m += 1;
+        }
+      }
+    }
+
+    const { startDate, endDate } = this.getMonthDateRange(y, m, payoutDay);
+
+    const [employees, attendanceRecords, manualPenalties, breakRecords, existingPayslips] = await Promise.all([
       prisma.user.findMany({
         where: {
           orgId,
@@ -240,17 +301,30 @@ class PayrollService {
     const totalDeductions = employeeRows.reduce((acc, r) => acc + r.totalDeductions, 0);
     const totalNet = employeeRows.reduce((acc, r) => acc + r.netSalary, 0);
 
+    const isCurrentCycle = now >= startDate && now <= endDate;
+    const isCompleted = now > endDate;
+    const cycleStatus = isCurrentCycle ? 'ACTIVE' : isCompleted ? 'COMPLETED' : 'UPCOMING';
+    const periodLabel = this.formatPeriodLabel(startDate, endDate);
+
     return {
       organization: org,
       year: y,
       month: m,
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      periodLabel,
+      cycleStatus,
       summary: {
         totalEmployees: employeeRows.length,
         totalBasePayroll: totalBase,
         totalDeductions,
         totalNetPayout: totalNet,
-        salaryPayoutDay: org?.salaryPayoutDay ?? 28,
+        salaryPayoutDay: payoutDay,
         currency: org?.salaryCurrency || 'NGN',
+        periodStart: startDate.toISOString(),
+        periodEnd: endDate.toISOString(),
+        periodLabel,
+        cycleStatus,
       },
       employees: employeeRows,
     };
@@ -362,12 +436,29 @@ class PayrollService {
    * Compute monthly payroll for all employees in an organization and persist to PayslipRecord
    */
   async calculateMonthlyPayroll(orgId, year, month) {
-    const y = parseInt(year || new Date().getFullYear(), 10);
-    const m = parseInt(month || new Date().getMonth() + 1, 10);
-    const { startDate, endDate } = this.getMonthDateRange(y, m);
+    const org = await prisma.organization.findUnique({ where: { id: orgId } });
+    const payoutDay = org?.salaryPayoutDay ?? 28;
+    const now = new Date();
 
-    const [org, employees, attendanceRecords, manualPenalties, breakRecords] = await Promise.all([
-      prisma.organization.findUnique({ where: { id: orgId } }),
+    let y = year ? parseInt(year, 10) : null;
+    let m = month ? parseInt(month, 10) : null;
+
+    if (!y || !m) {
+      y = now.getUTCFullYear();
+      m = now.getUTCMonth() + 1;
+      if (now.getUTCDate() > payoutDay) {
+        if (m === 12) {
+          y += 1;
+          m = 1;
+        } else {
+          m += 1;
+        }
+      }
+    }
+
+    const { startDate, endDate } = this.getMonthDateRange(y, m, payoutDay);
+
+    const [employees, attendanceRecords, manualPenalties, breakRecords] = await Promise.all([
       prisma.user.findMany({
         where: {
           orgId,
@@ -524,6 +615,8 @@ class PayrollService {
           status: 'GENERATED',
         },
         update: {
+          periodStart: startDate,
+          periodEnd: endDate,
           baseSalary,
           currency: emp.salaryCurrency || currency,
           totalWorkHours: Math.round(totalWorkHours * 10) / 10,
@@ -547,6 +640,9 @@ class PayrollService {
       success: true,
       year: y,
       month: m,
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      periodLabel: this.formatPeriodLabel(startDate, endDate),
       count: savedPayslips.length,
       payslips: savedPayslips,
     };
@@ -576,11 +672,20 @@ class PayrollService {
     let displayLateDays = payslip.totalLateDays || 0;
     let displayWorkHours = payslip.totalWorkHours || 0;
 
+    let periodStart = payslip.periodStart;
+    let periodEnd = payslip.periodEnd;
+    if (!periodStart || !periodEnd) {
+      const range = this.getMonthDateRange(payslip.year, payslip.month, payslip.organization?.salaryPayoutDay || 28);
+      periodStart = range.startDate;
+      periodEnd = range.endDate;
+    }
+    const periodLabel = this.formatPeriodLabel(periodStart, periodEnd);
+
     try {
       const atts = await prisma.attendanceRecord.findMany({
         where: {
           employeeId: payslip.employeeId,
-          date: { gte: payslip.periodStart, lte: payslip.periodEnd },
+          date: { gte: periodStart, lte: periodEnd },
         },
         select: {
           status: true,
@@ -652,10 +757,10 @@ class PayrollService {
       doc.fillColor('#ffffff').fontSize(16).font('Helvetica-Bold')
         .text('OFFICIAL EMPLOYEE PAYSLIP', 55, 68);
 
-      doc.fillColor('#cbd5e1').fontSize(8.5).font('Helvetica')
-        .text(`Pay Period: ${monthStr}`, 350, 54, { width: 190, align: 'right' });
-      doc.fillColor('#38bdf8').font('Helvetica-Bold')
-        .text('Status: Verified & Processed', 350, 68, { width: 190, align: 'right' });
+      doc.fillColor('#cbd5e1').fontSize(8).font('Helvetica')
+        .text(`Pay Period: ${periodLabel}`, 280, 52, { width: 260, align: 'right' });
+      doc.fillColor('#38bdf8').fontSize(9).font('Helvetica-Bold')
+        .text(`Payout Cycle: ${monthStr}`, 280, 66, { width: 260, align: 'right' });
 
       // ── COMPANY & EMPLOYEE INFO GRID ──
       doc.rect(40, 115, 515, 88).fill('#f8fafc');
@@ -717,7 +822,7 @@ class PayrollService {
       doc.rect(40, yPos, 515, 26).fill('#ffffff');
       doc.rect(40, yPos, 515, 26).strokeColor('#f1f5f9').stroke();
       doc.fillColor('#0f172a').fontSize(9).font('Helvetica')
-        .text(`Basic Monthly Salary (${monthStr})`, 55, yPos + 8, { width: 260 });
+        .text(`Basic Monthly Salary (${periodLabel})`, 55, yPos + 8, { width: 260 });
       doc.fillColor('#10b981').font('Helvetica-Bold')
         .text(`+${this.formatMoneyPdf(payslip.baseSalary, currency)}`, 320, yPos + 8, { width: 105, align: 'right' });
       doc.fillColor('#94a3b8').font('Helvetica')
@@ -896,6 +1001,15 @@ class PayrollService {
     const companyName = payslip.organization.name || 'TimeLogic Enterprise';
     const empName = `${payslip.employee.firstName} ${payslip.employee.lastName}`;
 
+    let periodStart = payslip.periodStart;
+    let periodEnd = payslip.periodEnd;
+    if (!periodStart || !periodEnd) {
+      const range = this.getMonthDateRange(payslip.year, payslip.month, payslip.organization?.salaryPayoutDay || 28);
+      periodStart = range.startDate;
+      periodEnd = range.endDate;
+    }
+    const periodLabel = this.formatPeriodLabel(periodStart, periodEnd);
+
     // Ensure PDF is generated
     let pdfPath = payslip.pdfPath;
     if (!pdfPath || !fs.existsSync(pdfPath)) {
@@ -907,7 +1021,7 @@ class PayrollService {
       `📄 *TIMELOGIC OFFICIAL PAYSLIP*`,
       `🏢 *Company:* ${companyName}`,
       `👤 *Employee:* ${empName} (${payslip.employee.employeeCode || 'TL-EMP'})`,
-      `📅 *Pay Period:* ${monthStr}`,
+      `📅 *Pay Period:* ${periodLabel} (${monthStr})`,
       ``,
       `💰 *Base Salary:* ${this.formatMoney(payslip.baseSalary, currency)}`,
       `⚠️ *Total Penalties & Deductions:* -${this.formatMoney(payslip.totalDeductions, currency)}`,
