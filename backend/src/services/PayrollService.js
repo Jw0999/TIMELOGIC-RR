@@ -1493,40 +1493,13 @@ class PayrollService {
   }
 
   /**
-   * Scheduled cron handler called daily:
-   * Finds organizations where today is salaryPayoutDay, calculates payroll, generates PDFs, and completes payout via email
+   * Automated payday background cron:
+   * Automatic background email dispatch is completely deactivated per organization policy.
+   * Emails are dispatched exclusively on-demand when the Admin clicks "Complete Payout" or the individual employee mail icon.
    */
   async executeAutomatedPaydayCron() {
-    const today = new Date();
-    const currentDay = today.getDate();
-    const currentYear = today.getFullYear();
-    const currentMonth = today.getMonth() + 1;
-
-    logger.info(`Running Automated Payday Cron for Day: ${currentDay}`);
-
-    const eligibleOrgs = await prisma.organization.findMany({
-      where: {
-        salaryAutomationEnabled: true,
-        salaryPayoutDay: currentDay,
-      },
-      select: { id: true, name: true },
-    });
-
-    logger.info(`Found ${eligibleOrgs.length} organizations scheduled for salary payout today.`);
-
-    const results = [];
-    for (const org of eligibleOrgs) {
-      try {
-        const calcRes = await this.calculateMonthlyPayroll(org.id, currentYear, currentMonth);
-        const payoutRes = await this.completeMonthlyPayout(org.id, currentYear, currentMonth);
-        results.push({ orgId: org.id, name: org.name, ...calcRes, ...payoutRes });
-      } catch (err) {
-        logger.error(`Error in automated payday payout for org ${org.name}:`, err);
-        results.push({ orgId: org.id, name: org.name, error: err.message });
-      }
-    }
-
-    return results;
+    logger.info('[Payroll] Automatic background email dispatch is disabled per organization policy. Payslip emails are dispatched exclusively on-demand by the admin via Complete Payout or the employee Mail icon.');
+    return [];
   }
 }
 

@@ -1091,11 +1091,11 @@ export default function Salary() {
                 <div className="flex items-center gap-2">
                   <Mail size={16} className="text-primary-600" />
                   <span className="text-xs font-bold text-[var(--text-main)]">
-                    Automated Email Payout Dispatch
+                    On-Demand Email Payout Dispatch
                   </span>
                 </div>
                 <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-                  When payout is completed (either manually via <strong>Complete Payout</strong> or automatically on the scheduled payday), official PDF payslips featuring itemized penalty calculations and attendance performance grades are automatically emailed to each employee&apos;s registered email address.
+                  Payslip dispatch is fully controlled by the admin: click <strong>Complete Payout</strong> to instantly email official PDF payslips to all employees at once, or click the individual <strong>Mail</strong> icon next to any employee to email only that employee. Automated background dispatch is disabled.
                 </p>
               </div>
 

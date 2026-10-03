@@ -165,13 +165,13 @@ const getHistory = async (req, res, next) => {
     // Admin requesting ALL employees' attendance for their org
     if (req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN') {
       const skip = (page - 1) * limit;
-      const targetOrgId = req.headers['x-organization-id'] || req.query.orgId || (req.user.orgId !== 'platform-org' ? req.user.orgId : null);
+      const targetOrgId = await resolveAdminOrgId(req);
       if (targetOrgId && targetOrgId !== 'platform-org') {
         await AttendanceService.reconcilePastAbsencesForOrg(targetOrgId).catch((err) => {
           logger.warn(`reconcilePastAbsencesForOrg in getHistory error: ${err.message}`);
         });
       }
-      const employeeFilter = targetOrgId ? { employee: { orgId: targetOrgId } } : {};
+      const employeeFilter = { employee: { orgId: targetOrgId } };
 
       const dateFilter = req.query.endDate
         ? { date: { gte: new Date(`${startDate}T00:00:00.000Z`), lte: new Date(`${req.query.endDate}T23:59:59.999Z`) } }
@@ -338,20 +338,20 @@ const flagRecord = async (req, res, next) => {
 const getLiveAttendance = async (req, res, next) => {
   try {
     const now = await getCurrentServerTime();
-    const targetOrgId = req.headers['x-organization-id'] || req.query.orgId || (req.user.orgId !== 'platform-org' ? req.user.orgId : null);
+    const targetOrgId = await resolveAdminOrgId(req);
     if (targetOrgId && targetOrgId !== 'platform-org') {
       await AttendanceService.reconcilePastAbsencesForOrg(targetOrgId).catch((err) => {
         logger.warn(`reconcilePastAbsencesForOrg in getLiveAttendance error: ${err.message}`);
       });
     }
-    const organization = await prisma.organization.findUnique({ where: { id: targetOrgId || req.user.orgId }, select: { timezone: true } });
+    const organization = await prisma.organization.findUnique({ where: { id: targetOrgId }, select: { timezone: true } });
     const today = new Date(`${dateKey(now, organization?.timezone || 'Africa/Lagos')}T00:00:00.000Z`);
     const records = await prisma.attendanceRecord.findMany({
       where: {
-        ...(targetOrgId ? { employee: { orgId: targetOrgId } } : {}),
+        employee: { orgId: targetOrgId },
         OR: [
           { date: today },
-          { session: { status: 'ACTIVE', ...(targetOrgId ? { office: { orgId: targetOrgId } } : {}) } },
+          { session: { status: 'ACTIVE', office: { orgId: targetOrgId } } },
         ],
       },
       include: {

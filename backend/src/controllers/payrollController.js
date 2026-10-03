@@ -1,4 +1,5 @@
 const PayrollService = require('../services/PayrollService');
+const { prisma } = require('../config/database');
 const logger = require('../config/logger');
 
 class PayrollController {
@@ -63,6 +64,14 @@ class PayrollController {
   async downloadPayslipPdf(req, res) {
     try {
       const payslipId = req.params.id;
+      const payslip = await prisma.payslipRecord.findUnique({
+        where: { id: payslipId },
+        select: { orgId: true },
+      });
+      if (!payslip || (req.user.role !== 'SUPER_ADMIN' && payslip.orgId !== req.user.orgId)) {
+        return res.status(404).json({ status: 'error', message: 'Payslip record not found or belongs to another organization.' });
+      }
+
       const { filePath, fileName } = await PayrollService.generatePayslipPdf(payslipId);
       res.download(filePath, fileName);
     } catch (err) {
@@ -74,6 +83,14 @@ class PayrollController {
   async sendEmail(req, res) {
     try {
       const payslipId = req.params.id;
+      const payslip = await prisma.payslipRecord.findUnique({
+        where: { id: payslipId },
+        select: { orgId: true },
+      });
+      if (!payslip || (req.user.role !== 'SUPER_ADMIN' && payslip.orgId !== req.user.orgId)) {
+        return res.status(404).json({ status: 'error', message: 'Payslip record not found or belongs to another organization.' });
+      }
+
       const data = await PayrollService.sendPayslipEmail(payslipId);
       res.json({ status: 'success', data });
     } catch (err) {
