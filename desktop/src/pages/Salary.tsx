@@ -1064,7 +1064,7 @@ export default function Salary() {
                 <div>
                   <p className="font-semibold text-sm text-[var(--text-main)]">Enable Automated Payday Processing</p>
                   <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                    Automatically computes penalties, generates official payslips with performance reviews, and dispatches via email on the payout day.
+                    Automatically computes penalties, generates official payslips with attendance performance grades, and dispatches via email on the payout day.
                   </p>
                 </div>
                 <input
@@ -1089,7 +1089,7 @@ export default function Salary() {
                   </span>
                 </div>
                 <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-                  When payout is completed (either manually via <strong>Complete Payout</strong> or automatically on the scheduled payday), official PDF payslips featuring itemized penalty calculations and clickable employee performance review links are automatically emailed to each employee&apos;s registered email address.
+                  When payout is completed (either manually via <strong>Complete Payout</strong> or automatically on the scheduled payday), official PDF payslips featuring itemized penalty calculations and attendance performance grades are automatically emailed to each employee&apos;s registered email address.
                 </p>
               </div>
             </div>
