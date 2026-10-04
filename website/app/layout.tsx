@@ -5,7 +5,7 @@ import "./globals.css";
 
 const TITLE = "TimeLogic — #1 Biometric Attendance & Workforce System";
 const DESCRIPTION =
-  "TimeLogic verifies every workforce check-in by physical kiosk hardware, facial biometrics, and authorized time. Secure, real-time attendance for offices, schools, clinics, factories, and multi-branch teams.";
+  "TimeLogic is the #1 biometric attendance system. Verify workforce check-ins with secure facial recognition, physical kiosk hardware, and real-time tracking.";
 const SITE_URL = "https://www.timelogics.tech";
 
 export const metadata: Metadata = {
