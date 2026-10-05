@@ -6,6 +6,7 @@ import { Hero } from "@/components/Hero";
 import { InteractiveFeatures } from "@/components/InteractiveFeatures";
 import { MetricsDashboard } from "@/components/MetricsDashboard";
 import { TestimonialsCarousel } from "@/components/TestimonialsCarousel";
+import { FaqSection } from "@/components/FaqSection";
 import { CtaBanner } from "@/components/CtaBanner";
 import { Footer } from "@/components/Footer";
 
@@ -28,7 +29,10 @@ export default function Home() {
         {/* ── 5. TESTIMONIALS CAROUSEL: Verified Reviews Carousel with Arrow Controls ── */}
         <TestimonialsCarousel />
 
-        {/* ── 6. FINAL HIGH-CONVERSION CTA: 24h Deployment Guarantee & Direct Onboarding ── */}
+        {/* ── 6. FREQUENTLY ASKED QUESTIONS: Interactive Accordion with FAQPage Schema.org Snippets ── */}
+        <FaqSection />
+
+        {/* ── 7. FINAL HIGH-CONVERSION CTA: 24h Deployment Guarantee & Direct Onboarding ── */}
         <CtaBanner />
       </main>
 
