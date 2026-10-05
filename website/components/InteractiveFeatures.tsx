@@ -99,8 +99,8 @@ export function InteractiveFeatures() {
           </div>
 
           <h2 className="text-3xl sm:text-4xl lg:text-[44px] font-extrabold text-slate-950 tracking-tight leading-[1.18]">
-            Scale Attendance & Operations{" "}
-            <span className="text-blue-600">Automatically</span>
+            Biometric Attendance Software & Kiosks{" "}
+            <span className="text-blue-600">Built to Scale</span>
           </h2>
 
           <p className="text-sm sm:text-base text-slate-600 leading-relaxed max-w-2xl">

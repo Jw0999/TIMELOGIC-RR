@@ -100,9 +100,9 @@ export function Hero() {
 
           {/* Master Headline */}
           <h1 className="text-3xl sm:text-5xl lg:text-[56px] font-bold text-white tracking-tight leading-[1.14]">
-            Workforce attendance locked to <br className="hidden sm:inline" />
+            The #1 Biometric Attendance System <br className="hidden sm:inline" />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-cyan-300 to-blue-500">
-              physical company hardware.
+              locked to physical company hardware.
             </span>
           </h1>
 
