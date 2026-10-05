@@ -27,6 +27,7 @@ export function Header() {
     { label: "Product", href: "/#features" },
     { label: "Solutions", href: "/solution" },
     { label: "Pricing", href: "/pricing" },
+    { label: "FAQ", href: "/#faq" },
     { label: "Company", href: "/team" },
   ];
 
