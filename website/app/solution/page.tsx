@@ -1,12 +1,17 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/Button";
 import {
   MessageSquare,
   CheckCircle2,
+  ArrowRight,
+  ShieldAlert,
+  WifiOff,
+  Scale,
 } from "lucide-react";
 
 export default function SolutionPage() {
@@ -152,6 +157,36 @@ export default function SolutionPage() {
           <p className="text-slate-300 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
             A comprehensive architectural breakdown of our hardware-bound kiosk terminals, facial biometric locks, live executive command center, automated fraud engine, and instant payroll analytics.
           </p>
+
+          {/* Internal Deep Dive Links */}
+          <div className="pt-4 flex items-center justify-center gap-3 flex-wrap">
+            <Link
+              href="/solution/anti-buddy-punching"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-mono font-medium text-rose-300 bg-rose-500/10 border border-rose-500/25 hover:bg-rose-500/20 transition-all"
+            >
+              <ShieldAlert size={14} className="text-rose-400" />
+              <span>Anti-Buddy Punching</span>
+              <ArrowRight size={12} />
+            </Link>
+
+            <Link
+              href="/solution/offline-attendance"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-mono font-medium text-cyan-300 bg-cyan-500/10 border border-cyan-500/25 hover:bg-cyan-500/20 transition-all"
+            >
+              <WifiOff size={14} className="text-cyan-400" />
+              <span>100% Offline Kiosk</span>
+              <ArrowRight size={12} />
+            </Link>
+
+            <Link
+              href="/vs/fingerprint-scanners"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-mono font-medium text-sky-300 bg-sky-500/10 border border-sky-500/25 hover:bg-sky-500/20 transition-all"
+            >
+              <Scale size={14} className="text-sky-400" />
+              <span>Face Kiosk vs Fingerprint</span>
+              <ArrowRight size={12} />
+            </Link>
+          </div>
         </div>
       </section>
 
