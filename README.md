@@ -1,8 +1,8 @@
 # TimeLogic
 
-TimeLogic is a multi-platform attendance system with a Node/Express backend,
-an Electron admin app, an Android employee app, a PWA, a super-admin web app,
-and a marketing site.
+TimeLogic is a multi-platform biometric attendance and workforce management system with a Node/Express backend, an Electron admin app, an Android employee app, a PWA, a super-admin web app, and an official marketing website.
+
+🌐 **Official Website:** [https://www.timelogics.tech](https://www.timelogics.tech)
 
 ## Security notice
 
