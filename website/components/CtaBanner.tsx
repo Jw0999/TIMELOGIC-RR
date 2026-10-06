@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import {
-  MessageSquare,
+  Mail,
   ArrowRight,
   ShieldCheck,
   CheckCircle2,
@@ -44,13 +44,11 @@ export function CtaBanner() {
           </Link>
 
           <a
-            href="https://wa.me/2349113380364?text=Hello%20TimeLogic%20Team%2C%20we%20would%20like%20to%20deploy%20TimeLogic%20for%20our%20workforce."
-            target="_blank"
-            rel="noopener noreferrer"
+            href="mailto:support@timelogics.tech?subject=TimeLogic%20Deployment%20Inquiry"
             className="inline-flex items-center gap-2 px-5 py-3 rounded-full text-xs sm:text-sm font-medium text-slate-200 border border-white/15 bg-white/[0.03] hover:bg-white/[0.08] hover:text-white transition-all"
           >
-            <MessageSquare size={14} className="text-sky-400" />
-            <span>Chat on WhatsApp (+234 911 338 0364)</span>
+            <Mail size={14} className="text-sky-400" />
+            <span>Contact Support</span>
           </a>
         </div>
 

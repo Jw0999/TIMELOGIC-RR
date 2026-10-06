@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { MessageSquare, Mail, MapPin, ShieldCheck, ArrowUp } from "lucide-react";
+import { Mail, MapPin, ShieldCheck, ArrowUp } from "lucide-react";
 import { Logo, Wordmark } from "./ui/Logo";
 
 export function Footer() {
@@ -99,22 +99,11 @@ export function Footer() {
             <ul className="space-y-2.5 text-xs sm:text-sm">
               <li>
                 <a
-                  href="https://wa.me/2349113380364"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href="mailto:support@timelogics.tech"
                   className="inline-flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 font-medium transition-colors"
                 >
-                  <MessageSquare size={13} />
-                  <span>WhatsApp Lead</span>
-                </a>
-              </li>
-              <li>
-                <a
-                  href="mailto:hello@timelogics.tech"
-                  className="inline-flex items-center gap-1.5 text-slate-300 hover:text-white transition-colors"
-                >
                   <Mail size={13} />
-                  <span>hello@timelogics.tech</span>
+                  <span>support@timelogics.tech</span>
                 </a>
               </li>
               <li className="flex items-center gap-1.5 text-slate-400 text-xs pt-1">

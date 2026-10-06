@@ -19,7 +19,7 @@ import {
   Building2,
   Fingerprint,
   ScanFace,
-  MessageSquare,
+  Mail,
 } from "lucide-react";
 
 interface ComparisonRow {
@@ -168,13 +168,11 @@ export default function FingerprintVsFacialPage() {
             </Link>
 
             <a
-              href="https://wa.me/2349113380364?text=Hello%20TimeLogic%2C%20we%20want%20to%20replace%20our%20fingerprint%20scanners%20with%20facial%20kiosks."
-              target="_blank"
-              rel="noopener noreferrer"
+              href="mailto:support@timelogics.tech?subject=TimeLogic%20Fingerprint%20Migration%20Inquiry"
               className="inline-flex items-center gap-2 px-5 py-3 rounded-full text-xs sm:text-sm font-medium text-slate-200 border border-white/15 bg-white/[0.03] hover:bg-white/[0.08] hover:text-white transition-all"
             >
-              <MessageSquare size={14} className="text-sky-400" />
-              <span>Discuss Migration with Lead Engineer</span>
+              <Mail size={14} className="text-sky-400" />
+              <span>Contact Support</span>
             </a>
           </div>
         </div>
@@ -365,12 +363,10 @@ export default function FingerprintVsFacialPage() {
                 View Transparent Pricing
               </Link>
               <a
-                href="https://wa.me/2349113380364?text=Hello%20TimeLogic%2C%20we%20want%20a%20free%20demo%20of%20the%20facial%20recognition%20kiosk."
-                target="_blank"
-                rel="noopener noreferrer"
+                href="mailto:support@timelogics.tech?subject=TimeLogic%20Kiosk%20Demo%20Inquiry"
                 className="px-5 py-3 rounded-full text-xs sm:text-sm font-medium text-slate-200 border border-white/15 bg-white/[0.04] hover:bg-white/[0.08]"
               >
-                Schedule Direct WhatsApp Demo
+                Schedule Direct Demo
               </a>
             </div>
           </div>

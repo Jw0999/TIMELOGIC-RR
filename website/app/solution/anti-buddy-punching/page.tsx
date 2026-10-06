@@ -15,7 +15,7 @@ import {
   ScanFace,
   ChevronDown,
   ArrowRight,
-  MessageSquare,
+  Mail,
   Lock,
   Layers,
   Sparkles,
@@ -99,13 +99,11 @@ export default function AntiBuddyPunchingPage() {
             </Link>
 
             <a
-              href="https://wa.me/2349113380364?text=Hello%20TimeLogic%2C%20we%20want%20to%20eliminate%20buddy%20punching%20in%20our%20workforce."
-              target="_blank"
-              rel="noopener noreferrer"
+              href="mailto:support@timelogics.tech?subject=TimeLogic%20Anti-Buddy%20Punching%20Inquiry"
               className="inline-flex items-center gap-2 px-5 py-3 rounded-full text-xs sm:text-sm font-medium text-slate-200 border border-white/15 bg-white/[0.03] hover:bg-white/[0.08] hover:text-white transition-all"
             >
-              <MessageSquare size={14} className="text-sky-400" />
-              <span>Talk to Our Engineering Team</span>
+              <Mail size={14} className="text-sky-400" />
+              <span>Contact Support</span>
             </a>
           </div>
         </div>
@@ -225,7 +223,7 @@ export default function AntiBuddyPunchingPage() {
                   <span>Credential & Session Sharing</span>
                 </div>
                 <p className="text-slate-300 text-xs leading-relaxed">
-                  Employees routinely log into a coworker’s account or share single-use PINs over WhatsApp so friends on-site clock in for them.
+                  Employees routinely log into a coworker’s account or share single-use PINs over messaging apps so friends on-site clock in for them.
                 </p>
               </div>
 
@@ -318,9 +316,7 @@ export default function AntiBuddyPunchingPage() {
                 View Plans & Pricing
               </Link>
               <a
-                href="https://wa.me/2349113380364?text=Hello%20TimeLogic%2C%20we%20want%20to%20deploy%20anti-buddy%20punching%20attendance."
-                target="_blank"
-                rel="noopener noreferrer"
+                href="mailto:support@timelogics.tech?subject=TimeLogic%20Deployment%20Inquiry"
                 className="px-5 py-3 rounded-full text-xs sm:text-sm font-medium text-slate-200 border border-white/15 bg-white/[0.04] hover:bg-white/[0.08]"
               >
                 Contact Deployment Engineering

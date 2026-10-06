@@ -88,7 +88,7 @@ const jsonLd = {
       name: "TimeLogic",
       url: SITE_URL,
       logo: `${SITE_URL}/logo-mark-cyan.png`,
-      email: "hr@timelogics.tech",
+      email: "support@timelogics.tech",
       sameAs: [
         "https://www.linkedin.com/company/timelogic",
         "https://twitter.com/TimeLogicTech",

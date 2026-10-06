@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/Button";
 import {
   CheckCircle2,
   Mail,
-  MessageSquare,
   ArrowRight,
   Inbox,
   Lock,
@@ -172,11 +171,11 @@ export default function SuccessPage() {
             <Button
               variant="primary"
               size="md"
-              href="https://wa.me/2349113380364"
-              icon={<MessageSquare size={14} />}
+              href="mailto:support@timelogics.tech?subject=TimeLogic%20Deployment%20Support"
+              icon={<Mail size={14} />}
               className="text-xs sm:text-sm font-semibold shadow-xs"
             >
-              Chat with Deployment Lead
+              Contact Deployment Support
             </Button>
 
             <Button

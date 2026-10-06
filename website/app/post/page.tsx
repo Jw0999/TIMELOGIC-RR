@@ -5,7 +5,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/Button";
 import {
-  MessageSquare,
+  Mail,
   CheckCircle2,
 } from "lucide-react";
 
@@ -279,11 +279,11 @@ export default function PostPage() {
             <Button
               variant="primary"
               size="md"
-              href="https://wa.me/2349113380364"
-              icon={<MessageSquare size={15} />}
+              href="mailto:support@timelogics.tech?subject=TimeLogic%20Demo%20Inquiry"
+              icon={<Mail size={15} />}
               className="font-semibold shadow-xs text-xs sm:text-sm"
             >
-              Chat with Deployment Lead
+              Contact Support
             </Button>
             <Button
               variant="outline"

@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/Button";
 import {
   Check,
   Minus,
-  MessageSquare,
   HelpCircle,
   Mail,
   ShieldCheck,
@@ -68,7 +67,7 @@ export default function PricingPage() {
         "Custom shift rules & multi-window break policies",
         "Dedicated enterprise account manager & SLA",
         "On-premise hardware setup and staff enrollment",
-        "24/7 priority telephone & on-site technical support",
+        "24/7 priority on-site technical support",
       ],
       ctaText: "Contact for Custom Deployment",
       highlighted: false,
@@ -107,7 +106,7 @@ export default function PricingPage() {
       category: "Service & Deployment",
       items: [
         { name: "Onboarding SLA", starter: "Included (24h)", enterprise: "Priority (12h)", org: "Dedicated SLA" },
-        { name: "Support channel", starter: "WhatsApp & Email", enterprise: "WhatsApp & Phone", org: "24/7 Dedicated Lead" },
+        { name: "Support channel", starter: "Email Support", enterprise: "Priority Email & SLAs", org: "24/7 Dedicated Lead" },
         { name: "On-site setup assistance", starter: "Remote guidance", enterprise: "Remote + Assisted", org: "Full on-premise deployment" },
       ],
     },
@@ -215,30 +214,20 @@ export default function PricingPage() {
                   </div>
                 </div>
 
-                {/* Action Buttons: WhatsApp & Direct Email Deployment */}
-                <div className="pt-4 border-t border-white/[0.08] space-y-2">
+                {/* Action Button: Direct Email Deployment */}
+                <div className="pt-4 border-t border-white/[0.08]">
                   <Button
                     variant={plan.highlighted ? "primary" : "outline"}
                     size="sm"
-                    href={`https://wa.me/2349113380364?text=${encodeURIComponent(`Hello TimeLogic Team, I would like to deploy TimeLogic on the ${plan.name} plan.`)}`}
-                    icon={<MessageSquare size={13} />}
+                    href={`mailto:support@timelogics.tech?subject=TimeLogic%20${encodeURIComponent(plan.name)}%20Deployment%20Inquiry&body=Hello%20TimeLogic%20Team%2C%0A%0AWe%20would%20like%20to%20deploy%20TimeLogic%20(${encodeURIComponent(plan.name)}%20Tier).%0A%0AOrganisation%20Name%3A%20...%0AEstimated%20Employees%3A%20...`}
+                    icon={<Mail size={13} />}
                     className={`w-full justify-center text-xs font-semibold ${
                       plan.highlighted
                         ? "shadow-xs"
                         : "text-white border-white/20 hover:bg-white/10"
                     }`}
                   >
-                    Deploy {plan.name} on WhatsApp
-                  </Button>
-
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    href={`mailto:deployment@timelogics.tech?subject=TimeLogic%20${encodeURIComponent(plan.name)}%20Deployment%20Inquiry&body=Hello%20TimeLogic%20Deployment%20Team%2C%0A%0AWe%20would%20like%20to%20deploy%20TimeLogic%20(${encodeURIComponent(plan.name)}%20Tier).%0A%0AOrganisation%20Name%3A%20...%0AEstimated%20Employees%3A%20...`}
-                    icon={<Mail size={12} />}
-                    className="w-full justify-center text-[11px] text-slate-300 hover:text-white"
-                  >
-                    Email Deployment Team
+                    Deploy {plan.name} via Email
                   </Button>
                 </div>
               </div>

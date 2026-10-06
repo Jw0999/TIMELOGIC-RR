@@ -6,7 +6,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/Button";
 import {
-  MessageSquare,
+  Mail,
   CheckCircle2,
   ArrowRight,
   ShieldAlert,
@@ -290,19 +290,19 @@ export default function SolutionPage() {
             <Button
               variant="primary"
               size="md"
-              href="https://wa.me/2349113380364"
-              icon={<MessageSquare size={15} />}
+              href="/pricing"
               className="font-semibold shadow-xs text-xs sm:text-sm"
             >
-              Chat with Deployment Team
+              View Monthly Plans
             </Button>
             <Button
               variant="outline"
               size="md"
-              href="/pricing"
+              href="mailto:support@timelogics.tech?subject=TimeLogic%20Deployment%20Inquiry"
+              icon={<Mail size={15} />}
               className="text-xs sm:text-sm text-white border-white/20 hover:bg-white/10"
             >
-              View Monthly Plans
+              Contact Support
             </Button>
           </div>
         </div>

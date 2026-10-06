@@ -4,7 +4,7 @@ import React from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/Button";
-import { MessageSquare, ShieldCheck, Cpu, Code2, ArrowLeft } from "lucide-react";
+import { Mail, ShieldCheck, Cpu, Code2, ArrowLeft } from "lucide-react";
 
 export default function TeamPage() {
   const principles = [
@@ -70,11 +70,11 @@ export default function TeamPage() {
               <Button
                 variant="primary"
                 size="md"
-                href="https://wa.me/2349113380364"
-                icon={<MessageSquare size={14} />}
+                href="mailto:support@timelogics.tech?subject=Executive%20Inquiry"
+                icon={<Mail size={14} />}
                 className="text-xs sm:text-sm font-semibold shadow-xs"
               >
-                Chat Directly with Leadership
+                Contact Leadership
               </Button>
               <Button
                 variant="outline"

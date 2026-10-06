@@ -37,7 +37,7 @@ const FAQ_ITEMS: FaqItem[] = [
   {
     question: "How quickly can an organization onboard and deploy TimeLogic?",
     answer:
-      "Most companies go live within 24 hours. You can import your employee directory via CSV or Excel, configure your company shift rules, and pair your first kiosk station in minutes. Our deployment team is available via WhatsApp and direct onboarding support to ensure seamless rollout.",
+      "Most companies go live within 24 hours. You can import your employee directory via CSV or Excel, configure your company shift rules, and pair your first kiosk station in minutes. Our deployment team is available via direct support to ensure seamless rollout.",
   },
 ];
 
@@ -137,12 +137,10 @@ export function FaqSection() {
           <ShieldCheck size={14} className="text-sky-400" />
           <span>Have a custom compliance or hardware inquiry?</span>
           <a
-            href="https://wa.me/2349113380364?text=Hello%20TimeLogic%2C%20I%20have%20a%20question%20about%20your%20biometric%20attendance%20system."
-            target="_blank"
-            rel="noopener noreferrer"
+            href="mailto:support@timelogics.tech?subject=TimeLogic%20Compliance%20or%20Hardware%20Inquiry"
             className="text-sky-400 hover:text-sky-300 underline font-semibold transition-colors"
           >
-            Chat with our engineering team
+            Contact support@timelogics.tech
           </a>
         </div>
       </div>

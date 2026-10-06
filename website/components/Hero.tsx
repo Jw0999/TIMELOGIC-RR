@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   Sparkles,
   Zap,
+  Mail,
 } from "lucide-react";
 
 export function Hero() {
@@ -123,12 +124,11 @@ export function Hero() {
             </a>
 
             <a
-              href="https://wa.me/2349113380364?text=Hello%20TimeLogic%20Team%2C%20we%20want%20to%20deploy%20TimeLogic%20on-premise%20attendance."
-              target="_blank"
-              rel="noopener noreferrer"
+              href="mailto:support@timelogics.tech?subject=TimeLogic%20Deployment%20Inquiry"
               className="inline-flex items-center gap-2 px-5 py-3 rounded-full text-xs sm:text-sm font-medium text-slate-200 border border-white/15 bg-white/[0.03] hover:bg-white/[0.08] hover:text-white transition-all"
             >
-              <span>Chat with Deployment Lead</span>
+              <Mail size={14} className="text-sky-400" />
+              <span>Contact Support</span>
               <span className="text-xs font-mono text-emerald-400">● 24h SLA</span>
             </a>
           </div>
