@@ -42,10 +42,17 @@ interface PayrollLineItem {
   id: string;
   type: string;
   category: string;
+  categoryLabel?: string;
+  categoryColor?: string;
+  badgeBg?: string;
   amount: number;
   currency: string;
   description: string;
   date?: string | null;
+  dateFormatted?: string | null;
+  time?: string | null;
+  timeStr?: string | null;
+  subDetail?: string | null;
   minutes?: number;
   ratePerHour?: number;
   ruleVersion?: string;
@@ -1319,12 +1326,19 @@ export default function Salary() {
                   {(breakdownModalEmployee.calculationSnapshot?.lineItems || breakdownModalEmployee.lineItems || []).map((item) => (
                     <div key={item.id} className="py-2.5 flex items-start justify-between gap-3 text-xs">
                       <div className="min-w-0">
-                        <p className="font-semibold text-[var(--text-main)]">{item.description}</p>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {item.categoryLabel && (
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${item.category === 'EARNING' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'}`}>
+                              {item.categoryLabel}
+                            </span>
+                          )}
+                          <p className="font-semibold text-[var(--text-main)]">{item.description}</p>
+                        </div>
                         <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
-                          {[item.date, item.minutes != null ? `${item.minutes} min` : null, item.ratePerHour != null ? `${formatMoney(item.ratePerHour, item.currency)}/hr` : null, item.ruleVersion, item.sourceType ? `${item.sourceType} ${item.sourceId}` : null].filter(Boolean).join(' · ')}
+                          {[item.dateFormatted || item.date, item.time || item.timeStr, item.subDetail, item.minutes != null ? `${item.minutes} min` : null, item.ratePerHour != null ? `${formatMoney(item.ratePerHour, item.currency)}/hr` : null, item.ruleVersion].filter(Boolean).join(' · ')}
                         </p>
                       </div>
-                      <span className={`font-bold whitespace-nowrap ${item.category === 'EARNING' ? 'text-emerald-700' : 'text-red-700'}`}>
+                      <span className={`font-bold whitespace-nowrap ${item.category === 'EARNING' ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
                         {item.category === 'EARNING' ? '+' : '-'}{formatMoney(item.amount, item.currency)}
                       </span>
                     </div>
