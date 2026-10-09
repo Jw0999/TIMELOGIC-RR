@@ -8,10 +8,107 @@ const EmployeePolicy = require('./EmployeePolicyService');
 const { dateOnly, dateKey, zonedParts, evaluateAttendance, attendanceDate, isSunday, openingOccurrence, atZonedTime, officeHoursFor } = require('../utils/attendanceClock');
 const { getCurrentServerTime } = require('../utils/networkTime');
 const { performFaceVerification, hasValidEnrolledFace } = require('../utils/faceVerify');
+const AuditService = require('./AuditService');
+const WorkEventService = require('./WorkEventService');
+const BreakService = require('./BreakService');
 
 const CHALLENGE_TTL_SECONDS = 120; // code valid for 2 minutes
 
 class AttendanceService {
+  async _executeAttendanceEvent({
+    orgId,
+    employeeId,
+    actorId = employeeId,
+    sessionId = null,
+    eventType,
+    source,
+    idempotencyKey,
+    clientTimestamp = null,
+    deviceId = null,
+    networkEvidence = null,
+    identityEvidence = null,
+    livenessEvidence = null,
+    ruleVersion = 'attendance-trust-v1',
+    persist,
+  }) {
+    const key = String(idempotencyKey || uuidv4());
+    const existing = await prisma.attendanceEvent.findUnique({
+      where: { orgId_idempotencyKey: { orgId, idempotencyKey: key } },
+    });
+    if (existing) return this._replayAttendanceEvent(existing);
+
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const event = await tx.attendanceEvent.create({
+          data: {
+            orgId,
+            employeeId,
+            actorId,
+            sessionId,
+            eventType,
+            source,
+            result: 'PROCESSING',
+            idempotencyKey: key,
+            clientTimestamp: clientTimestamp instanceof Date && !Number.isNaN(clientTimestamp.getTime()) ? clientTimestamp : null,
+            deviceId,
+            networkEvidence,
+            identityEvidence,
+            livenessEvidence,
+            ruleVersion,
+          },
+        });
+        const outcome = await persist(tx);
+        await tx.attendanceEvent.update({
+          where: { id: event.id },
+          data: {
+            result: 'ACCEPTED',
+            attendanceRecordId: outcome.record?.id || null,
+            outcome: {
+              recordId: outcome.record?.id || null,
+              status: outcome.status || null,
+              penalty: outcome.penalty ?? null,
+              clockInTime: outcome.clockInTime || outcome.record?.clockInTime || null,
+              clockOutTime: outcome.clockOutTime || outcome.record?.clockOutTime || null,
+              ruleEvaluation: outcome.ruleEvaluation || null,
+            },
+          },
+        });
+        await WorkEventService.recordAttendanceEvent(
+          tx,
+          { ...event, result: 'ACCEPTED', attendanceRecordId: outcome.record?.id || null, outcome },
+          outcome,
+        );
+        return { ...outcome, eventId: event.id, duplicate: false };
+      });
+    } catch (err) {
+      if (err.code === 'P2002') {
+        const committed = await prisma.attendanceEvent.findUnique({
+          where: { orgId_idempotencyKey: { orgId, idempotencyKey: key } },
+        });
+        if (committed) return this._replayAttendanceEvent(committed);
+      }
+      throw err;
+    }
+  }
+
+  async _replayAttendanceEvent(event) {
+    if (event.result !== 'ACCEPTED' || !event.attendanceRecordId) {
+      throw Object.assign(new Error('This attendance event is still being processed.'), { status: 409, code: 'EVENT_IN_PROGRESS' });
+    }
+    const record = await prisma.attendanceRecord.findUnique({ where: { id: event.attendanceRecordId } });
+    if (!record) throw Object.assign(new Error('The original attendance result is unavailable.'), { status: 409, code: 'EVENT_RESULT_UNAVAILABLE' });
+    const outcome = event.outcome || {};
+    return {
+      record,
+      status: outcome.status || record.status,
+      penalty: outcome.penalty ?? record.penalty,
+      clockInTime: outcome.clockInTime || record.clockInTime,
+      clockOutTime: outcome.clockOutTime || record.clockOutTime,
+      eventId: event.id,
+      duplicate: true,
+    };
+  }
+
   // ── CHALLENGE (anti-automation) ───────────────────────────────────────────────
   // Step 1 of check-in: validate the Wi-Fi FIRST, then issue a short-lived random
   // code the employee must type back. If they're on the wrong network, no code is
@@ -403,15 +500,28 @@ class AttendanceService {
     });
 
     // ── Persist the record ──
-    const record = await this._persistCheckIn({
-      employeeId, sessionId, date: today, clockInTime, status, penalty,
-      checkInSource: 'PHONE', scanResult: 'VALID',
-      wifiVerified: check.wifiVerified, deviceVerified: check.deviceVerified,
-      deviceId: deviceId ?? null, wifiSSID: wifiSSID ?? null,
+    const outcome = await this._executeAttendanceEvent({
+      orgId: employee.orgId,
+      employeeId,
+      actorId: employeeId,
+      sessionId,
+      eventType: 'CHECK_IN',
+      source: 'PHONE',
+      ruleVersion: 'attendance-office-v1',
+      idempotencyKey: scanData.idempotencyKey,
+      deviceId: deviceId ?? null,
+      networkEvidence: { wifiSSID: wifiSSID ?? null, ip: ip ?? null, wifiVerified: check.wifiVerified },
+      identityEvidence: { method: 'AUTHENTICATED_EMPLOYEE_TOKEN' },
+      persist: (tx) => this._persistCheckIn({
+        employeeId, sessionId, date: today, clockInTime, status, penalty,
+        checkInSource: 'PHONE', scanResult: 'VALID',
+        wifiVerified: check.wifiVerified, deviceVerified: check.deviceVerified,
+        deviceId: deviceId ?? null, wifiSSID: wifiSSID ?? null,
+      }, tx).then((record) => ({ record, status, penalty, clockInTime, timezone: session.office.timezone || 'Africa/Lagos' })),
     });
 
-    this._emit('attendance:checkin', { record, sessionId });
-    return { success: true, record, status, penalty, clockInTime, timezone: session.office.timezone || 'Africa/Lagos' };
+    if (!outcome.duplicate) this._emit('attendance:checkin', { record: outcome.record, sessionId });
+    return { success: true, ...outcome };
   }
 
   // ── CHECK OUT ─────────────────────────────────────────────────────────────────
@@ -436,6 +546,8 @@ class AttendanceService {
               select: {
                 id: true, orgId: true, name: true, wifiSSID: true, publicIp: true,
                 openTime: true, closeTime: true, weeklySchedule: true, timezone: true,
+                overtimeStartAfterCloseMinutes: true, overtimeFeePerHour: true,
+                overstayPenalty: true, breakMinutes: true, breakStart: true, breakEnd: true,
                 securitySettings: true,
               },
             },
@@ -469,31 +581,75 @@ class AttendanceService {
 
     const workMs = clockOutTime - record.clockInTime;
     const totalWorkHours = parseFloat((workMs / 3600000).toFixed(2));
+    const activeBreaks = await prisma.breakRecord.findMany({ where: { employeeId, endTime: null } });
+    const { policy: overtimePolicy, evaluation: overtimeEvaluation } = await this._evaluateOvertimeAtCheckout(employee.orgId, record, clockOutTime);
 
-    // Auto-end any active break upon clock out
-    const activeBreaks = await prisma.breakRecord.findMany({
-      where: { employeeId, endTime: null },
-    });
+    // Auto-end any active break upon clock out with break penalty calculation
+    const bPolicy = await BreakService._getPolicy(employeeId).catch(() => null);
+    const bOffice = record.session?.office;
+    const bTz = bOffice?.timezone || 'Africa/Lagos';
     for (const b of activeBreaks) {
       const dur = Math.max(1, Math.floor((clockOutTime - b.startTime) / 60000));
+      const bPenalty = BreakService._overstayPenalty(b.startTime, clockOutTime, bPolicy, bTz, bOffice);
       await prisma.breakRecord.update({
         where: { id: b.id },
-        data: { endTime: clockOutTime, durationMinutes: dur, isAutoEnded: true, notes: 'Auto-ended on clock out' },
+        data: { endTime: clockOutTime, durationMinutes: dur, penalty: bPenalty, isAutoEnded: true, notes: 'Auto-ended on clock out' },
       });
+      await prisma.attendanceRecord.update({
+        where: { id: record.id },
+        data: { totalBreakMinutes: { increment: dur } },
+      }).catch(() => {});
     }
 
-    const changed = await prisma.attendanceRecord.updateMany({
-      where: { id: record.id, clockOutTime: null },
-      data: { clockOutTime, totalWorkHours, checkOutSource: 'PHONE' },
-    });
-    if (!changed.count) throw Object.assign(new Error('Already clocked out'), { status: 409 });
-    const updated = await prisma.attendanceRecord.findUnique({
-      where: { id: record.id },
-      include: { session: { select: { office: { select: { timezone: true } } } } },
+    const outcome = await this._executeAttendanceEvent({
+      orgId: employee.orgId,
+      employeeId,
+      actorId: employeeId,
+      sessionId: record.sessionId,
+      eventType: 'CHECK_OUT',
+      source: 'PHONE',
+      ruleVersion: overtimeEvaluation ? 'OFFICE-OVERTIME-v1' : 'NO-OVERTIME-CONFIGURED',
+      idempotencyKey: ctx.idempotencyKey,
+      deviceId: ctx.deviceId ?? null,
+      networkEvidence: { wifiSSID: ctx.wifiSSID ?? null, ip: ctx.ip ?? null, wifiVerified: check.wifiVerified },
+      identityEvidence: { method: 'AUTHENTICATED_EMPLOYEE_TOKEN' },
+      persist: async (tx) => {
+        const activeBreaks = await tx.breakRecord.findMany({ where: { employeeId, endTime: null } });
+        for (const b of activeBreaks) {
+          const dur = Math.max(1, Math.floor((clockOutTime - b.startTime) / 60000));
+          const bPenalty = BreakService._overstayPenalty(b.startTime, clockOutTime, bPolicy, bTz, bOffice);
+          await tx.breakRecord.update({
+            where: { id: b.id },
+            data: { endTime: clockOutTime, durationMinutes: dur, penalty: bPenalty, isAutoEnded: true, notes: 'Auto-ended on clock out' },
+          });
+          await tx.attendanceRecord.update({
+            where: { id: record.id },
+            data: { totalBreakMinutes: { increment: dur } },
+          }).catch(() => {});
+        }
+        const changed = await tx.attendanceRecord.updateMany({
+          where: { id: record.id, clockOutTime: null },
+          data: {
+            clockOutTime,
+            totalWorkHours,
+            checkOutSource: 'PHONE',
+            overtimeMinutes: overtimeEvaluation?.overtimeMinutes ?? 0,
+            overtimeEarnings: overtimeEvaluation?.overtimeEarnings ?? 0,
+            overtimeRuleVersion: overtimeEvaluation?.ruleVersion ?? null,
+            overtimeDetails: overtimeEvaluation ?? null,
+          },
+        });
+        if (!changed.count) throw Object.assign(new Error('Already clocked out'), { status: 409 });
+        const updated = await tx.attendanceRecord.findUnique({
+          where: { id: record.id },
+          include: { session: { select: { office: { select: { timezone: true } } } } },
+        });
+        return { record: updated, clockOutTime: updated.clockOutTime, ruleEvaluation: overtimeEvaluation };
+      },
     });
 
-    this._emit('attendance:checkout', { record: updated, sessionId: record.sessionId });
-    return updated;
+    if (!outcome.duplicate) this._emit('attendance:checkout', { record: outcome.record, sessionId: record.sessionId });
+    return outcome.record;
   }
 
   async getManualDashboard(adminOrgId, { sessionId, search = '', page = 1, limit = 100 } = {}) {
@@ -798,8 +954,9 @@ class AttendanceService {
     };
   }
 
-  async manualCheckIn(adminId, adminOrgId, { employeeId, sessionId, password, faceImage, timestamp }) {
-    const clockInTime = timestamp ? new Date(timestamp) : await getCurrentServerTime();
+  async manualCheckIn(adminId, adminOrgId, { employeeId, sessionId, password, faceImage, livenessFrames, timestamp, idempotencyKey }) {
+    const clientTimestamp = timestamp ? new Date(timestamp) : null;
+    const clockInTime = await getCurrentServerTime();
     const employee = await this._loadEmployeeForChannel(employeeId, 'MANUAL', true);
     if (adminOrgId !== 'platform-org' && employee.orgId !== adminOrgId) {
       throw Object.assign(new Error('Employee not found.'), { status: 404 });
@@ -810,12 +967,13 @@ class AttendanceService {
 
     // ── Face verification (after password passes) ──────────────────────────
     const hasFace = Boolean(hasValidEnrolledFace(employee));
+    let faceResult = null;
     if (hasFace) {
       // Employee has a verified face enrolled on disk → must verify
       if (!faceImage) {
         throw Object.assign(new Error('Face image is required. Please capture your face.'), { status: 400, code: 'FACE_REQUIRED' });
       }
-      await performFaceVerification(employee, faceImage);
+      faceResult = await performFaceVerification(employee, faceImage, livenessFrames);
     } else if (employee.organization?.requireFaceVerification) {
       // Org requires face but employee hasn't enrolled yet
       throw Object.assign(new Error('Face not registered. Please enroll your face first.'), { status: 400, code: 'FACE_NOT_ENROLLED' });
@@ -830,20 +988,33 @@ class AttendanceService {
     await this._assertEmployeeMayCheckIn(employeeId, clockInTime, session.office.timezone);
 
     const { status, penalty } = this._computeStatusAndPenalty(clockInTime, session, employee);
-    const record = await this._persistCheckIn({
-      employeeId, sessionId, date: attendanceDate(clockInTime, {
-        ...session.office,
-        openingReference: session.startTime,
-      }),
-      clockInTime, status, penalty,
-      checkInSource: 'MANUAL', checkInRecordedById: adminId,
-      wifiVerified: false, deviceVerified: false,
+    const outcome = await this._executeAttendanceEvent({
+      orgId: employee.orgId,
+      employeeId,
+      actorId: adminId,
+      sessionId,
+      eventType: 'CHECK_IN',
+      source: 'MANUAL',
+      ruleVersion: 'attendance-office-v1',
+      idempotencyKey,
+      clientTimestamp,
+      identityEvidence: { method: 'EMPLOYEE_PASSWORD', faceVerified: Boolean(faceResult?.identity?.verified ?? faceResult?.verified) },
+      livenessEvidence: faceResult?.liveness || (faceResult ? { verified: faceResult.is_real === true, method: faceResult.liveness_method || 'provider' } : null),
+      persist: (tx) => this._persistCheckIn({
+        employeeId, sessionId, date: attendanceDate(clockInTime, {
+          ...session.office,
+          openingReference: session.startTime,
+        }),
+        clockInTime, status, penalty,
+        checkInSource: 'MANUAL', checkInRecordedById: adminId,
+        wifiVerified: false, deviceVerified: false,
+      }, tx).then((record) => ({ record, status, penalty, clockInTime })),
     });
-    this._emit('attendance:checkin', { record, sessionId, source: 'MANUAL' });
-    return { record, status, penalty, clockInTime };
+    if (!outcome.duplicate) this._emit('attendance:checkin', { record: outcome.record, sessionId, source: 'MANUAL' });
+    return outcome;
   }
 
-  async manualCheckOut(adminId, adminOrgId, { employeeId, sessionId, password, faceImage, timestamp }) {
+  async manualCheckOut(adminId, adminOrgId, { employeeId, sessionId, password, faceImage, timestamp, idempotencyKey }) {
     const employee = await this._loadEmployeeForChannel(employeeId, 'MANUAL', true);
     if (adminOrgId !== 'platform-org' && employee.orgId !== adminOrgId) {
       throw Object.assign(new Error('Employee not found.'), { status: 404 });
@@ -867,38 +1038,63 @@ class AttendanceService {
         session: {
           select: {
             startTime: true,
-            office: { select: { orgId: true, openTime: true, closeTime: true, weeklySchedule: true, timezone: true } },
+            office: { select: { orgId: true, openTime: true, closeTime: true, weeklySchedule: true, timezone: true, overtimeStartAfterCloseMinutes: true, overtimeFeePerHour: true, overstayPenalty: true, breakMinutes: true, breakStart: true, breakEnd: true } },
           },
         },
       },
     });
     if (!record) throw Object.assign(new Error('No open attendance record found for this employee.'), { status: 404 });
-    const clockOutTime = timestamp ? new Date(timestamp) : await getCurrentServerTime();
+    const clientTimestamp = timestamp ? new Date(timestamp) : null;
+    const clockOutTime = await getCurrentServerTime();
     this._assertCheckoutAllowed(record, clockOutTime);
     const totalWorkHours = parseFloat(((clockOutTime - record.clockInTime) / 3600000).toFixed(2));
-    // Auto-end any active break upon manual clock out
-    const activeBreaks = await prisma.breakRecord.findMany({
-      where: { employeeId, endTime: null },
-    });
-    for (const b of activeBreaks) {
-      const dur = Math.max(1, Math.floor((clockOutTime - b.startTime) / 60000));
-      await prisma.breakRecord.update({
-        where: { id: b.id },
-        data: { endTime: clockOutTime, durationMinutes: dur, isAutoEnded: true, notes: 'Auto-ended on manual clock out' },
-      });
-    }
-
-    const changed = await prisma.attendanceRecord.updateMany({
-      where: { id: record.id, clockOutTime: null },
-      data: {
-        clockOutTime, totalWorkHours,
-        checkOutSource: 'MANUAL', checkOutRecordedById: adminId,
+    const { policy: overtimePolicy, evaluation: overtimeEvaluation } = await this._evaluateOvertimeAtCheckout(employee.orgId, record, clockOutTime);
+    const outcome = await this._executeAttendanceEvent({
+      orgId: employee.orgId,
+      employeeId,
+      actorId: adminId,
+      sessionId: record.sessionId,
+      eventType: 'CHECK_OUT',
+      source: 'MANUAL',
+      ruleVersion: overtimeEvaluation ? 'OFFICE-OVERTIME-v1' : 'NO-OVERTIME-CONFIGURED',
+      idempotencyKey,
+      clientTimestamp,
+      identityEvidence: { method: 'EMPLOYEE_PASSWORD' },
+      persist: async (tx) => {
+        const activeBreaks = await tx.breakRecord.findMany({ where: { employeeId, endTime: null } });
+        const bPolicy = await BreakService._getPolicy(employeeId).catch(() => null);
+        const bOffice = record.session?.office;
+        const bTz = bOffice?.timezone || 'Africa/Lagos';
+        for (const b of activeBreaks) {
+          const dur = Math.max(1, Math.floor((clockOutTime - b.startTime) / 60000));
+          const bPenalty = BreakService._overstayPenalty(b.startTime, clockOutTime, bPolicy, bTz, bOffice);
+          await tx.breakRecord.update({
+            where: { id: b.id },
+            data: { endTime: clockOutTime, durationMinutes: dur, penalty: bPenalty, isAutoEnded: true, notes: 'Auto-ended on manual clock out' },
+          });
+          await tx.attendanceRecord.update({
+            where: { id: record.id },
+            data: { totalBreakMinutes: { increment: dur } },
+          }).catch(() => {});
+        }
+        const changed = await tx.attendanceRecord.updateMany({
+          where: { id: record.id, clockOutTime: null },
+          data: {
+            clockOutTime, totalWorkHours,
+            checkOutSource: 'MANUAL', checkOutRecordedById: adminId,
+            overtimeMinutes: overtimeEvaluation?.overtimeMinutes ?? 0,
+            overtimeEarnings: overtimeEvaluation?.overtimeEarnings ?? 0,
+            overtimeRuleVersion: overtimeEvaluation?.ruleVersion ?? null,
+            overtimeDetails: overtimeEvaluation ?? null,
+          },
+        });
+        if (!changed.count) throw Object.assign(new Error('Employee is already checked out.'), { status: 409 });
+        const updated = await tx.attendanceRecord.findUnique({ where: { id: record.id } });
+        return { record: updated, clockOutTime: updated.clockOutTime, ruleEvaluation: overtimeEvaluation };
       },
     });
-    if (!changed.count) throw Object.assign(new Error('Employee is already checked out.'), { status: 409 });
-    const updated = await prisma.attendanceRecord.findUnique({ where: { id: record.id } });
-    this._emit('attendance:checkout', { record: updated, sessionId: record.sessionId, source: 'MANUAL' });
-    return { record: updated, clockOutTime: updated.clockOutTime };
+    if (!outcome.duplicate) this._emit('attendance:checkout', { record: outcome.record, sessionId: record.sessionId, source: 'MANUAL' });
+    return outcome;
   }
 
   async batchSyncAttendance(adminId, adminOrgId, { records }) {
@@ -920,10 +1116,11 @@ class AttendanceService {
             password,
             faceImage,
             timestamp,
+            idempotencyKey: clientEventId,
           });
           results.push({
             clientEventId,
-            status: 'SYNCED',
+            status: res.duplicate ? 'ALREADY_SYNCED' : 'SYNCED',
             type: 'check_in',
             recordId: res.record.id,
             clockInTime: res.clockInTime,
@@ -936,10 +1133,11 @@ class AttendanceService {
             password,
             faceImage,
             timestamp,
+            idempotencyKey: clientEventId,
           });
           results.push({
             clientEventId,
-            status: 'SYNCED',
+            status: res.duplicate ? 'ALREADY_SYNCED' : 'SYNCED',
             type: 'check_out',
             recordId: res.record.id,
             clockOutTime: res.clockOutTime,
@@ -986,6 +1184,20 @@ class AttendanceService {
     const hours = officeHoursFor(clockOutTime, office);
     if (!hours) throw Object.assign(new Error('This office is closed today.'), { status: 400, reason: 'SUNDAY_CLOSED' });
 
+    const closeAt = this._getScheduledOfficeClose(record, clockOutTime, hours);
+    if (closeAt && clockOutTime < closeAt) {
+      throw Object.assign(
+        new Error(`Check-out is available after the organisation closes at ${hours.closeTime} (${office.timezone || 'Africa/Lagos'}).`),
+        { status: 400, reason: 'CHECKOUT_TOO_EARLY' }
+      );
+    }
+  }
+
+  _getScheduledOfficeClose(record, at, knownHours = null) {
+    const office = record.session?.office;
+    if (!office?.closeTime) return null;
+    const hours = knownHours || officeHoursFor(at, office);
+    if (!hours?.closeTime) return null;
     const opening = openingOccurrence(
       record.session.startTime,
       hours.openTime,
@@ -994,15 +1206,45 @@ class AttendanceService {
       record.session.startTime,
     );
     let closeAt = atZonedTime(record.session.startTime, hours.closeTime, office.timezone);
-    if (opening && closeAt && closeAt <= opening) {
-      closeAt = atZonedTime(record.session.startTime, hours.closeTime, office.timezone, 1);
-    }
-    if (closeAt && clockOutTime < closeAt) {
-      throw Object.assign(
-        new Error(`Check-out is available after the organisation closes at ${hours.closeTime} (${office.timezone || 'Africa/Lagos'}).`),
-        { status: 400, reason: 'CHECKOUT_TOO_EARLY' }
-      );
-    }
+    if (opening && closeAt && closeAt <= opening) closeAt = atZonedTime(record.session.startTime, hours.closeTime, office.timezone, 1);
+    return closeAt;
+  }
+
+  async _evaluateOvertimeAtCheckout(orgId, record, clockOutTime) {
+    const office = record.session?.office;
+    const scheduledClose = this._getScheduledOfficeClose(record, clockOutTime);
+    const startAfterCloseMinutes = Math.max(0, Number(office?.overtimeStartAfterCloseMinutes) || 0);
+    const feePerOvertimeHour = Math.max(0, Number(office?.overtimeFeePerHour) || 0);
+    if (!office || !scheduledClose || feePerOvertimeHour <= 0) return { policy: null, evaluation: null };
+
+    const overtimeStartsAt = new Date(scheduledClose.getTime() + startAfterCloseMinutes * 60_000);
+    const elapsedMinutes = Math.max(0, Math.floor((clockOutTime.getTime() - overtimeStartsAt.getTime()) / 60_000));
+    const breaks = await prisma.breakRecord.findMany({
+      where: { attendanceRecordId: record.id },
+      select: { startTime: true, endTime: true },
+    });
+    const overtimeBreakMinutes = breaks.reduce((total, item) => {
+      const breakStart = item.startTime.getTime();
+      const breakEnd = (item.endTime || clockOutTime).getTime();
+      const overlapStart = Math.max(breakStart, overtimeStartsAt.getTime());
+      const overlapEnd = Math.min(breakEnd, clockOutTime.getTime());
+      return total + Math.max(0, Math.floor((overlapEnd - overlapStart) / 60_000));
+    }, 0);
+    const overtimeMinutes = Math.max(0, elapsedMinutes - overtimeBreakMinutes);
+    const overtimeEarnings = Math.round((overtimeMinutes / 60) * feePerOvertimeHour * 100) / 100;
+    return {
+      policy: null,
+      evaluation: {
+        ruleVersion: 'OFFICE-OVERTIME-v1',
+        scheduledClose: scheduledClose.toISOString(),
+        overtimeStartsAt: overtimeStartsAt.toISOString(),
+        startAfterCloseMinutes,
+        overtimeMinutes,
+        overtimeHours: Math.round((overtimeMinutes / 60) * 100) / 100,
+        feePerOvertimeHour,
+        overtimeEarnings,
+      },
+    };
   }
 
   async _loadEmployeeForChannel(employeeId, channel, includePassword = false) {
@@ -1112,13 +1354,21 @@ class AttendanceService {
       });
       if (existing?.reviewNotes === 'WAIVED_BY_ADMIN') continue;
 
-      const status = leave ? 'ON_LEAVE' : 'ABSENT';
-      const penalty = leave ? 0 : (session.office.absentPenalty || 0);
-
-      await prisma.attendanceRecord.upsert({
+      const evaluation = {
+        status: leave ? 'ON_LEAVE' : 'ABSENT',
+        penalty: leave ? 0 : (session.office.absentPenalty || 0),
+      };
+      const savedRecord = await prisma.attendanceRecord.upsert({
         where: { employeeId_sessionId_date: { employeeId: employee.id, sessionId, date } },
-        create: { id: uuidv4(), employeeId: employee.id, sessionId, date, status, penalty, checkInSource: 'PHONE' },
-        update: { status, penalty },
+        create: { id: uuidv4(), employeeId: employee.id, sessionId, date, status: evaluation.status, penalty: evaluation.penalty, checkInSource: 'PHONE' },
+        update: { status: evaluation.status, penalty: evaluation.penalty },
+      });
+      await WorkEventService.record({
+        orgId: session.office.orgId, employeeId: employee.id, type: evaluation.status,
+        occurredAt: session.startTime, source: 'SYSTEM', status: 'FINALIZED', sessionId,
+        ruleVersion: 'absence-office-v1', sourceType: 'AttendanceRecord', sourceId: savedRecord.id,
+        dedupeKey: `absence:${savedRecord.id}:${evaluation.status}:absence-office-v1`,
+        metadata: { ruleEvaluation: evaluation, policySnapshot: { version: 'absence-office-v1' } },
       });
     }
   }
@@ -1277,10 +1527,11 @@ class AttendanceService {
                 continue;
               }
 
-              const penaltyAmount = leave ? 0 : (office.absentPenalty || 0);
-              const status = leave ? 'ON_LEAVE' : 'ABSENT';
-
-              await prisma.attendanceRecord.upsert({
+              const evaluation = {
+                status: leave ? 'ON_LEAVE' : 'ABSENT',
+                penalty: leave ? 0 : (office.absentPenalty || 0),
+              };
+              const savedRecord = await prisma.attendanceRecord.upsert({
                 where: {
                   employeeId_sessionId_date: {
                     employeeId: emp.id,
@@ -1293,14 +1544,21 @@ class AttendanceService {
                   employeeId: emp.id,
                   sessionId: session.id,
                   date: targetDate,
-                  status,
-                  penalty: penaltyAmount,
+                  status: evaluation.status,
+                  penalty: evaluation.penalty,
                   checkInSource: 'PHONE',
                 },
                 update: {
-                  status,
-                  penalty: penaltyAmount,
+                  status: evaluation.status,
+                  penalty: evaluation.penalty,
                 },
+              });
+              await WorkEventService.record({
+                orgId, employeeId: emp.id, type: evaluation.status,
+                occurredAt: openAt, source: 'SYSTEM', status: 'FINALIZED', sessionId: session.id,
+                ruleVersion: 'absence-office-v1', sourceType: 'AttendanceRecord', sourceId: savedRecord.id,
+                dedupeKey: `absence:${savedRecord.id}:${evaluation.status}:absence-office-v1`,
+                metadata: { ruleEvaluation: evaluation, policySnapshot: { version: 'absence-office-v1' } },
               });
             }
           }
@@ -1346,7 +1604,7 @@ class AttendanceService {
     return session;
   }
 
-  async _persistCheckIn(data) {
+  async _persistCheckIn(data, db = prisma) {
     const key = {
       employeeId_sessionId_date: {
         employeeId: data.employeeId,
@@ -1354,7 +1612,7 @@ class AttendanceService {
         date: data.date,
       },
     };
-    const existing = await prisma.attendanceRecord.findUnique({ where: key });
+    const existing = await db.attendanceRecord.findUnique({ where: key });
     if (existing?.clockInTime) {
       throw Object.assign(new Error('Already clocked in for this session today.'), { status: 409 });
     }
@@ -1371,17 +1629,17 @@ class AttendanceService {
       wifiSSID: data.wifiSSID ?? null,
     };
     if (existing) {
-      const changed = await prisma.attendanceRecord.updateMany({
+      const changed = await db.attendanceRecord.updateMany({
         where: { id: existing.id, clockInTime: null },
         data: recordData,
       });
       if (!changed.count) {
         throw Object.assign(new Error('Already clocked in for this session today.'), { status: 409 });
       }
-      return prisma.attendanceRecord.findUnique({ where: { id: existing.id } });
+      return db.attendanceRecord.findUnique({ where: { id: existing.id } });
     }
     try {
-      return await prisma.attendanceRecord.create({
+      return await db.attendanceRecord.create({
         data: {
           id: uuidv4(), employeeId: data.employeeId, sessionId: data.sessionId,
           date: data.date, ...recordData,
@@ -1596,24 +1854,42 @@ class AttendanceService {
 
   async flagRecord(recordId, reason, adminId, orgId) {
     const record = await prisma.attendanceRecord.findFirst({
-      where: { id: recordId, employee: { orgId } }, select: { id: true },
+      where: { id: recordId, employee: { orgId } }, select: { id: true, employeeId: true, flagged: true, flagReason: true },
     });
     if (!record) throw Object.assign(new Error('Attendance record not found.'), { status: 404 });
-    return prisma.attendanceRecord.update({
+    const updated = await prisma.attendanceRecord.update({
       where: { id: record.id },
       data: { flagged: true, flagReason: reason, reviewedBy: adminId },
     });
+    await AuditService.log({ actorId: adminId, action: 'ATTENDANCE_RECORD_FLAGGED', targetId: record.id, targetType: 'AttendanceRecord', details: { orgId, before: record, after: { flagged: updated.flagged, flagReason: updated.flagReason } } });
+    await WorkEventService.record({
+      orgId, employeeId: record.employeeId, actorId: adminId, type: 'ATTENDANCE_CORRECTED',
+      occurredAt: updated.updatedAt, source: 'ADMIN', status: 'CORRECTED',
+      sourceType: 'AttendanceRecord', sourceId: record.id,
+      dedupeKey: `attendance-correction:flag:${record.id}:${updated.updatedAt.toISOString()}`,
+      metadata: { action: 'FLAGGED', before: record, after: updated, reason },
+    });
+    return updated;
   }
 
   async approveRecord(recordId, adminId, notes, orgId) {
     const record = await prisma.attendanceRecord.findFirst({
-      where: { id: recordId, employee: { orgId } }, select: { id: true },
+      where: { id: recordId, employee: { orgId } }, select: { id: true, employeeId: true, flagged: true, reviewNotes: true },
     });
     if (!record) throw Object.assign(new Error('Attendance record not found.'), { status: 404 });
-    return prisma.attendanceRecord.update({
+    const updated = await prisma.attendanceRecord.update({
       where: { id: record.id },
       data: { flagged: false, reviewedBy: adminId, reviewNotes: notes },
     });
+    await AuditService.log({ actorId: adminId, action: 'ATTENDANCE_RECORD_APPROVED', targetId: record.id, targetType: 'AttendanceRecord', details: { orgId, before: record, after: { flagged: updated.flagged, reviewNotes: updated.reviewNotes } } });
+    await WorkEventService.record({
+      orgId, employeeId: record.employeeId, actorId: adminId, type: 'ATTENDANCE_CORRECTED',
+      occurredAt: updated.updatedAt, source: 'ADMIN', status: 'CORRECTED',
+      sourceType: 'AttendanceRecord', sourceId: record.id,
+      dedupeKey: `attendance-correction:approve:${record.id}:${updated.updatedAt.toISOString()}`,
+      metadata: { action: 'APPROVED', before: record, after: updated, notes },
+    });
+    return updated;
   }
 
   _emit(event, payload) {

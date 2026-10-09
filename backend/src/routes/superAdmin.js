@@ -108,4 +108,9 @@ router.put('/users/:userId/office',              ctrl.reassignUserOffice);
 router.put('/users/:userId/reassign',            ctrl.reassignEmployee);
 router.get('/audit-logs',                        ctrl.getAuditLogs);
 
+// Device management across organizations: view and unlock
+router.get('/devices',                           ctrl.listDevices);
+router.put('/devices/:id/unlock',                ctrl.unlockDevice);
+router.delete('/devices/:id',                    ctrl.deleteDevice);
+
 module.exports = router;

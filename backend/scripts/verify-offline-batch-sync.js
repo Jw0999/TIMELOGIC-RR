@@ -6,6 +6,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const bcrypt = require('bcryptjs');
 const AttendanceService = require('../src/services/AttendanceService');
+const { atZonedTime } = require('../src/utils/attendanceClock');
 
 async function run() {
   console.log('🚀 Starting Offline Batch Sync & Multi-Frontend Propagation Test...\n');
@@ -35,17 +36,21 @@ async function run() {
         name: 'HQ Office',
         orgId: testOrg.id,
         timezone: 'Africa/Lagos',
-        openTime: '08:00',
-        closeTime: '18:00',
+        openTime: '00:00',
+        closeTime: '23:59',
         graceMinutes: 15,
         isActive: true,
       },
     });
 
-    // Session starting today at 07:00 and ending at 19:00
+    // Keep the test session active regardless of the local time the suite runs.
     const today = new Date();
-    const startTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 7, 0, 0);
-    const endTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 19, 0, 0);
+    const startTime = atZonedTime(today, '00:00', 'Africa/Lagos');
+    const endTime = atZonedTime(today, '23:59', 'Africa/Lagos');
+    const closeTime = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Africa/Lagos', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+    }).format(new Date(Date.now() - 5 * 60 * 1000));
+    await prisma.office.update({ where: { id: testOffice.id }, data: { closeTime } });
 
     testSession = await prisma.attendanceSession.create({
       data: {
@@ -137,7 +142,8 @@ async function run() {
     }
     console.log('   ✓ Idempotency verified: Duplicates safely detected and confirmed!');
 
-    // 5. Simulate Offline Check-Out at 18:05 (Office closes at 18:00)
+    // 5. Simulate offline check-out. The client timestamp is contextual only;
+    // the backend's accepted server time remains authoritative.
     const offlineClockOutTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 18, 5, 0).toISOString();
     console.log(`\n5. Simulating Offline Check-Out captured at: ${offlineClockOutTime}`);
 
@@ -169,7 +175,7 @@ async function run() {
       where: { id: savedRecord.id },
     });
 
-    console.log(`   ✓ Work Hours calculated from offline times: ${completedRecord.totalWorkHours} hrs (Expected ~9.42 hrs)`);
+    console.log(`   ✓ Server-authoritative work hours recorded: ${completedRecord.totalWorkHours} hrs`);
 
     console.log('\n========================================================');
     console.log('🎉 ALL OFFLINE BATCH SYNC & TIMESTAMPS TESTS PASSED 100%!');

@@ -23,22 +23,32 @@ type ResultNotice = {
   status?: string | null;
   penalty?: number | null;
   time?: string | null;
+  ruleExplanation?: string | null;
+  ruleVersion?: string | null;
 };
 
-function FaceCapture({ onCapture }: { onCapture: (image: string) => void }) {
+function FaceCapture({ onCapture, canStart }: { onCapture: (image: string, livenessFrames: string[]) => void; canStart: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [ready, setReady] = useState(false);
+  const [instruction, setInstruction] = useState('Position your face in the frame');
+  const [capturing, setCapturing] = useState(false);
+  const [attempted, setAttempted] = useState(false);
+  const [started, setStarted] = useState(false);
   useEffect(() => {
     let stream: MediaStream | null = null;
+    if (!started) return undefined;
     navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false }).then((next) => {
       stream = next;
       if (videoRef.current) { videoRef.current.srcObject = next; videoRef.current.onloadedmetadata = () => setReady(true); }
     }).catch(() => {});
     return () => stream?.getTracks().forEach((track) => track.stop());
-  }, []);
-  const capture = () => { const video = videoRef.current; const canvas = canvasRef.current; if (!video || !canvas) return; canvas.width = video.videoWidth; canvas.height = video.videoHeight; canvas.getContext('2d')?.drawImage(video, 0, 0); onCapture(canvas.toDataURL('image/jpeg', 0.75)); };
-  return <div className="space-y-2"><video ref={videoRef} autoPlay playsInline muted className="w-full rounded-xl bg-black max-h-48 object-cover" /><canvas ref={canvasRef} hidden /><button type="button" onClick={capture} disabled={!ready} className="w-full px-3 py-2 rounded-xl bg-slate-800 text-white text-sm font-bold disabled:opacity-40">Capture face for check-in</button></div>;
+  }, [started]);
+  const captureFrame = () => { const video = videoRef.current; const canvas = canvasRef.current; if (!video || !canvas) return null; canvas.width = video.videoWidth; canvas.height = video.videoHeight; canvas.getContext('2d')?.drawImage(video, 0, 0); return canvas.toDataURL('image/jpeg', 0.75); };
+  const capture = async () => { if (capturing || attempted) return; setAttempted(true); setCapturing(true); setInstruction('Turn your head slightly left'); await new Promise((resolve) => window.setTimeout(resolve, 1400)); const first = captureFrame(); if (!first) { setCapturing(false); return; } setInstruction('Now turn your head slightly right'); await new Promise((resolve) => window.setTimeout(resolve, 1400)); const second = captureFrame(); if (!second) { setCapturing(false); return; } setInstruction('Face the camera normally'); await new Promise((resolve) => window.setTimeout(resolve, 700)); const third = captureFrame(); if (third) { setInstruction('Live verification complete'); onCapture(third, [first, second, third]); } setCapturing(false); };
+  useEffect(() => { if (started && ready && !capturing && !attempted) void capture(); }, [started, ready, capturing, attempted]);
+  if (!started) return <div className="space-y-2"><p className="text-xs font-semibold text-slate-600">Enter the employee password first, then start face verification.</p><button type="button" onClick={() => setStarted(true)} disabled={!canStart} className="w-full px-3 py-2 rounded-xl bg-slate-800 text-white text-sm font-bold disabled:opacity-40">Start Face Verification</button></div>;
+  return <div className="space-y-2"><video ref={videoRef} autoPlay playsInline muted className="w-full rounded-xl bg-black max-h-48 object-cover" /><p className="text-xs font-semibold text-slate-600" aria-live="polite">{instruction}</p><canvas ref={canvasRef} hidden /></div>;
 }
 
 function formatTime(value?: string | null, timezone?: string | null) {
@@ -84,6 +94,7 @@ export default function ManualCheckIn() {
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [password, setPassword] = useState('');
   const [faceImage, setFaceImage] = useState('');
+  const [livenessFrames, setLivenessFrames] = useState<string[]>([]);
   const [confirmError, setConfirmError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<ResultNotice | null>(null);
@@ -131,10 +142,11 @@ export default function ManualCheckIn() {
     setPending(null);
     setPassword('');
     setFaceImage('');
+    setLivenessFrames([]);
     setConfirmError('');
   };
 
-  const confirmAction = async () => {
+  const confirmAction = async (faceOverride?: string, framesOverride?: string[]) => {
     if (!pending || (pending.kind === 'check-in' && !activeSessionId)) return;
     if (!password) {
       setConfirmError('The employee must enter their own password to confirm this action.');
@@ -143,7 +155,7 @@ export default function ManualCheckIn() {
     setSubmitting(true);
     setConfirmError('');
     try {
-      const body = { employeeId: pending.employee.id, sessionId: activeSessionId, password, faceImage: pending.kind === 'check-in' ? faceImage : undefined };
+      const body = { employeeId: pending.employee.id, sessionId: activeSessionId, password, faceImage: pending.kind === 'check-in' ? (faceOverride ?? faceImage) : undefined, livenessFrames: pending.kind === 'check-in' ? (framesOverride ?? livenessFrames) : undefined, idempotencyKey: crypto.randomUUID() };
       const response = pending.kind === 'check-in'
         ? await manualEmployeeCheckIn(body)
         : await manualEmployeeCheckOut({
@@ -157,6 +169,8 @@ export default function ManualCheckIn() {
         kind: pending.kind,
         status: response.status ?? record?.status,
         penalty: response.penalty ?? record?.penalty,
+        ruleExplanation: response.ruleEvaluation?.explanation ?? null,
+        ruleVersion: response.ruleEvaluation?.ruleVersion ?? null,
         time: pending.kind === 'check-in'
           ? response.clockInTime ?? record?.clockInTime ?? response.serverTime
           : response.clockOutTime ?? record?.clockOutTime ?? response.serverTime,
@@ -212,6 +226,7 @@ export default function ManualCheckIn() {
                 {result.status && <span>Status: <b>{result.status.replace(/_/g, ' ')}</b></span>}
                 {result.penalty != null && <span>Penalty: <b>{result.penalty}</b></span>}
               </div>
+              {result.ruleExplanation && <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-2">{result.ruleExplanation}{result.ruleVersion ? ` · ${result.ruleVersion}` : ''}</p>}
             </div>
             <button onClick={() => setResult(null)} className="text-emerald-700"><X size={15} /></button>
           </div>
@@ -343,7 +358,7 @@ export default function ManualCheckIn() {
                   onChange={(event) => setPassword(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void confirmAction(); }}
                   className="w-full border border-[var(--input-border)] bg-[var(--input-bg)] text-[var(--text-main)] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
               </div>
-              {pending.kind === 'check-in' && <FaceCapture onCapture={setFaceImage} />}
+              {pending.kind === 'check-in' && <FaceCapture canStart={Boolean(password)} onCapture={(image, frames) => { setFaceImage(image); setLivenessFrames(frames); if (password) window.setTimeout(() => void confirmAction(image, frames), 0); }} />}
             </div>
             <div className="px-6 pb-6 flex justify-end gap-3">
               <button onClick={closeConfirmation} disabled={submitting} className="px-4 py-2 border border-[var(--border)] rounded-xl text-sm font-semibold text-[var(--text-main)]">Cancel</button>

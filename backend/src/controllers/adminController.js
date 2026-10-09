@@ -7,6 +7,7 @@ const AttendanceService = require('../services/AttendanceService');
 const EmployeePolicy = require('../services/EmployeePolicyService');
 const PlanPolicy = require('../services/PlanPolicyService');
 const AuditService = require('../services/AuditService');
+const WorkEventService = require('../services/WorkEventService');
 const { hasValidEnrolledFace } = require('../utils/faceVerify');
 const { getOrgSubscriptionStatus, redeemActivationCode } = require('../utils/subscription');
 const fs = require('fs');
@@ -688,7 +689,10 @@ const findManualEmployee = async (req, res, next) => {
 const manualCheckIn = async (req, res, next) => {
   try {
     const targetOrgId = await resolveAdminOrgId(req);
-    const data = await AttendanceService.manualCheckIn(req.user.id, targetOrgId, req.body);
+    const data = await AttendanceService.manualCheckIn(req.user.id, targetOrgId, {
+      ...req.body,
+      idempotencyKey: req.body.idempotencyKey || req.headers['idempotency-key'],
+    });
     res.status(201).json({ success: true, data });
   } catch (err) { next(err); }
 };
@@ -696,7 +700,10 @@ const manualCheckIn = async (req, res, next) => {
 const manualCheckOut = async (req, res, next) => {
   try {
     const targetOrgId = await resolveAdminOrgId(req);
-    const data = await AttendanceService.manualCheckOut(req.user.id, targetOrgId, req.body);
+    const data = await AttendanceService.manualCheckOut(req.user.id, targetOrgId, {
+      ...req.body,
+      idempotencyKey: req.body.idempotencyKey || req.headers['idempotency-key'],
+    });
     res.json({ success: true, data });
   } catch (err) { next(err); }
 };
@@ -759,6 +766,13 @@ const createPenalty = async (req, res, next) => {
       details: { employeeId, amount: Number(amount), reason: reason.trim() },
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
+    });
+    await WorkEventService.record({
+      orgId: targetOrgId, employeeId, actorId: req.user.id,
+      type: 'PENALTY_APPLIED', occurredAt: penalty.createdAt, source: 'ADMIN',
+      sourceType: 'ManualPenalty', sourceId: penalty.id,
+      dedupeKey: `manual-penalty:${penalty.id}`,
+      metadata: { amount: penalty.amount, reason: penalty.reason },
     });
 
     res.status(201).json({ success: true, data: penalty });
@@ -915,6 +929,7 @@ const getKioskDevices = async (req, res, next) => {
         subscriptionTier: true,
         maxEmployees: true,
         maxKiosks: true,
+        maxDesktopAdmins: true,
         maxOffices: true,
         _count: {
           select: {
@@ -933,7 +948,8 @@ const getKioskDevices = async (req, res, next) => {
 
     const activeEmployeesCount = org._count?.users || 0;
     const activeOfficesCount = org._count?.offices || 0;
-    const boundKiosksCount = devices.filter((d) => d.isBound).length;
+    const boundKiosksCount = devices.filter((d) => d.isBound && d.deviceType === 'KIOSK').length;
+    const boundDesktopAdminsCount = devices.filter((d) => d.isBound && d.deviceType === 'DESKTOP_ADMIN').length;
 
     res.json({
       success: true,
@@ -944,10 +960,12 @@ const getKioskDevices = async (req, res, next) => {
           subscriptionTier: org.subscriptionTier,
           maxEmployees: org.maxEmployees,
           maxKiosks: org.maxKiosks,
+          maxDesktopAdmins: org.maxDesktopAdmins,
           maxOffices: org.maxOffices,
           activeEmployeesCount,
           activeOfficesCount,
           boundKiosksCount,
+          boundDesktopAdminsCount,
         },
         devices,
       },
@@ -963,7 +981,14 @@ const releaseKioskDevice = async (req, res, next) => {
     const device = await prisma.kioskDevice.findFirst({
       where: { id, orgId },
     });
-    if (!device) return res.status(404).json({ success: false, message: 'Kiosk device not found.' });
+    if (!device) return res.status(404).json({ success: false, message: 'Device not found.' });
+
+    if (device.deviceType === 'DESKTOP_ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'This Desktop Admin device is locked to your organization. Only a Super Administrator can unlock or release this device.',
+      });
+    }
 
     const updated = await prisma.kioskDevice.update({
       where: { id },

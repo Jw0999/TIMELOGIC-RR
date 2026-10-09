@@ -23,6 +23,15 @@ const adminRoutes      = require('../routes/admin');
 const superAdminRoutes = require('../routes/superAdmin');
 const studentRoutes    = require('../routes/students');
 const payrollRoutes    = require('../routes/payroll');
+const workHistoryRoutes = require('../routes/workHistory');
+let salesRoutes = null;
+try {
+  if (process.env.ENABLE_LOCAL_SALES === 'true' || (!process.env.DYNO && process.env.NODE_ENV !== 'production')) {
+    salesRoutes = require('../routes/sales');
+  }
+} catch {
+  salesRoutes = null;
+}
 
 function createApp() {
   const app = express();
@@ -145,6 +154,13 @@ function createApp() {
   app.use('/api/super',      superAdminRoutes);
   app.use('/api/students',   studentRoutes);
   app.use('/api/payroll',    payrollRoutes);
+  app.use('/api/work-history', workHistoryRoutes);
+
+  // Sales Intelligence is strictly local desktop only — never mounted on remote Heroku cloud servers
+  if (salesRoutes && !process.env.DYNO && (process.env.ENABLE_LOCAL_SALES === 'true' || process.env.NODE_ENV !== 'production')) {
+    app.use('/api/sales',        salesRoutes);
+    app.use('/api/admin/sales',  salesRoutes);
+  }
 
   // 404 & error handling
   app.use(notFound);

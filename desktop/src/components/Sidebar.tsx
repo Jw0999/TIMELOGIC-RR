@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, CalendarClock, Users, ClipboardList,
   UmbrellaOff, Coffee, ShieldAlert, Zap, BarChart3, LogOut, Settings,
-  GraduationCap, UserCheck, ReceiptText, Banknote, type LucideIcon,
+  GraduationCap, UserCheck, ReceiptText, Banknote, TrendingUp, type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import logo from '../assets/logo.jpg';
@@ -17,6 +17,7 @@ const NAV: { to: string; label: string; icon: LucideIcon; capability?: Capabilit
   { to: '/manual-attendance', label: 'Manual Check-In', icon: UserCheck },
   { to: '/employees',  label: 'Employees',      icon: Users },
   { to: '/salary',     label: 'Salary & Payroll', icon: Banknote },
+  { to: '/sales-intelligence', label: 'Sales Intelligence', icon: TrendingUp },
   { to: '/penalties',  label: 'Penalties',      icon: ReceiptText },
   { to: '/students',   label: 'Students',       icon: GraduationCap, capability: 'hasStudents' },
   { to: '/leaves',     label: 'Leave Requests', icon: UmbrellaOff },
@@ -31,7 +32,14 @@ export default function Sidebar() {
   const { user, organization, logout } = useAuth();
   const navigate = useNavigate();
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
-  const visibleNav = NAV.filter((item) => isSuperAdmin || !item.capability || Boolean(organization?.[item.capability]));
+  const isLocalOrElectron = typeof window !== 'undefined' && (
+    Boolean((window as any).electronAPI) ||
+    ['localhost', '127.0.0.1'].includes(window.location.hostname)
+  );
+  const visibleNav = NAV.filter((item) => {
+    if (item.to === '/sales-intelligence' && !isLocalOrElectron) return false;
+    return isSuperAdmin || !item.capability || Boolean(organization?.[item.capability]);
+  });
   return (
     <aside className="w-60 min-h-screen bg-primary-900 dark:bg-slate-950 flex flex-col flex-shrink-0 transition-colors">
       <div className="px-5 py-6 border-b border-primary-800 dark:border-slate-800">

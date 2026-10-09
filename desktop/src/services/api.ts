@@ -16,7 +16,12 @@ export function setToken(t: string | null) {
   } catch { /* localStorage unavailable (rare) */ }
 }
 
-export function getToken() { return _token; }
+export function getToken() {
+  if (!_token && typeof localStorage !== 'undefined') {
+    try { _token = localStorage.getItem('accessToken'); } catch { /* ignore */ }
+  }
+  return _token;
+}
 
 export function setActiveOrgId(id: string | null) {
   _activeOrgId = id;
@@ -26,7 +31,12 @@ export function setActiveOrgId(id: string | null) {
   } catch { /* localStorage unavailable */ }
 }
 
-export function getActiveOrgId() { return _activeOrgId; }
+export function getActiveOrgId() {
+  if (!_activeOrgId && typeof localStorage !== 'undefined') {
+    try { _activeOrgId = localStorage.getItem('activeOrgId'); } catch { /* ignore */ }
+  }
+  return _activeOrgId;
+}
 
 let refreshPromise: Promise<boolean> | null = null;
 
@@ -96,10 +106,12 @@ export async function authenticatedFetch(url: string, init: RequestInit = {}): P
       bodyToSend = { isMultipart: true, fields, files };
     }
 
+    const token = getToken();
+    const orgId = getActiveOrgId();
     const headers: Record<string, string> = {
       ...(init.headers as any || {}),
-      ...(_token ? { Authorization: `Bearer ${_token}` } : {}),
-      ...(_activeOrgId ? { 'X-Organization-Id': _activeOrgId } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(orgId ? { 'X-Organization-Id': orgId } : {}),
     };
     if (isFormData) {
       delete headers['Content-Type'];
@@ -139,14 +151,18 @@ export async function authenticatedFetch(url: string, init: RequestInit = {}): P
     return resp;
   }
 
-  const send = () => fetch(url, {
-    ...init,
-    headers: {
-      ...(init.headers || {}),
-      ...(_token ? { Authorization: `Bearer ${_token}` } : {}),
-      ...(_activeOrgId ? { 'X-Organization-Id': _activeOrgId } : {}),
-    },
-  });
+  const send = () => {
+    const token = getToken();
+    const orgId = getActiveOrgId();
+    return fetch(url, {
+      ...init,
+      headers: {
+        ...(init.headers || {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(orgId ? { 'X-Organization-Id': orgId } : {}),
+      },
+    });
+  };
   let res = await send();
   if (res.status === 401 && await refreshAccessToken()) res = await send();
   return res;
@@ -156,12 +172,14 @@ export async function authenticatedFetch(url: string, init: RequestInit = {}): P
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 async function request<T>(method: Method, path: string, body?: unknown, allowRefresh = true): Promise<T> {
+  const token = getToken();
+  const orgId = getActiveOrgId();
   const reqHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
     'Cache-Control': 'no-cache',
     Pragma: 'no-cache',
-    ...(_token ? { Authorization: `Bearer ${_token}` } : {}),
-    ...(_activeOrgId ? { 'X-Organization-Id': _activeOrgId } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(orgId ? { 'X-Organization-Id': orgId } : {}),
   };
 
   if (typeof window !== 'undefined' && (window as any).electronAPI?.apiRequest) {
@@ -210,8 +228,12 @@ async function request<T>(method: Method, path: string, body?: unknown, allowRef
     return res.data as T;
   }
 
+  const requestUrl = path.startsWith('http://') || path.startsWith('https://')
+    ? path
+    : `${API_URL}${path.startsWith('/') ? path : '/' + path}`;
+
   const doFetch = () =>
-    fetch(`${API_URL}${path}`, {
+    fetch(requestUrl, {
       method,
       headers: reqHeaders,
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),

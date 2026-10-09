@@ -4,6 +4,8 @@ const EmployeePolicy = require('../services/EmployeePolicyService');
 const { dateKey } = require('../utils/attendanceClock');
 const { getCurrentServerTime } = require('../utils/networkTime');
 const logger = require('../config/logger');
+const AuditService = require('../services/AuditService');
+const WorkEventService = require('../services/WorkEventService');
 
 // GET /api/attendance/current-session
 // Returns the active session for the employee's org (used by mobile check-in button)
@@ -111,8 +113,8 @@ const checkIn = async (req, res, next) => {
 
 const checkOut = async (req, res, next) => {
   try {
-    const { sessionId, deviceId, wifiSSID, platform } = req.body;
-    const record = await AttendanceService.checkOut(req.user.id, sessionId, { deviceId, wifiSSID, platform, ip: req.ip });
+    const { sessionId, deviceId, wifiSSID, platform, idempotencyKey } = req.body;
+    const record = await AttendanceService.checkOut(req.user.id, sessionId, { deviceId, wifiSSID, platform, idempotencyKey, ip: req.ip });
     res.json({ success: true, data: record });
   } catch (err) { next(err); }
 };
@@ -204,9 +206,11 @@ const getHistory = async (req, res, next) => {
 };
 
 const resolveAdminOrgId = async (req) => {
-  const headerOrgId = req.headers['x-organization-id'];
-  if (headerOrgId) return headerOrgId;
-  if (req.query.orgId) return req.query.orgId;
+  if (req.user?.role === 'SUPER_ADMIN') {
+    const headerOrgId = req.headers['x-organization-id'];
+    if (headerOrgId) return headerOrgId;
+    if (req.query.orgId) return req.query.orgId;
+  }
   if (req.user?.role === 'SUPER_ADMIN' && req.user?.orgId === 'platform-org') {
     const orgWithUsers = await prisma.organization.findFirst({
       where: { id: { not: 'platform-org' } },
@@ -312,7 +316,9 @@ const getMonthlyPenalties = async (req, res, next) => {
 const waiveRecordPenalty = async (req, res, next) => {
   try {
     const { recordId } = req.params;
-    const targetOrgId = req.headers['x-organization-id'] || req.query.orgId || (req.user.orgId !== 'platform-org' ? req.user.orgId : null);
+    const targetOrgId = req.user.role === 'SUPER_ADMIN'
+      ? (req.headers['x-organization-id'] || req.query.orgId || (req.user.orgId !== 'platform-org' ? req.user.orgId : null))
+      : req.user.orgId;
     const orgFilter = targetOrgId ? { employee: { orgId: targetOrgId } } : (req.user.orgId !== 'platform-org' ? { employee: { orgId: req.user.orgId } } : {});
     const record = await prisma.attendanceRecord.findFirst({
       where: { id: recordId, ...orgFilter },
@@ -321,6 +327,21 @@ const waiveRecordPenalty = async (req, res, next) => {
     const updated = await prisma.attendanceRecord.update({
       where: { id: recordId },
       data: { penalty: 0 },
+    });
+    await AuditService.log({
+      actorId: req.user.id,
+      actorRole: req.user.role,
+      action: 'ATTENDANCE_PENALTY_WAIVED',
+      targetId: recordId,
+      targetType: 'AttendanceRecord',
+      details: { orgId: targetOrgId, before: { penalty: record.penalty }, after: { penalty: updated.penalty } },
+    });
+    await WorkEventService.record({
+      orgId: targetOrgId, employeeId: record.employeeId, actorId: req.user.id,
+      type: 'PENALTY_WAIVED', occurredAt: updated.updatedAt, source: 'ADMIN', status: 'CORRECTED',
+      sourceType: 'AttendanceRecord', sourceId: recordId,
+      dedupeKey: `attendance-penalty-waive:${recordId}:${updated.updatedAt.toISOString()}`,
+      metadata: { before: { penalty: record.penalty }, after: { penalty: updated.penalty } },
     });
     res.json({ success: true, data: updated, message: 'Attendance penalty waived successfully.' });
   } catch (err) { next(err); }

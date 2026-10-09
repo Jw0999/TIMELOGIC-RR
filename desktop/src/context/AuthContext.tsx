@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { api, setToken, getToken, setActiveOrgId, getActiveOrgId } from '../services/api';
 import { fetchOrganizations } from '../services';
+import { getDesktopDeviceInfo } from '../utils/security';
 import type { AdminOrganization, AdminUser, SubscriptionStatus } from '../types/api';
 
 interface AuthCtx {
@@ -205,9 +206,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (identifier: string, password: string) => {
     try {
       const isEmail = identifier.includes('@');
-      const body = isEmail
-        ? { email: identifier, password }
-        : { employeeCode: identifier, password };
+      const deviceInfo = getDesktopDeviceInfo();
+      const body = {
+        ...(isEmail ? { email: identifier } : { employeeCode: identifier }),
+        password,
+        ...deviceInfo,
+      };
 
       const res = await api.post<{
         success: boolean;

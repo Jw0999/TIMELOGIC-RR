@@ -5,10 +5,15 @@ const { getOrgSubscriptionStatus } = require('../utils/subscription');
 
 const login = async (req, res, next) => {
   try {
-    const { email, password, deviceFingerprint } = req.body;
+    const { email, password, deviceFingerprint, deviceId, deviceName, platform, firmwareVersion, deviceType } = req.body;
     const result = await AuthService.login(email, password, deviceFingerprint, {
       ipAddress: req.ip,
       userAgent: req.get('user-agent'),
+      deviceId,
+      deviceName,
+      platform,
+      firmwareVersion,
+      deviceType,
     });
     res.json({ success: true, data: result });
   } catch (err) { next(err); }
@@ -102,7 +107,7 @@ const changePassword = async (req, res, next) => {
 
 const stationLogin = async (req, res, next) => {
   try {
-    const { identifier, email, password, deviceId, deviceName, platform } = req.body;
+    const { identifier, email, password, deviceId, deviceName, platform, firmwareVersion } = req.body;
     const cleanId = identifier || email;
     const result = await AuthService.stationLogin(cleanId, password, {
       ipAddress: req.ip,
@@ -110,6 +115,7 @@ const stationLogin = async (req, res, next) => {
       deviceId,
       deviceName,
       platform,
+      firmwareVersion,
     });
     res.json({ success: true, data: result });
   } catch (err) { next(err); }

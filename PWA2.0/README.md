@@ -23,6 +23,6 @@ Create a Pages project from this repository with:
 - **Root directory:** `PWA2.0`
 - **Build command:** `npm run build`
 - **Output directory:** `dist`
-- **Environment variable:** `VITE_API_URL=https://timelogic.onrender.com/api`
+- **Environment variable:** `VITE_API_URL=https://timelogic-backend.onrender.com/api`
 
 The app uses the authenticated administrator's organization when loading `/admin/manual-attendance`. The backend remains responsible for tenant isolation, active sessions, employee-password confirmation, server timestamps, and attendance persistence shared with the desktop app and other frontends.

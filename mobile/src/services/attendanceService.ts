@@ -1,4 +1,6 @@
 import { api } from './api';
+
+const createIdempotencyKey = () => `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
 import { collectCheckInContext } from './deviceInfo';
 
 export interface AttendanceStatus {
@@ -66,7 +68,7 @@ export async function checkInApi(payload: {
 }): Promise<AttendanceStatus> {
   // Collect device + wifi context for backend enforcement
   const ctx = await collectCheckInContext();
-  const res = await api.post<any>('/attendance/check-in', { ...payload, ...ctx });
+  const res = await api.post<any>('/attendance/check-in', { ...payload, ...ctx, idempotencyKey: createIdempotencyKey() });
   const d = res?.record;
   const timezone = res?.timezone || d?.session?.office?.timezone || 'Africa/Lagos';
   return {
@@ -89,7 +91,7 @@ export async function checkInApi(payload: {
 export async function checkOutApi(): Promise<{ checkOutTime: string; totalWorkHours: string | null }> {
   // Same device / wifi / location enforcement applies on check-out
   const ctx = await collectCheckInContext();
-  const d = await api.post<any>('/attendance/check-out', ctx);
+  const d = await api.post<any>('/attendance/check-out', { ...ctx, idempotencyKey: createIdempotencyKey() });
   const timezone = d?.session?.office?.timezone || 'Africa/Lagos';
   return {
     checkOutTime: d?.clockOutTime

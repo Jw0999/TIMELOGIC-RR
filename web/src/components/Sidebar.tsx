@@ -3,13 +3,14 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Building2, MapPin, LayoutList,
   Users, Shield, BarChart3, LogOut, Settings, AlertOctagon,
-  LucideIcon, Smartphone,
+  LucideIcon, Smartphone, Laptop,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const MENU_NAV: { to: string; icon: LucideIcon; label: string; badge?: string }[] = [
   { to: '/dashboard',     icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/organizations', icon: Building2,        label: 'Organizations' },
+  { to: '/devices',       icon: Laptop,           label: 'Devices' },
   { to: '/offices',       icon: MapPin,           label: 'Offices' },
   { to: '/departments',   icon: LayoutList,       label: 'Departments' },
   { to: '/users',         icon: Users,            label: 'All Users' },

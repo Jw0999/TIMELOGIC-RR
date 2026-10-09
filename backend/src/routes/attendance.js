@@ -25,6 +25,7 @@ router.post('/check-in', authenticate, scanLimiter, [
   body('wifiSSID').optional({ nullable: true }).isString(),
   body('platform').optional().isString(),
   body('model').optional().isString(),
+  body('idempotencyKey').optional().isString().isLength({ min: 8, max: 200 }),
 ], validate, ctrl.checkIn);
 
 router.post('/check-out', authenticate, [
@@ -32,6 +33,7 @@ router.post('/check-out', authenticate, [
   body('sessionId').optional().isUUID(),
   body('deviceId').optional().isString(),
   body('wifiSSID').optional({ nullable: true }).isString(),
+  body('idempotencyKey').optional().isString().isLength({ min: 8, max: 200 }),
 ], validate, ctrl.checkOut);
 
 router.get('/network', authenticate, ctrl.network);

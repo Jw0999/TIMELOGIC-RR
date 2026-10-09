@@ -7,9 +7,8 @@
  *  openTime - AUTO_SESSION_LEAD_MIN
  *        → auto-create an ACTIVE session if the admin hasn't already.
  *  closeTime
- *        → close the work day and allow the auto-checkout sweep to finish open records.
- *  closeTime + AUTO_CHECKOUT_LAG (e.g. 20:40 for a 20:00 close)
- *        → auto check-out anyone still clocked in.
+ *        → end the session and stop new session activity. Open attendance records
+ *          remain open until the employee explicitly checks out.
  */
 
 const { prisma } = require('../config/database');
@@ -44,7 +43,6 @@ async function tick() {
     // Reconcile missed work after a restart, laptop sleep, or delayed timer.
     await endExpiredSessions(now);
     await endSessionsOutsideOfficeHours(now);
-    await autoCheckoutExpired(now);
 
     // Periodic sweep for past absences across all organizations (runs every 10 minutes)
     if (minuteKey % 10 === 0) {
@@ -171,6 +169,15 @@ async function endSessionsOutsideOfficeHours(now) {
   });
 
   for (const session of sessions) {
+    if (!session.office) {
+      await prisma.attendanceSession.updateMany({
+        where: { id: session.id, status: { in: ['ACTIVE', 'PAUSED'] } },
+        data: { status: 'ENDED' },
+      });
+      await QRTokenService.invalidatePrevious(session.id).catch(() => {});
+      logger.warn(`Scheduler: ended session ${session.sessionName} because its office no longer exists`);
+      continue;
+    }
     const local = zonedParts(now, session.office.timezone);
     const hours = officeHoursFor(now, session.office);
     if (!hours) {
@@ -207,34 +214,6 @@ async function endSessionsOutsideOfficeHours(now) {
       logger.info(`Scheduler: ended session outside office hours ${session.sessionName}`);
     }
   }
-}
-
-async function autoCheckoutExpired(now) {
-  const cutoff = new Date(now.getTime() - env.AUTO_CHECKOUT_LAG_MIN * 60000);
-  const open = await prisma.attendanceRecord.findMany({
-    where: {
-      clockInTime: { not: null },
-      clockOutTime: null,
-      session: { endTime: { lte: cutoff } },
-    },
-    select: { id: true, clockInTime: true, session: { select: { endTime: true } } },
-  });
-  for (const r of open) {
-    const scheduledCheckout = new Date(r.session.endTime.getTime() + env.AUTO_CHECKOUT_LAG_MIN * 60000);
-    const clockOutTime = scheduledCheckout > r.clockInTime ? scheduledCheckout : new Date(r.clockInTime);
-    const workMs = clockOutTime - r.clockInTime;
-
-    await prisma.breakRecord.updateMany({
-      where: { attendanceRecordId: r.id, endTime: null },
-      data: { endTime: clockOutTime, isAutoEnded: true, notes: 'Auto-ended on session expiry' },
-    });
-
-    await prisma.attendanceRecord.updateMany({
-      where: { id: r.id, clockOutTime: null },
-      data: { clockOutTime, totalWorkHours: parseFloat((workMs / 3600000).toFixed(2)), checkOutSource: 'SYSTEM' },
-    });
-  }
-  if (open.length) logger.info(`Scheduler: auto-checked-out ${open.length} expired attendance record(s)`);
 }
 
 function startSessionScheduler() {

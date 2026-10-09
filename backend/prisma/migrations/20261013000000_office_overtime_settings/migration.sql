@@ -1,0 +1,2 @@
+ALTER TABLE "offices" ADD COLUMN "overtimeStartAfterCloseMinutes" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "offices" ADD COLUMN "overtimeFeePerHour" DOUBLE PRECISION NOT NULL DEFAULT 0;

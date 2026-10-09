@@ -1,0 +1,1033 @@
+# TIMELOGIC — SALES INTELLIGENCE & BUSINESS ANALYTICS MODULE
+
+You are working on the existing **TimeLogic** desktop Admin application.
+
+I want you to add a completely new module to the Admin application that allows an organization to upload its sales records and automatically turn those records into a professional business intelligence dashboard.
+
+The feature should feel like something a professional **data analyst / business intelligence system** would provide, not simply a spreadsheet viewer.
+
+---
+
+## 1. NEW ADMIN SCREEN
+
+Create a new Admin navigation item/screen.
+
+Use a professional name such as:
+
+**Business Analytics**
+
+or
+
+**Sales Intelligence**
+
+Choose whichever fits the existing TimeLogic UI/branding best.
+
+This screen becomes the organization's central location for uploading, analyzing, and viewing historical sales data.
+
+---
+
+# 2. FILE UPLOAD SYSTEM
+
+The organization should be able to upload sales records from different file formats.
+
+At minimum support:
+
+* `.xlsx`
+* `.xls`
+* `.csv`
+* `.sqlite`
+* `.db`
+* `.json`
+
+Design the import system so that additional formats can be supported later.
+
+The user should be able to click:
+
+**Upload Sales Data**
+
+and select their file.
+
+Do NOT assume every organization uses the same spreadsheet structure.
+
+For example, one company may have:
+
+```text
+Date | Product | Quantity | Price | Total
+```
+
+Another may have:
+
+```text
+Transaction Date | Item Name | Units Sold | Unit Price | Revenue
+```
+
+Another may have:
+
+```text
+date
+product_name
+qty
+amount
+```
+
+The system should intelligently detect and map columns.
+
+---
+
+# 3. DATA IMPORT / COLUMN MAPPING
+
+After uploading a file, inspect its structure.
+
+Automatically identify likely fields such as:
+
+* Date
+* Product
+* Product ID/SKU
+* Quantity
+* Unit Price
+* Revenue/Sales Amount
+* Cost
+* Profit
+* Customer
+* Salesperson
+* Category
+* Invoice/Transaction ID
+
+If the system cannot confidently identify a column, show the administrator a simple mapping interface.
+
+Example:
+
+```text
+YOUR FILE
+
+Transaction Date   →  Date
+Item Name          →  Product
+Units Sold         →  Quantity
+Selling Price      →  Unit Price
+Amount             →  Revenue
+```
+
+Allow the administrator to correct the mapping before importing.
+
+Do not destroy the original uploaded data.
+
+---
+
+# 4. MONTHLY DATA MODEL
+
+The most important requirement is that sales data must be organized by month.
+
+For every imported record, determine:
+
+* Date
+* Month
+* Year
+
+Example:
+
+```text
+January 2026
+February 2026
+March 2026
+April 2026
+...
+```
+
+The organization can upload sales records covering up to **31 days for a month**.
+
+For example:
+
+```text
+January 1 → January 31
+```
+
+The system should recognize that these records belong to January.
+
+When February records are later uploaded:
+
+```text
+February 1 → February 28
+```
+
+they must be stored separately from January.
+
+Do NOT overwrite January.
+
+The system should continuously build historical business records.
+
+Example:
+
+```text
+2026
+
+January
+February
+March
+April
+May
+June
+July
+August
+September
+October
+November
+December
+```
+
+---
+
+# 5. PREVENT DUPLICATE IMPORTS
+
+The system must protect the organization's historical data.
+
+If an administrator uploads the same sales file twice, do not blindly duplicate every transaction.
+
+Implement duplicate detection using appropriate identifiers such as:
+
+* Transaction ID
+* Invoice ID
+* Date + Product + Quantity + Amount
+* File hash
+* Other reliable unique combinations
+
+If duplicates are detected, clearly tell the administrator.
+
+Example:
+
+```text
+Import completed
+
+1,245 records detected
+1,210 new records imported
+35 duplicate records skipped
+```
+
+---
+
+# 6. SALES INTELLIGENCE DASHBOARD
+
+After importing data, automatically analyze it.
+
+The main dashboard should immediately show important business metrics.
+
+At the top:
+
+### TOTAL SALES
+
+Example:
+
+```text
+₦12,450,000
+```
+
+### TOTAL PROFIT
+
+If cost data is available:
+
+```text
+₦4,320,000
+```
+
+### TOTAL UNITS SOLD
+
+```text
+18,450
+```
+
+### NUMBER OF PRODUCTS
+
+```text
+126
+```
+
+### TRANSACTIONS
+
+```text
+4,821
+```
+
+### AVERAGE ORDER VALUE
+
+```text
+₦2,582
+```
+
+Only display metrics that can actually be calculated from the imported data.
+
+Do not invent values.
+
+---
+
+# 7. MOST PROFITABLE PRODUCTS
+
+Automatically identify the organization's most profitable products.
+
+Example:
+
+```text
+MOST PROFITABLE PRODUCTS
+
+1. Product A       ₦1,250,000 profit
+2. Product B       ₦980,000 profit
+3. Product C       ₦745,000 profit
+4. Product D       ₦530,000 profit
+5. Product E       ₦420,000 profit
+```
+
+If profit cannot be calculated because cost information is unavailable, use the best available metric such as:
+
+**Top Products by Revenue**
+
+and clearly label it.
+
+Do not call revenue "profit."
+
+---
+
+# 8. TOP SELLING PRODUCTS
+
+Show products ranked by:
+
+* Units sold
+* Revenue
+* Profit where available
+
+Example:
+
+```text
+TOP SELLING PRODUCTS
+
+Product A
+████████████████████ 4,250 units
+
+Product B
+███████████████ 3,120 units
+
+Product C
+██████████ 2,340 units
+```
+
+Use proper charts rather than ASCII bars in the actual UI.
+
+---
+
+# 9. SALES OVER TIME
+
+Create professional charts showing sales trends.
+
+At minimum:
+
+### Daily Sales
+
+For example:
+
+```text
+January 1
+January 2
+January 3
+...
+January 31
+```
+
+Display:
+
+* Revenue
+* Profit if available
+* Units sold
+
+Use line/area charts.
+
+The administrator should be able to identify:
+
+* Best sales day
+* Worst sales day
+* Growth/decline
+* Sales spikes
+* Sales drops
+
+---
+
+# 10. MONTHLY COMPARISON
+
+Once multiple months exist, provide a historical comparison.
+
+Example:
+
+```text
+MONTHLY SALES
+
+January      ₦8.2M
+February     ₦9.1M
+March        ₦11.4M
+April        ₦10.8M
+May          ₦13.2M
+```
+
+Display this visually using charts.
+
+Allow the administrator to compare:
+
+* Month vs previous month
+* Month vs previous year where data exists
+* Revenue
+* Profit
+* Units sold
+* Transactions
+
+Calculate percentage changes.
+
+Example:
+
+```text
+Revenue
+
+March → ₦11.4M
+April → ₦13.2M
+
+↑ 15.8% increase
+```
+
+---
+
+# 11. PRODUCT PERFORMANCE ANALYSIS
+
+Create a product analytics section.
+
+For every product where enough data exists, calculate:
+
+* Total units sold
+* Total revenue
+* Total profit
+* Average selling price
+* Number of transactions
+* Percentage contribution to total revenue
+* Percentage contribution to total profit
+
+Allow sorting by:
+
+```text
+Revenue
+Profit
+Units Sold
+Transactions
+```
+
+---
+
+# 12. SALES CATEGORY ANALYSIS
+
+If the uploaded data contains product categories, analyze them.
+
+Example:
+
+```text
+CATEGORY PERFORMANCE
+
+Electronics      ₦5.2M
+Clothing         ₦3.8M
+Accessories      ₦2.1M
+Services         ₦1.4M
+```
+
+Use charts such as:
+
+* Bar charts
+* Donut charts
+* Treemaps where appropriate
+
+If category information does not exist, do not manufacture categories.
+
+---
+
+# 13. PROFITABILITY ANALYSIS
+
+If the data contains:
+
+```text
+Selling Price
+Cost Price
+Quantity
+```
+
+calculate:
+
+```text
+Profit per unit
+Total profit
+Profit margin
+```
+
+Formula:
+
+```text
+Profit = Revenue - Cost
+```
+
+and:
+
+```text
+Profit Margin = Profit / Revenue × 100
+```
+
+Show:
+
+```text
+Highest Margin Products
+Lowest Margin Products
+Highest Total Profit Products
+```
+
+Clearly distinguish:
+
+**Profit margin**
+
+from
+
+**Total profit**
+
+because a product with the highest margin may not generate the highest total profit.
+
+---
+
+# 14. BUSINESS INSIGHTS
+
+The system should automatically generate useful analytical observations from the imported data.
+
+For example:
+
+```text
+BUSINESS INSIGHTS
+
+• Revenue increased by 18.4% compared with last month.
+
+• Product A generated the highest revenue this month.
+
+• Product B generated the highest profit margin.
+
+• Saturday recorded the highest sales volume.
+
+• 42% of total revenue came from the top 5 products.
+
+• Product C's sales declined by 23% compared with the previous month.
+```
+
+These insights must be calculated from actual data.
+
+Never fabricate insights.
+
+---
+
+# 15. ANOMALY / UNUSUAL SALES DETECTION
+
+Where enough historical data exists, detect unusual patterns.
+
+Examples:
+
+* Extremely high sales day
+* Extremely low sales day
+* Sudden revenue spike
+* Sudden revenue decline
+* Product suddenly becoming popular
+* Product sales declining consistently
+
+Display something like:
+
+```text
+⚠ SALES ALERT
+
+Product X sales dropped 31% compared with the previous month.
+```
+
+This should be analytical, not speculative.
+
+---
+
+# 16. MONTH SELECTOR
+
+The dashboard must have a clear month selector.
+
+Example:
+
+```text
+[ January 2026 ▼ ]
+```
+
+Selecting another month updates the entire dashboard.
+
+Example:
+
+```text
+January 2026
+February 2026
+March 2026
+April 2026
+```
+
+Also provide:
+
+```text
+All Time
+```
+
+for historical analysis.
+
+---
+
+# 17. YEAR SELECTOR
+
+Support multiple years.
+
+Example:
+
+```text
+2026
+2027
+2028
+```
+
+The system must not assume the organization will only use TimeLogic for one year.
+
+Historical data should remain accessible.
+
+---
+
+# 18. IMPORT HISTORY
+
+Create an import history section.
+
+Display:
+
+```text
+IMPORT HISTORY
+
+January Sales
+Imported: Jan 31, 2026
+Records: 1,245
+Status: Successful
+
+February Sales
+Imported: Feb 28, 2026
+Records: 1,382
+Status: Successful
+```
+
+Allow administrators to inspect an import.
+
+Do NOT allow accidental deletion of historical data.
+
+If deletion is supported, require confirmation.
+
+---
+
+# 19. RAW DATA VIEW
+
+Include a section where administrators can view the normalized imported records.
+
+Example:
+
+| Date | Product | Quantity | Revenue | Cost | Profit |
+| ---- | ------- | -------- | ------- | ---- | ------ |
+
+Allow:
+
+* Search
+* Filtering
+* Sorting
+* Date filtering
+* Product filtering
+* Category filtering
+* Export
+
+---
+
+# 20. EXPORT ANALYTICS
+
+Allow the organization to export reports.
+
+At minimum:
+
+* CSV
+* Excel
+* PDF
+
+The exported report should contain:
+
+### Executive Summary
+
+### Sales Summary
+
+### Product Performance
+
+### Profitability
+
+### Monthly Comparison
+
+### Charts
+
+### Business Insights
+
+Make the report professional enough to present to a business owner or management team.
+
+---
+
+# 21. DATA STORAGE
+
+Do NOT simply keep the uploaded file as the database.
+
+Create a proper normalized internal data model.
+
+For example:
+
+```text
+organizations
+    ↓
+sales_imports
+    ↓
+sales_transactions
+    ↓
+products
+    ↓
+sales_months
+```
+
+Use the existing TimeLogic database architecture where appropriate.
+
+Respect the existing:
+
+* PostgreSQL
+* Prisma
+* authentication
+* organization/tenant structure
+* Admin permissions
+
+Do not introduce a completely separate database unless there is a strong architectural reason.
+
+---
+
+# 22. MULTI-TENANT SECURITY
+
+This is extremely important.
+
+An organization must NEVER be able to see another organization's sales data.
+
+Every sales record must be associated with the correct organization.
+
+Example:
+
+```text
+organizationId
+```
+
+should be enforced throughout the data model and API.
+
+Never rely only on frontend filtering.
+
+Backend authorization must enforce tenant isolation.
+
+---
+
+# 23. DATA VALIDATION
+
+Before importing:
+
+Check for:
+
+* Invalid dates
+* Missing products
+* Negative quantities
+* Invalid prices
+* Missing required fields
+* Duplicate transactions
+* Corrupted rows
+* Unsupported file structures
+
+Show a useful validation report.
+
+Example:
+
+```text
+IMPORT VALIDATION
+
+✓ 1,210 valid records
+⚠ 23 records missing product names
+⚠ 8 records have invalid dates
+⚠ 4 duplicate transactions
+
+[Review Issues] [Import Valid Records]
+```
+
+---
+
+# 24. FILE FORMAT FLEXIBILITY
+
+The system should be designed around a flexible import pipeline:
+
+```text
+UPLOAD FILE
+     ↓
+FILE DETECTION
+     ↓
+PARSER
+     ↓
+COLUMN DETECTION
+     ↓
+COLUMN MAPPING
+     ↓
+VALIDATION
+     ↓
+NORMALIZATION
+     ↓
+DUPLICATE DETECTION
+     ↓
+DATABASE
+     ↓
+ANALYTICS ENGINE
+     ↓
+DASHBOARD
+```
+
+Do not tightly couple the dashboard to one spreadsheet format.
+
+---
+
+# 25. PROFESSIONAL UI
+
+The UI should match the existing TimeLogic Admin application.
+
+Keep the interface:
+
+* Clean
+* Premium
+* Professional
+* Minimal
+* Responsive
+* Easy for non-technical business owners
+
+Avoid overwhelming the user with dozens of charts at once.
+
+Organize the screen into logical sections.
+
+Suggested structure:
+
+```text
+BUSINESS ANALYTICS
+
+[ Month ▼ ] [ Year ▼ ] [ Upload Sales Data ]
+
+------------------------------------------------
+
+TOTAL SALES     TOTAL PROFIT     UNITS SOLD
+₦12.4M          ₦4.3M            18,450
+
+------------------------------------------------
+
+SALES TREND
+[ Large line chart ]
+
+------------------------------------------------
+
+TOP PRODUCTS            PROFITABILITY
+[ Bar chart ]            [ Chart ]
+
+------------------------------------------------
+
+CATEGORY PERFORMANCE
+[ Chart ]
+
+------------------------------------------------
+
+BUSINESS INSIGHTS
+[ Insight cards ]
+
+------------------------------------------------
+
+MONTHLY PERFORMANCE
+[ Historical chart ]
+
+------------------------------------------------
+
+RECENT IMPORTS
+[ Table ]
+```
+
+---
+
+# 26. IMPORTANT BUSINESS LOGIC
+
+The system must understand that:
+
+**Revenue ≠ Profit**
+
+If the organization only provides:
+
+```text
+Date
+Product
+Quantity
+Selling Price
+```
+
+the system can calculate:
+
+```text
+Revenue
+```
+
+but cannot accurately calculate profit unless cost information exists.
+
+Therefore show:
+
+```text
+Profit data unavailable
+
+Your uploaded file does not contain product cost information.
+Upload cost data to enable profitability analysis.
+```
+
+Do NOT estimate profit unless the organization explicitly provides a cost/expense methodology.
+
+---
+
+# 27. FUTURE-READY ARCHITECTURE
+
+Build this module so it can eventually support:
+
+* Inventory analysis
+* Expenses
+* Customer analytics
+* Sales forecasting
+* Product demand forecasting
+* Low-stock alerts
+* Customer retention
+* Customer lifetime value
+* AI business assistant
+* Automated monthly reports
+* Automated management summaries
+
+Do not implement all of these now unless necessary.
+
+Build the architecture so they can be added later.
+
+---
+
+# 28. AI / ANALYTICS READY
+
+Structure the analytics layer so an AI assistant can later query questions such as:
+
+```text
+"What was our best-selling product in March?"
+
+"Which product generated the most profit?"
+
+"How much did sales grow this year?"
+
+"What was our worst sales day?"
+
+"Which products are declining?"
+
+"What percentage of our revenue comes from our top 5 products?"
+```
+
+The answers must come from the organization's actual stored data.
+
+---
+
+# 29. IMPORTANT IMPLEMENTATION RULE
+
+Before writing code:
+
+1. Inspect the existing TimeLogic codebase.
+2. Understand the current Admin application architecture.
+3. Identify the frontend framework.
+4. Identify the backend architecture.
+5. Inspect the Prisma schema.
+6. Inspect existing organization/tenant authentication.
+7. Inspect existing API patterns.
+8. Inspect existing UI components.
+9. Reuse existing components and styling where possible.
+10. Do not break existing TimeLogic functionality.
+
+Do not rebuild the application from scratch.
+
+Integrate this feature into the existing application.
+
+---
+
+# 30. DELIVERABLE
+
+Implement the complete feature end-to-end:
+
+```text
+UPLOAD
+   ↓
+IMPORT
+   ↓
+VALIDATE
+   ↓
+NORMALIZE
+   ↓
+STORE
+   ↓
+ANALYZE
+   ↓
+VISUALIZE
+   ↓
+HISTORICAL RECORD
+```
+
+The final result should allow a business to start with something as simple as:
+
+```text
+January sales.xlsx
+```
+
+upload it into TimeLogic, and immediately get a professional business analytics dashboard.
+
+Then next month:
+
+```text
+February sales.xlsx
+```
+
+can be uploaded without destroying January.
+
+The organization should eventually have:
+
+```text
+January
+February
+March
+April
+May
+June
+...
+```
+
+and TimeLogic becomes a historical business intelligence record for the organization.
+
+---
+
+## FINAL REQUIREMENT
+
+Do not treat this as a simple "sales page."
+
+Treat it as a **Sales Intelligence & Business Analytics platform inside TimeLogic**.
+
+The goal is:
+
+> An organization uploads the sales data it already has, regardless of whether it came from Excel, CSV, SQLite, or another supported source, and TimeLogic transforms that raw business data into understandable sales, revenue, profitability, product-performance, trend, and historical analytics.
+
+Build the feature with production-quality architecture, proper tenant isolation, robust data validation, reusable analytics services, and a polished Admin UI.
+
+
+
+
+build this 
+employee - checkin - work session - break - check out - attendance
+
+
+
+each employee should have there own record: 
+employee to identity verified to check in to timestamp to device/method to location/context where applicable to work session to break to checkout to calculated hours to rules aapplied to immutable/auditable record
+
+

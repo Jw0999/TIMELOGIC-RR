@@ -5,7 +5,6 @@ import {
   cacheRosterAndSessions,
   getCachedRoster,
   findEmployeeOffline,
-  queueOfflineAttendance,
   getStationAuthCache,
 } from './offline/db';
 
@@ -323,25 +322,11 @@ export async function manualCheckIn(
   sessionId: string,
   password: string,
   faceImage?: string,
+  livenessFrames?: string[],
   employeeName = 'Employee'
 ): Promise<ActionResult> {
   if (!navigator.onLine) {
-    const clientTime = new Date().toISOString();
-    await queueOfflineAttendance({
-      employeeId,
-      employeeName,
-      type: 'check_in',
-      sessionId,
-      password,
-      faceImage,
-      timestamp: clientTime,
-    });
-    return {
-      status: 'SAVED_OFFLINE',
-      clockInTime: clientTime,
-      serverTime: clientTime,
-      isOffline: true,
-    };
+    throw new Error('Manual attendance requires a live connection so the server can verify identity and liveness.');
   }
 
   try {
@@ -350,25 +335,12 @@ export async function manualCheckIn(
       sessionId,
       password,
       faceImage,
+      livenessFrames,
+      idempotencyKey: crypto.randomUUID(),
     })).data;
   } catch (error: any) {
     if (error.message?.includes('Unable to connect') || error.message?.includes('Failed to fetch') || !navigator.onLine) {
-      const clientTime = new Date().toISOString();
-      await queueOfflineAttendance({
-        employeeId,
-        employeeName,
-        type: 'check_in',
-        sessionId,
-        password,
-        faceImage,
-        timestamp: clientTime,
-      });
-      return {
-        status: 'SAVED_OFFLINE',
-        clockInTime: clientTime,
-        serverTime: clientTime,
-        isOffline: true,
-      };
+      throw new Error('Manual attendance requires a live connection so the server can verify identity and liveness.');
     }
     throw error;
   }
@@ -381,21 +353,7 @@ export async function manualCheckOut(
   employeeName = 'Employee'
 ): Promise<ActionResult> {
   if (!navigator.onLine) {
-    const clientTime = new Date().toISOString();
-    await queueOfflineAttendance({
-      employeeId,
-      employeeName,
-      type: 'check_out',
-      sessionId,
-      password,
-      timestamp: clientTime,
-    });
-    return {
-      status: 'SAVED_OFFLINE',
-      clockOutTime: clientTime,
-      serverTime: clientTime,
-      isOffline: true,
-    };
+    throw new Error('Manual attendance requires a live connection so the server can verify the authenticated employee.');
   }
 
   try {
@@ -403,24 +361,11 @@ export async function manualCheckOut(
       employeeId,
       sessionId,
       password,
+      idempotencyKey: crypto.randomUUID(),
     })).data;
   } catch (error: any) {
     if (error.message?.includes('Unable to connect') || error.message?.includes('Failed to fetch') || !navigator.onLine) {
-      const clientTime = new Date().toISOString();
-      await queueOfflineAttendance({
-        employeeId,
-        employeeName,
-        type: 'check_out',
-        sessionId,
-        password,
-        timestamp: clientTime,
-      });
-      return {
-        status: 'SAVED_OFFLINE',
-        clockOutTime: clientTime,
-        serverTime: clientTime,
-        isOffline: true,
-      };
+      throw new Error('Manual attendance requires a live connection so the server can verify the authenticated employee.');
     }
     throw error;
   }

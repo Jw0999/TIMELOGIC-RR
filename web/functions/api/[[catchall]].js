@@ -1,6 +1,5 @@
 /**
- * Cloudflare Pages Function: Reverse-proxies /api/* requests to Heroku backend.
- * This completely hides the Heroku API domain from the client browser / Network tab.
+ * Cloudflare Pages Function: Reverse-proxies /api/* requests to the canonical Render backend.
  */
 export async function onRequest(context) {
   const { request } = context;

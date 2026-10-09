@@ -17,6 +17,18 @@ export const reemployEmployee       = (userId: string) => api.put<any>(`/super/e
 export const generateOrgActivationCode = (orgId: string, durationDays = 30) => api.post<any>(`/super/organizations/${orgId}/generate-code`, { durationDays }).then((r) => r.data);
 export const fetchOrgActivationCodes   = (orgId: string) => api.get<any>(`/super/organizations/${orgId}/activation-codes`).then((r) => r.data ?? []);
 export const manualRenewOrgSubscription = (orgId: string, durationDays = 30) => api.post<any>(`/super/organizations/${orgId}/manual-renew`, { durationDays }).then((r) => r.data);
+// ─── Super Admin Device Management ──────────────────────────────────────────
+export const fetchSuperDevices = (params: { orgId?: string; deviceType?: string; isBound?: boolean | string; search?: string } = {}) => {
+  const query = new URLSearchParams();
+  if (params.orgId) query.set('orgId', params.orgId);
+  if (params.deviceType) query.set('deviceType', params.deviceType);
+  if (params.isBound !== undefined && params.isBound !== '') query.set('isBound', String(params.isBound));
+  if (params.search) query.set('search', params.search);
+  const qStr = query.toString();
+  return api.get<any>(`/super/devices${qStr ? `?${qStr}` : ''}`).then((r) => r.data);
+};
+export const unlockSuperDevice = (deviceId: string) => api.put<any>(`/super/devices/${deviceId}/unlock`, {});
+export const deleteSuperDevice = (deviceId: string) => api.delete<any>(`/super/devices/${deviceId}`);
 
 // ─── Existing ────────────────────────────────────────────────────────────────
 export const fetchOrg         = () => api.get<any>('/admin/org').then((r) => r.data);

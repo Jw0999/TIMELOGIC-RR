@@ -1,5 +1,5 @@
 import { api, authenticatedFetch } from './api';
-import { API_URL } from '../config';
+import { API_URL, LOCAL_SALES_API_URL } from '../config';
 import type {
   ApiEnvelope,
   EmployeeCheckInMethod,
@@ -68,7 +68,7 @@ export const fetchManualAttendance = (params: { sessionId?: string; search?: str
     return { ...dashboard, employees: [...dashboard.employees, ...rest.flat()] };
   });
 };
-export const manualEmployeeCheckIn = (body: { employeeId: string; sessionId: string; password: string; faceImage?: string }) =>
+export const manualEmployeeCheckIn = (body: { employeeId: string; sessionId: string; password: string; faceImage?: string; livenessFrames?: string[] }) =>
   api.post<ApiEnvelope<ManualAttendanceResult>>('/admin/manual-attendance/check-in', body).then((r) => r.data);
 export const manualEmployeeCheckOut = (body: { employeeId: string; sessionId?: string; password: string }) =>
   api.post<ApiEnvelope<ManualAttendanceResult>>('/admin/manual-attendance/check-out', body).then((r) => r.data);
@@ -226,6 +226,132 @@ export const downloadPayslipPdf = async (payslipId: string, fileName = 'payslip.
   const a = document.createElement('a');
   a.href = url;
   a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+};
+
+// ─── Trusted Workforce Record & Timeline ───────────────────────────────────
+export const fetchWorkforceTimeline = (
+  employeeId: string,
+  params: { date?: string; recordId?: string; sessionId?: string } = {}
+) => {
+  const q = new URLSearchParams();
+  if (params.date) q.set('date', params.date);
+  if (params.recordId) q.set('recordId', params.recordId);
+  if (params.sessionId) q.set('sessionId', params.sessionId);
+  const queryStr = q.toString() ? `?${q.toString()}` : '';
+  return api.get<any>(`/work-history/timeline/${employeeId}${queryStr}`).then((r) => r.data ?? r);
+};
+
+// ─── Sales Intelligence & Business Analytics (Strictly Local-Only) ────────
+const localSalesUrl = (path: string) => `${LOCAL_SALES_API_URL}${path.startsWith('/') ? path : '/' + path}`;
+
+export const fetchSalesDashboard = (params: { year?: number | string; month?: number | string } = {}) => {
+  const q = new URLSearchParams();
+  if (params.year) q.set('year', String(params.year));
+  if (params.month) q.set('month', String(params.month));
+  const queryStr = q.toString() ? `?${q.toString()}` : '';
+  return api.get<any>(localSalesUrl(`/sales/dashboard${queryStr}`)).then((r) => r.data ?? r);
+};
+
+export const fetchSalesPeriods = () =>
+  api.get<any>(localSalesUrl('/sales/periods')).then((r) => r.data ?? r);
+
+export const previewSalesUpload = async (formData: FormData) => {
+  const res = await authenticatedFetch(localSalesUrl('/sales/preview'), {
+    method: 'POST',
+    body: formData,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.message || 'Failed to inspect sales file');
+  return data.data;
+};
+
+export const importSalesUpload = async (formData: FormData) => {
+  const res = await authenticatedFetch(localSalesUrl('/sales/import'), {
+    method: 'POST',
+    body: formData,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.message || 'Failed to import sales data');
+  return data;
+};
+
+export const fetchSalesTransactions = (params: {
+  year?: number | string;
+  month?: number | string;
+  search?: string;
+  category?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: string;
+} = {}) => {
+  const q = new URLSearchParams();
+  if (params.year) q.set('year', String(params.year));
+  if (params.month) q.set('month', String(params.month));
+  if (params.search) q.set('search', params.search);
+  if (params.category) q.set('category', params.category);
+  if (params.page) q.set('page', String(params.page));
+  if (params.limit) q.set('limit', String(params.limit));
+  if (params.sortBy) q.set('sortBy', params.sortBy);
+  if (params.sortOrder) q.set('sortOrder', params.sortOrder);
+  const queryStr = q.toString() ? `?${q.toString()}` : '';
+  return api.get<any>(localSalesUrl(`/sales/transactions${queryStr}`)).then((r) => r.data ?? r);
+};
+
+export const fetchSalesImports = () =>
+  api.get<any>(localSalesUrl('/sales/imports')).then((r) => r.data ?? r);
+
+export const deleteSalesImport = (batchId: string) =>
+  api.delete<any>(localSalesUrl(`/sales/imports/${batchId}`)).then((r) => r.data ?? r);
+
+export const downloadSalesExcel = async (params: { year?: number | string; month?: number | string } = {}) => {
+  const q = new URLSearchParams();
+  if (params.year) q.set('year', String(params.year));
+  if (params.month) q.set('month', String(params.month));
+  const queryStr = q.toString() ? `?${q.toString()}` : '';
+  const res = await authenticatedFetch(localSalesUrl(`/sales/export/excel${queryStr}`));
+  if (!res.ok) throw new Error('Failed to download Excel report');
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `TimeLogic_Sales_Intelligence_${Date.now()}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+};
+
+export const downloadSalesCsv = async (params: { year?: number | string; month?: number | string } = {}) => {
+  const q = new URLSearchParams();
+  if (params.year) q.set('year', String(params.year));
+  if (params.month) q.set('month', String(params.month));
+  const queryStr = q.toString() ? `?${q.toString()}` : '';
+  const res = await authenticatedFetch(localSalesUrl(`/sales/export/csv${queryStr}`));
+  if (!res.ok) throw new Error('Failed to download CSV data');
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `TimeLogic_Sales_Data_${Date.now()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+};
+
+export const downloadSalesTemplate = async (format: 'excel' | 'csv' = 'excel') => {
+  const res = await authenticatedFetch(localSalesUrl(`/sales/template?format=${format}`));
+  if (!res.ok) throw new Error('Failed to download template');
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = format === 'csv' ? 'TimeLogic_Sales_Template.csv' : 'TimeLogic_Sales_Template.xlsx';
   document.body.appendChild(a);
   a.click();
   window.URL.revokeObjectURL(url);

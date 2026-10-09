@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TimeLogic – Organisation Registration Agreement</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap');
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: 'Inter', 'Liberation Sans', 'DejaVu Sans', Arial, sans-serif;
+    font-size: 10pt;
+    color: #1a1a2e;
+    background: #fff;
+    line-height: 1.6;
+  }
+
+  /* ─── PAGE WRAPPER ─────────────────────────────── */
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto;
+    padding: 18mm 20mm 16mm 20mm;
+    page-break-after: always;
+    position: relative;
+    background: #fff;
+  }
+  .page:last-child {
+    page-break-after: avoid;
+  }
+
+  /* ─── HEADER ────────────────────────────────────── */
+  .doc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 3px solid #0A2562;
+    padding-bottom: 12px;
+    margin-bottom: 22px;
+  }
+  .header-brand {
+    display: flex;
+    flex-direction: column;
+  }
+  .brand-name {
+    font-size: 22pt;
+    font-weight: 900;
+    color: #0A2562;
+    letter-spacing: -0.5px;
+    line-height: 1;
+  }
+  .brand-tag {
+    font-size: 7pt;
+    font-weight: 500;
+    color: #1A56DB;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 3px;
+  }
+  .header-meta {
+    text-align: right;
+  }
+  .header-meta .doc-title {
+    font-size: 8.5pt;
+    font-weight: 700;
+    color: #0A2562;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+  }
+  .header-meta .doc-ref {
+    font-size: 7.5pt;
+    color: #6b7280;
+    margin-top: 2px;
+  }
+
+  /* ─── BANNER ────────────────────────────────────── */
+  .agreement-banner {
+    background: linear-gradient(135deg, #0A2562 0%, #1A56DB 100%);
+    color: #fff;
+    padding: 16px 20px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+  }
+  .agreement-banner h1 {
+    font-size: 14pt;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+    line-height: 1.2;
+  }
+  .agreement-banner p {
+    font-size: 8pt;
+    opacity: 0.85;
+    margin-top: 5px;
+    line-height: 1.5;
+  }
+
+  /* ─── SECTION HEADINGS ─────────────────────────── */
+  .section-num {
+    font-size: 7pt;
+    font-weight: 700;
+    color: #1A56DB;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 18px;
+    margin-bottom: 4px;
+    display: block;
+  }
+  h2.section-title {
+    font-size: 11pt;
+    font-weight: 800;
+    color: #0A2562;
+    border-left: 4px solid #1A56DB;
+    padding-left: 10px;
+    margin-bottom: 10px;
+    line-height: 1.3;
+  }
+  h3.sub-title {
+    font-size: 9.5pt;
+    font-weight: 700;
+    color: #0A2562;
+    margin-top: 12px;
+    margin-bottom: 5px;
+  }
+
+  /* ─── BODY TEXT ─────────────────────────────────── */
+  p {
+    font-size: 9pt;
+    color: #374151;
+    margin-bottom: 8px;
+    text-align: justify;
+    line-height: 1.65;
+  }
+
+  /* ─── ORDERED / UNORDERED LISTS ─────────────────── */
+  ol, ul {
+    padding-left: 18px;
+    margin-bottom: 8px;
+  }
+  li {
+    font-size: 9pt;
+    color: #374151;
+    margin-bottom: 5px;
+    line-height: 1.6;
+    text-align: justify;
+  }
+  ol { list-style-type: lower-alpha; }
+  ol.numeric { list-style-type: decimal; }
+
+  /* ─── HIGHLIGHT BOXES ───────────────────────────── */
+  .notice-box {
+    background: #eff6ff;
+    border-left: 4px solid #1A56DB;
+    padding: 10px 14px;
+    border-radius: 0 4px 4px 0;
+    margin: 12px 0;
+  }
+  .notice-box p {
+    margin-bottom: 0;
+    font-size: 8.5pt;
+  }
+  .warning-box {
+    background: #fff7ed;
+    border-left: 4px solid #f59e0b;
+    padding: 10px 14px;
+    border-radius: 0 4px 4px 0;
+    margin: 12px 0;
+  }
+  .warning-box p {
+    margin-bottom: 0;
+    font-size: 8.5pt;
+    color: #78350f;
+  }
+  .data-tag {
+    display: inline-block;
+    background: #0A2562;
+    color: #fff;
+    font-size: 7pt;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 3px;
+    letter-spacing: 0.5px;
+    margin-right: 4px;
+    margin-bottom: 3px;
+  }
+
+  /* ─── DIVIDER ───────────────────────────────────── */
+  .divider {
+    border: none;
+    border-top: 1px solid #e5e7eb;
+    margin: 14px 0;
+  }
+  .divider-thick {
+    border: none;
+    border-top: 2px solid #0A2562;
+    margin: 16px 0;
+  }
+
+  /* ─── FILL FIELDS ───────────────────────────────── */
+  .field-row {
+    display: flex;
+    align-items: flex-end;
+    margin-bottom: 14px;
+    gap: 10px;
+  }
+  .field-label {
+    font-size: 8.5pt;
+    font-weight: 600;
+    color: #0A2562;
+    white-space: nowrap;
+    min-width: 160px;
+  }
+  .field-line {
+    flex: 1;
+    border-bottom: 1.5px solid #0A2562;
+    height: 18px;
+    min-width: 120px;
+  }
+
+  /* ─── SIGNATURE BLOCK ───────────────────────────── */
+  .sig-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-top: 16px;
+  }
+  .sig-column {
+    border: 1px solid #d1d5db;
+    border-radius: 5px;
+    padding: 14px 16px;
+  }
+  .sig-column .sig-party {
+    font-size: 8pt;
+    font-weight: 700;
+    color: #0A2562;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid #1A56DB;
+  }
+  .sig-field {
+    margin-bottom: 14px;
+  }
+  .sig-field-label {
+    font-size: 7.5pt;
+    font-weight: 600;
+    color: #6b7280;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .sig-field-line {
+    border-bottom: 1.2px solid #374151;
+    height: 20px;
+    width: 100%;
+  }
+
+  /* ─── TABLE ─────────────────────────────────────── */
+  table.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0 14px 0;
+    font-size: 8.5pt;
+  }
+  table.data-table th {
+    background: #0A2562;
+    color: #fff;
+    padding: 6px 10px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 7.5pt;
+    letter-spacing: 0.5px;
+  }
+  table.data-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid #e5e7eb;
+    color: #374151;
+    vertical-align: top;
+  }
+  table.data-table tr:nth-child(even) td {
+    background: #f9fafb;
+  }
+
+  /* ─── FOOTER ────────────────────────────────────── */
+  .page-footer {
+    position: absolute;
+    bottom: 12mm;
+    left: 20mm;
+    right: 20mm;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid #e5e7eb;
+    padding-top: 7px;
+  }
+  .footer-left {
+    font-size: 7pt;
+    color: #9ca3af;
+  }
+  .footer-right {
+    font-size: 7pt;
+    color: #9ca3af;
+  }
+  .footer-center {
+    font-size: 7pt;
+    color: #1A56DB;
+    font-weight: 600;
+  }
+
+  /* ─── PRINT ─────────────────────────────────────── */
+  @media print {
+    body { background: #fff; }
+    .page {
+      margin: 0;
+      width: 210mm;
+      min-height: 297mm;
+      padding: 18mm 20mm 16mm 20mm;
+    }
+  }
+
+  @page {
+    size: A4;
+    margin: 0;
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════
+     PAGE 1 — PREAMBLE, PARTIES & DEFINITIONS
+════════════════════════════════════════════════════════ -->
+<div class="page">
+
+  <div class="doc-header">
+    <div class="header-brand">
+      <span class="brand-name">TimeLogic</span>
+      <span class="brand-tag">Technologies · Est. 2024</span>
+    </div>
+    <div class="header-meta">
+      <div class="doc-title">Organisation Registration Agreement</div>
+      <div class="doc-ref">Document Ref: TL-ORA-2024 &nbsp;|&nbsp; Version 1.0 &nbsp;|&nbsp; Page 1 of 4</div>
+    </div>
+  </div>
+
+  <div class="agreement-banner">
+    <h1>Organisation Registration &amp; Service Agreement</h1>
+    <p>This Agreement is entered into between TimeLogic Technologies ("TimeLogic", "the Platform", "the Provider") and the Organisation named herein ("the Client", "the Organisation"). By completing registration on the TimeLogic platform — whether through the web dashboard, mobile application, or authorised representative — the Organisation acknowledges that it has read, understood, and agrees to be bound by the terms and conditions set out in this Agreement.</p>
+  </div>
+
+  <!-- PREAMBLE -->
+  <span class="section-num">01</span>
+  <h2 class="section-title">Preamble &amp; Background</h2>
+  <p>TimeLogic Technologies is a technology company incorporated and operating under the laws of the Federal Republic of Nigeria, specialising in biometric attendance management, workforce intelligence, and cloud-based payroll integration. TimeLogic operates a hardware-anchored attendance kiosk platform combining edge facial-recognition hardware, offline data synchronisation, and a real-time cloud dashboard accessible to authorised administrators and employees.</p>
+  <p>This Agreement establishes the legal basis upon which any Organisation may access, subscribe to, and operate the TimeLogic platform. It defines the rights and obligations of both parties with respect to data handling, service levels, acceptable use, intellectual property, and dispute resolution. This document is legally binding and shall be governed by Nigerian law.</p>
+
+  <!-- PARTIES -->
+  <span class="section-num">02</span>
+  <h2 class="section-title">Identification of Parties</h2>
+
+  <h3 class="sub-title">2.1 — Service Provider</h3>
+  <p><strong>TimeLogic Technologies</strong> &nbsp;|&nbsp; Lagos, Nigeria (Remote-First Operations)<br>
+  Email: support@timelogics.tech &nbsp;|&nbsp; Website: https://www.timelogics.tech</p>
+
+  <h3 class="sub-title">2.2 — Client Organisation</h3>
+  <p>The Organisation entering into this Agreement is identified as follows. Please complete all fields clearly using block letters or an authorised stamp:</p>
+
+  <div class="field-row">
+    <span class="field-label">Full Legal Organisation Name:</span>
+    <span class="field-line"></span>
+  </div>
+  <div class="field-row">
+    <span class="field-label">Organisation Type:</span>
+    <span class="field-line"></span>
+  </div>
+  <div class="field-row">
+    <span class="field-label">CAC Registration Number (if applicable):</span>
+    <span class="field-line"></span>
+  </div>
+  <div class="field-row">
+    <span class="field-label">Organisation Address:</span>
+    <span class="field-line"></span>
+  </div>
+  <div class="field-row">
+    <span class="field-label">City / State:</span>
+    <span class="field-line"></span>
+  </div>
+  <div class="field-row">
+    <span class="field-label">Official Email Address:</span>
+    <span class="field-line"></span>
+  </div>
+  <div class="field-row">
+    <span class="field-label">Contact Phone Number:</span>
+    <span class="field-line"></span>
+  </div>
+
+  <!-- DEFINITIONS -->
+  <span class="section-num">03</span>
+  <h2 class="section-title">Definitions</h2>
+  <p>For the purposes of this Agreement, the following terms shall bear the meanings assigned to them below unless the context otherwise requires:</p>
+  <ol class="numeric">
+    <li><strong>"Platform"</strong> — The TimeLogic web dashboard, mobile application, API endpoints, biometric kiosk hardware, and all associated software and services provided by TimeLogic Technologies.</li>
+    <li><strong>"Biometric Data"</strong> — Facial recognition vector embeddings, fingerprint data (where applicable), and any other physiological identifiers captured during attendance marking.</li>
+    <li><strong>"Employee / Staff"</strong> — Any individual enrolled by the Organisation on the TimeLogic platform for the purpose of attendance tracking, shift management, or payroll integration.</li>
+    <li><strong>"Subscription Plan"</strong> — The tier of service (Starter, Professional, or Enterprise) selected by the Organisation, determining the feature set and pricing applicable.</li>
+    <li><strong>"Authorised Administrator"</strong> — Any person designated by the Organisation with admin-level access credentials to manage the Organisation's TimeLogic account.</li>
+    <li><strong>"Personal Data"</strong> — Any information relating to an identified or identifiable natural person, as defined under the Nigeria Data Protection Regulation (NDPR) 2019 and the Nigeria Data Protection Act 2023.</li>
+    <li><strong>"Processing"</strong> — Any operation performed on Personal Data including collection, storage, retrieval, consultation, use, disclosure, or erasure.</li>
+    <li><strong>"Effective Date"</strong> — The date on which the Organisation completes registration on the TimeLogic platform or signs this Agreement, whichever is earlier.</li>
+  </ol>
+
+  <div class="page-footer">
+    <span class="footer-left">TimeLogic Technologies · support@timelogics.tech</span>
+    <span class="footer-center">CONFIDENTIAL — ORGANISATION REGISTRATION AGREEMENT</span>
+    <span class="footer-right">Page 1 of 4</span>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     PAGE 2 — DATA COLLECTION, PRIVACY & DATA PROTECTION
+════════════════════════════════════════════════════════ -->
+<div class="page">
+
+  <div class="doc-header">
+    <div class="header-brand">
+      <span class="brand-name">TimeLogic</span>
+      <span class="brand-tag">Technologies · Est. 2024</span>
+    </div>
+    <div class="header-meta">
+      <div class="doc-title">Organisation Registration Agreement</div>
+      <div class="doc-ref">Document Ref: TL-ORA-2024 &nbsp;|&nbsp; Version 1.0 &nbsp;|&nbsp; Page 2 of 4</div>
+    </div>
+  </div>
+
+  <!-- DATA COLLECTED -->
+  <span class="section-num">04</span>
+  <h2 class="section-title">Data We Collect</h2>
+  <p>TimeLogic collects and processes the following categories of data in order to deliver, maintain, and improve the Platform. The Organisation is responsible for ensuring that all enrolled individuals have been informed of, and have consented to, the collection of the data types listed herein.</p>
+
+  <table class="data-table">
+    <tr>
+      <th>Category</th>
+      <th>Data Types Collected</th>
+      <th>Purpose</th>
+    </tr>
+    <tr>
+      <td><span class="data-tag">BIOMETRIC</span></td>
+      <td>Facial recognition vector embeddings (mathematical representations); liveness detection metadata</td>
+      <td>Identity verification at attendance kiosk; anti-spoofing</td>
+    </tr>
+    <tr>
+      <td><span class="data-tag">ATTENDANCE</span></td>
+      <td>Clock-in / clock-out timestamps; shift records; late arrivals; absences; break durations</td>
+      <td>Attendance tracking; payroll calculation; workforce analytics</td>
+    </tr>
+    <tr>
+      <td><span class="data-tag">EMPLOYEE</span></td>
+      <td>Full name; employee ID; department; role; contact email; employment type</td>
+      <td>Account management; payroll integration; reporting</td>
+    </tr>
+    <tr>
+      <td><span class="data-tag">DEVICE</span></td>
+      <td>Kiosk device ID; firmware version; sync logs; location metadata (where enabled)</td>
+      <td>Device health monitoring; offline sync reconciliation</td>
+    </tr>
+    <tr>
+      <td><span class="data-tag">ORGANISATION</span></td>
+      <td>Organisation name; address; CAC number; billing information; administrator details</td>
+      <td>Account registration; subscription management; compliance</td>
+    </tr>
+    <tr>
+      <td><span class="data-tag">USAGE</span></td>
+      <td>Platform login events; feature usage logs; API call records; session metadata</td>
+      <td>Platform security; performance optimisation; audit trails</td>
+    </tr>
+  </table>
+
+  <div class="notice-box">
+    <p><strong>Note on Biometric Data:</strong> TimeLogic stores only mathematical vector representations of facial features — not raw photographic images — in encrypted form. These vectors cannot be reverse-engineered to reconstruct a facial photograph. Original capture images are processed at the edge device and are not transmitted to or retained on TimeLogic servers.</p>
+  </div>
+
+  <!-- WE DO NOT SELL DATA -->
+  <span class="section-num">05</span>
+  <h2 class="section-title">Data Privacy Commitment — We Do Not Sell Your Data</h2>
+
+  <div class="warning-box">
+    <p><strong>ABSOLUTE COMMITMENT:</strong> TimeLogic Technologies does NOT sell, rent, trade, barter, or otherwise transfer Personal Data or Biometric Data belonging to the Organisation or its employees to any third party for commercial, marketing, or any other purpose. This commitment is unconditional and applies regardless of the subscription tier, contract value, or any other commercial consideration.</p>
+  </div>
+
+  <p>TimeLogic further commits to the following privacy principles:</p>
+  <ol>
+    <li><strong>No Third-Party Advertising:</strong> TimeLogic does not use Organisation or employee data to serve targeted advertising on behalf of any third party, nor does it share data with advertising networks or data brokers.</li>
+    <li><strong>Limited Disclosure:</strong> Data shall only be disclosed to third parties where strictly necessary to operate the Platform (e.g., cloud infrastructure providers under binding data processing agreements), where required by a valid court order or applicable Nigerian law, or where the Organisation provides explicit written consent.</li>
+    <li><strong>Sub-Processor Accountability:</strong> Where TimeLogic engages third-party sub-processors (such as cloud hosting providers), those sub-processors shall be bound by contractual data protection obligations no less stringent than those in this Agreement.</li>
+    <li><strong>Employee Data Ownership:</strong> The Organisation retains ownership of all employee data submitted to the Platform. TimeLogic processes this data solely as a data processor acting on the Organisation's instructions.</li>
+    <li><strong>Data Access by TimeLogic Staff:</strong> Access to Organisation data by TimeLogic personnel is restricted to authorised support and engineering staff on a need-to-know basis, subject to internal access controls and audit logging.</li>
+  </ol>
+
+  <!-- NDPR COMPLIANCE -->
+  <span class="section-num">06</span>
+  <h2 class="section-title">Data Protection &amp; Legal Compliance</h2>
+
+  <h3 class="sub-title">6.1 — Applicable Legal Framework</h3>
+  <p>Both parties agree to comply with the following applicable laws and regulations in their processing of personal data under this Agreement:</p>
+  <ul>
+    <li>Nigeria Data Protection Regulation (NDPR) 2019, as issued by the National Information Technology Development Agency (NITDA)</li>
+    <li>Nigeria Data Protection Act (NDPA) 2023</li>
+    <li>The Constitution of the Federal Republic of Nigeria 1999 (as amended) with respect to the right to privacy</li>
+    <li>Any other applicable sector-specific data protection regulations in force in Nigeria</li>
+  </ul>
+
+  <h3 class="sub-title">6.2 — Organisation's Data Protection Responsibilities</h3>
+  <ol>
+    <li>The Organisation shall act as <strong>Data Controller</strong> for all employee personal data submitted to the Platform and shall ensure that it has a valid lawful basis for processing under the NDPA 2023 (including obtaining informed consent from employees where required).</li>
+    <li>The Organisation shall maintain a current employee data privacy notice informing enrolled staff of the nature, purpose, and duration of data processing conducted via TimeLogic.</li>
+    <li>The Organisation shall promptly notify TimeLogic (within 48 hours of becoming aware) of any suspected breach of employee data security, accidental disclosure, or unauthorised access.</li>
+    <li>The Organisation shall not enrol any minor (person under 18 years of age) on the Platform without appropriate legal guardianship consent and documentation.</li>
+  </ol>
+
+  <h3 class="sub-title">6.3 — Data Retention &amp; Deletion</h3>
+  <ol>
+    <li>TimeLogic retains data for the duration of the active subscription period plus a maximum of <strong>90 days</strong> following subscription expiry or account closure (the "Retention Window"), to allow the Organisation to export records.</li>
+    <li>Upon written request received before the Retention Window expires, TimeLogic shall permanently delete all Organisation data within <strong>30 business days</strong>.</li>
+    <li>Biometric vector data shall be deleted immediately upon an employee's de-registration from the Platform or upon receipt of a verified deletion request from the Organisation.</li>
+    <li>Certain anonymised, aggregated, and non-identifiable usage metrics may be retained by TimeLogic beyond the Retention Window solely for platform improvement purposes.</li>
+  </ol>
+
+  <div class="page-footer">
+    <span class="footer-left">TimeLogic Technologies · support@timelogics.tech</span>
+    <span class="footer-center">CONFIDENTIAL — ORGANISATION REGISTRATION AGREEMENT</span>
+    <span class="footer-right">Page 2 of 4</span>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     PAGE 3 — OBLIGATIONS, USE POLICY, SUBSCRIPTION & LIABILITY
+════════════════════════════════════════════════════════ -->
+<div class="page">
+
+  <div class="doc-header">
+    <div class="header-brand">
+      <span class="brand-name">TimeLogic</span>
+      <span class="brand-tag">Technologies · Est. 2024</span>
+    </div>
+    <div class="header-meta">
+      <div class="doc-title">Organisation Registration Agreement</div>
+      <div class="doc-ref">Document Ref: TL-ORA-2024 &nbsp;|&nbsp; Version 1.0 &nbsp;|&nbsp; Page 3 of 4</div>
+    </div>
+  </div>
+
+  <!-- ORGANISATION RESPONSIBILITIES -->
+  <span class="section-num">07</span>
+  <h2 class="section-title">Organisation's Obligations &amp; Responsibilities</h2>
+  <p>By registering on the TimeLogic platform, the Organisation accepts the following obligations:</p>
+  <ol>
+    <li><strong>Accurate Information:</strong> The Organisation shall provide accurate, complete, and up-to-date registration information and shall promptly update such information in the event of any change. Providing false or misleading information constitutes grounds for immediate account suspension.</li>
+    <li><strong>Account Security:</strong> The Organisation is solely responsible for maintaining the confidentiality of all administrator login credentials and API keys. The Organisation shall promptly notify TimeLogic of any unauthorised access or suspected breach of its account.</li>
+    <li><strong>Authorised Use Only:</strong> The Organisation shall use the Platform exclusively for its internal workforce management and attendance tracking operations. The Platform shall not be used to monitor individuals outside the Organisation's employment relationship without their documented consent.</li>
+    <li><strong>Device Integrity:</strong> The Organisation shall not tamper with, modify, reverse-engineer, or attempt to circumvent security mechanisms in any TimeLogic kiosk hardware or software provided under this Agreement. Physical damage or unauthorised modification of kiosk hardware voids warranty and may result in additional charges.</li>
+    <li><strong>Employee Consent:</strong> Prior to enrolling any employee's biometric data, the Organisation shall obtain documented informed consent in compliance with NDPA 2023 requirements. TimeLogic reserves the right to request evidence of consent at any time.</li>
+    <li><strong>Lawful Payroll Deductions:</strong> Where the Platform is used in conjunction with payroll systems, the Organisation is solely responsible for ensuring that any deductions from employee wages — whether for lateness, absence, or other reasons — comply with the Nigerian Labour Act (Cap L1, LFN 2004) and applicable employment contracts. TimeLogic provides tools for recording attendance data; the legal validity of resulting payroll deductions is the Organisation's sole responsibility.</li>
+    <li><strong>Subscription Payments:</strong> The Organisation shall pay all applicable subscription fees in accordance with the selected plan and payment schedule. Continued access to the Platform is conditional upon payment remaining current.</li>
+    <li><strong>Compliance with Laws:</strong> The Organisation shall, at all times, ensure its use of the Platform complies with all applicable Nigerian laws and regulations, including but not limited to employment law, data protection law, and anti-discrimination legislation.</li>
+  </ol>
+
+  <!-- TIMELOGIC OBLIGATIONS -->
+  <span class="section-num">08</span>
+  <h2 class="section-title">TimeLogic's Obligations to the Organisation</h2>
+  <ol>
+    <li><strong>Service Availability:</strong> TimeLogic shall use commercially reasonable efforts to maintain Platform uptime of <strong>99.5% or greater</strong> on a rolling monthly basis, excluding scheduled maintenance windows (which shall be communicated with a minimum of 24 hours' notice).</li>
+    <li><strong>Data Security:</strong> TimeLogic shall implement and maintain industry-standard technical and organisational security measures including encryption at rest and in transit (TLS 1.2+, AES-256), role-based access controls, regular vulnerability assessments, and incident response procedures.</li>
+    <li><strong>Customer Support:</strong> TimeLogic shall provide responsive technical support via email (support@timelogics.tech) and the in-platform support portal during designated support hours. Enterprise plan subscribers receive priority support with a target response time of 4 business hours.</li>
+    <li><strong>Transparency:</strong> TimeLogic shall notify the Organisation of any material changes to this Agreement or its privacy practices with a minimum of <strong>30 days' advance notice</strong> via email or in-platform notification.</li>
+    <li><strong>Breach Notification:</strong> In the event of a confirmed data breach affecting the Organisation's data, TimeLogic shall notify the affected Organisation within <strong>72 hours</strong> of becoming aware of the breach, in compliance with NDPA 2023 notification requirements.</li>
+    <li><strong>Data Portability:</strong> Upon request, TimeLogic shall provide the Organisation with an export of all its data in a machine-readable format (CSV/JSON) within 10 business days.</li>
+  </ol>
+
+  <!-- ACCEPTABLE USE -->
+  <span class="section-num">09</span>
+  <h2 class="section-title">Acceptable Use &amp; Prohibited Activities</h2>
+  <p>The following activities are strictly prohibited and constitute grounds for immediate account suspension and potential legal action:</p>
+  <ol>
+    <li>Using the Platform to collect biometric data without the explicit, documented consent of the individuals concerned</li>
+    <li>Sharing TimeLogic administrator credentials with unauthorised third parties or competitors</li>
+    <li>Attempting to extract, scrape, or reverse-engineer biometric models or Platform algorithms</li>
+    <li>Using the Platform to discriminate against employees on grounds prohibited by Nigerian law including gender, ethnicity, religion, disability, or pregnancy</li>
+    <li>Misrepresenting attendance data, manipulating records, or instructing employees to fraudulently circumvent the biometric system</li>
+    <li>Reselling, sub-licensing, or white-labelling the TimeLogic Platform or any component thereof without express written authorisation from TimeLogic Technologies</li>
+    <li>Using the Platform for purposes unrelated to legitimate employment or workforce management</li>
+    <li>Introducing malicious code, viruses, or any disruptive software into the Platform or connected systems</li>
+  </ol>
+
+  <!-- SUBSCRIPTION & TERMINATION -->
+  <span class="section-num">10</span>
+  <h2 class="section-title">Subscription Terms &amp; Termination</h2>
+
+  <h3 class="sub-title">10.1 — Subscription Plans</h3>
+  <p>The Organisation's access to the Platform is governed by the chosen Subscription Plan (Starter, Professional, or Enterprise). The features, employee limits, and pricing applicable to each plan are as set out in the current TimeLogic Monetisation and Access Policy document (TL-MAP-2024), which forms an annexure to this Agreement.</p>
+
+  <h3 class="sub-title">10.2 — Termination by the Organisation</h3>
+  <p>The Organisation may terminate this Agreement at any time by providing <strong>30 days' written notice</strong> to TimeLogic at support@timelogics.tech. Upon termination, the Organisation may request export of all its data within the 90-day Retention Window.</p>
+
+  <h3 class="sub-title">10.3 — Termination by TimeLogic</h3>
+  <p>TimeLogic reserves the right to suspend or terminate the Organisation's account immediately, with or without prior notice, in the following circumstances:</p>
+  <ol>
+    <li>Material breach of any provision of this Agreement</li>
+    <li>Non-payment of subscription fees after 14 days' written notice</li>
+    <li>Confirmed misuse of data, biometric information, or Platform features</li>
+    <li>Discovery that the Organisation provided materially false registration information</li>
+    <li>Legal order or regulatory directive requiring discontinuation of service</li>
+  </ol>
+
+  <h3 class="sub-title">10.4 — Effect of Termination</h3>
+  <p>Upon termination, all licences granted to the Organisation under this Agreement shall immediately cease. TimeLogic shall retain data solely within the Retention Window as specified in Clause 6.3, after which all Organisation data shall be permanently deleted.</p>
+
+  <!-- LIABILITY -->
+  <span class="section-num">11</span>
+  <h2 class="section-title">Limitation of Liability</h2>
+  <ol>
+    <li><strong>Cap on Liability:</strong> To the maximum extent permitted by Nigerian law, TimeLogic's total aggregate liability to the Organisation under or in connection with this Agreement shall not exceed the total subscription fees paid by the Organisation in the <strong>three (3) calendar months</strong> immediately preceding the event giving rise to the claim.</li>
+    <li><strong>Exclusion of Consequential Loss:</strong> TimeLogic shall not be liable for any indirect, incidental, special, consequential, or punitive damages, including loss of profits, loss of data, loss of business, or reputational harm, arising out of or in connection with the Platform or this Agreement.</li>
+    <li><strong>Third-Party Integrations:</strong> TimeLogic is not liable for the performance, security, or data practices of third-party services connected to the Platform by the Organisation (e.g., payroll providers, ERP systems).</li>
+    <li><strong>Force Majeure:</strong> Neither party shall be liable for any failure or delay in performance caused by circumstances beyond its reasonable control, including acts of God, civil unrest, government action, network outages, or natural disasters.</li>
+  </ol>
+
+  <div class="page-footer">
+    <span class="footer-left">TimeLogic Technologies · support@timelogics.tech</span>
+    <span class="footer-center">CONFIDENTIAL — ORGANISATION REGISTRATION AGREEMENT</span>
+    <span class="footer-right">Page 3 of 4</span>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     PAGE 4 — INTELLECTUAL PROPERTY, GOVERNING LAW & SIGNATURES
+════════════════════════════════════════════════════════ -->
+<div class="page">
+
+  <div class="doc-header">
+    <div class="header-brand">
+      <span class="brand-name">TimeLogic</span>
+      <span class="brand-tag">Technologies · Est. 2024</span>
+    </div>
+    <div class="header-meta">
+      <div class="doc-title">Organisation Registration Agreement</div>
+      <div class="doc-ref">Document Ref: TL-ORA-2024 &nbsp;|&nbsp; Version 1.0 &nbsp;|&nbsp; Page 4 of 4</div>
+    </div>
+  </div>
+
+  <!-- INTELLECTUAL PROPERTY -->
+  <span class="section-num">12</span>
+  <h2 class="section-title">Intellectual Property Rights</h2>
+  <ol>
+    <li><strong>TimeLogic IP:</strong> All intellectual property in the Platform — including but not limited to the software, facial recognition models, algorithms, dashboards, brand assets, documentation, and hardware design — is and shall remain the exclusive property of TimeLogic Technologies. This Agreement does not transfer any intellectual property rights to the Organisation.</li>
+    <li><strong>Licence Grant:</strong> TimeLogic grants the Organisation a limited, non-exclusive, non-transferable, revocable licence to access and use the Platform solely for its internal workforce management purposes during the term of this Agreement and in accordance with the selected Subscription Plan.</li>
+    <li><strong>Organisation Data Ownership:</strong> Nothing in this Agreement transfers ownership of Organisation data (including employee records) to TimeLogic. The Organisation retains all rights, title, and interest in its data submitted to the Platform.</li>
+    <li><strong>Feedback:</strong> If the Organisation provides feedback, suggestions, or ideas to TimeLogic regarding the Platform, TimeLogic may use such feedback freely without any obligation of confidentiality, attribution, or compensation.</li>
+  </ol>
+
+  <!-- CONFIDENTIALITY -->
+  <span class="section-num">13</span>
+  <h2 class="section-title">Confidentiality</h2>
+  <p>Each party agrees to treat as confidential all non-public information received from the other party in connection with this Agreement, including commercial terms, technical specifications, pricing, and employee data. Each party shall:</p>
+  <ol>
+    <li>Use Confidential Information only for the purposes of performing its obligations under this Agreement</li>
+    <li>Disclose Confidential Information only to employees, officers, or contractors who have a legitimate need to know and who are bound by equivalent confidentiality obligations</li>
+    <li>Implement reasonable security measures to prevent unauthorised disclosure of Confidential Information</li>
+    <li>Promptly notify the other party if it becomes aware of any actual or suspected breach of confidentiality</li>
+  </ol>
+  <p>This obligation of confidentiality shall survive the termination of this Agreement for a period of <strong>five (5) years</strong>.</p>
+
+  <!-- DISPUTE RESOLUTION -->
+  <span class="section-num">14</span>
+  <h2 class="section-title">Dispute Resolution</h2>
+  <ol>
+    <li><strong>Good Faith Negotiation:</strong> In the event of any dispute, controversy, or claim arising out of or relating to this Agreement, the parties shall first attempt to resolve the matter through good-faith negotiation for a period of <strong>30 calendar days</strong> from the date either party gives written notice of the dispute to the other.</li>
+    <li><strong>Mediation:</strong> If the dispute is not resolved through negotiation, either party may refer the matter to mediation administered by the Lagos Multi-Door Courthouse (LMDC) or any other mutually agreed mediation body.</li>
+    <li><strong>Arbitration:</strong> If mediation fails to resolve the dispute within 60 days of referral, the dispute shall be finally resolved by binding arbitration under the Arbitration and Conciliation Act (ACA) Cap A18, LFN 2004, or its successor legislation, conducted in Lagos, Nigeria, in the English language.</li>
+    <li><strong>Jurisdiction:</strong> Nothing in this clause shall prevent either party from seeking interim or emergency relief from a court of competent jurisdiction.</li>
+  </ol>
+
+  <!-- GOVERNING LAW -->
+  <span class="section-num">15</span>
+  <h2 class="section-title">Governing Law &amp; General Provisions</h2>
+  <ol>
+    <li><strong>Governing Law:</strong> This Agreement shall be governed by and construed in accordance with the laws of the Federal Republic of Nigeria. The parties submit to the exclusive jurisdiction of the Nigerian courts, with venue in Lagos State.</li>
+    <li><strong>Entire Agreement:</strong> This Agreement, together with the TimeLogic Monetisation and Access Policy (TL-MAP-2024) and any applicable Order Form, constitutes the entire agreement between the parties with respect to its subject matter and supersedes all prior negotiations, representations, and understandings.</li>
+    <li><strong>Amendments:</strong> TimeLogic may update these terms from time to time. The Organisation will be notified of material changes with a minimum of 30 days' notice. Continued use of the Platform after the notice period constitutes acceptance of the updated terms.</li>
+    <li><strong>Severability:</strong> If any provision of this Agreement is held to be invalid or unenforceable, that provision shall be modified to the minimum extent necessary to make it enforceable, and the remaining provisions shall remain in full force and effect.</li>
+    <li><strong>Waiver:</strong> Failure by either party to enforce any provision of this Agreement shall not constitute a waiver of that party's right to enforce such provision in the future.</li>
+    <li><strong>Notices:</strong> All formal notices under this Agreement shall be given in writing and delivered by email (to support@timelogics.tech for TimeLogic and to the Organisation's registered email for the Organisation) or by courier to the registered addresses of the respective parties.</li>
+  </ol>
+
+  <hr class="divider-thick">
+
+  <!-- SIGNATURE BLOCK -->
+  <span class="section-num">16</span>
+  <h2 class="section-title">Declaration &amp; Execution</h2>
+  <p style="margin-bottom:14px;">By signing below, each party confirms that they have read, understood, and agree to be bound by the terms and conditions of this Organisation Registration Agreement. The signatory on behalf of the Organisation warrants that they have the legal authority to enter into this Agreement on the Organisation's behalf.</p>
+
+  <div class="sig-grid">
+    <!-- Organisation Column -->
+    <div class="sig-column">
+      <div class="sig-party">On Behalf of the Organisation</div>
+
+      <div class="sig-field">
+        <div class="sig-field-label">Full Legal Name of Organisation</div>
+        <div class="sig-field-line"></div>
+      </div>
+      <div class="sig-field">
+        <div class="sig-field-label">Authorised Representative (Full Name)</div>
+        <div class="sig-field-line"></div>
+      </div>
+      <div class="sig-field">
+        <div class="sig-field-label">Designation / Job Title</div>
+        <div class="sig-field-line"></div>
+      </div>
+      <div class="sig-field">
+        <div class="sig-field-label">Signature</div>
+        <div class="sig-field-line" style="margin-top:14px;"></div>
+      </div>
+      <div class="sig-field">
+        <div class="sig-field-label">Official Stamp (if applicable)</div>
+        <div class="sig-field-line" style="height:40px;"></div>
+      </div>
+      <div class="sig-field">
+        <div class="sig-field-label">Date</div>
+        <div class="sig-field-line"></div>
+      </div>
+    </div>
+
+    <!-- TimeLogic Column -->
+    <div class="sig-column">
+      <div class="sig-party">On Behalf of TimeLogic Technologies</div>
+
+      <div class="sig-field">
+        <div class="sig-field-label">TimeLogic Representative (Full Name)</div>
+        <div class="sig-field-line"></div>
+      </div>
+      <div class="sig-field">
+        <div class="sig-field-label">Designation / Role</div>
+        <div class="sig-field-line"></div>
+      </div>
+      <div class="sig-field">
+        <div class="sig-field-label">Signature</div>
+        <div class="sig-field-line" style="margin-top:14px;"></div>
+      </div>
+      <div class="sig-field">
+        <div class="sig-field-label">Official TimeLogic Stamp</div>
+        <div class="sig-field-line" style="height:40px;"></div>
+      </div>
+      <div class="sig-field">
+        <div class="sig-field-label">Date</div>
+        <div class="sig-field-line"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notice-box" style="margin-top:14px;">
+    <p>This document is issued by TimeLogic Technologies and is subject to periodic review. For questions regarding this Agreement, contact <strong>support@timelogics.tech</strong> or visit <strong>https://www.timelogics.tech</strong>. A copy of this signed Agreement should be retained by the Organisation for its records.</p>
+  </div>
+
+  <div class="page-footer">
+    <span class="footer-left">TimeLogic Technologies · support@timelogics.tech · https://www.timelogics.tech</span>
+    <span class="footer-center">CONFIDENTIAL — ORGANISATION REGISTRATION AGREEMENT</span>
+    <span class="footer-right">Page 4 of 4</span>
+  </div>
+</div>
+
+</body>
+</html>

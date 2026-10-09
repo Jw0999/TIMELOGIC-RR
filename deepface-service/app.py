@@ -97,6 +97,10 @@ def detect_faces(img):
     return None
 
 
+def face_center(face):
+    return float(face[0] + (face[2] / 2.0)), float(face[1] + (face[3] / 2.0))
+
+
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({'status': 'ok', 'engine': 'opencv_sface_ultra_fast'})
@@ -159,6 +163,63 @@ def verify():
     except Exception as e:
         traceback.print_exc()
         return jsonify({'error': f"Face verification engine error: {str(e)}"}), 500
+
+
+@app.route('/liveness', methods=['POST'])
+def liveness():
+    """Validate a short active movement sequence before identity matching."""
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        frames = data.get('frames')
+        if not isinstance(frames, list) or len(frames) < 3 or len(frames) > 5:
+            return jsonify({'verified': False, 'error': 'At least three liveness frames are required.'}), 400
+
+        centers = []
+        areas = []
+        face_crops = []
+        for frame in frames:
+            image = decode_image(frame)
+            faces = detect_faces(image)
+            if faces is None or len(faces) != 1:
+                return jsonify({'verified': False, 'error': 'Keep exactly one face in view during the live check.'}), 200
+            face = faces[0]
+            centers.append(face_center(face))
+            areas.append(float(face[2] * face[3]))
+            x, y, width, height = [int(value) for value in face[:4]]
+            padding_x = int(width * 0.15)
+            padding_y = int(height * 0.15)
+            left = max(0, x - padding_x)
+            top = max(0, y - padding_y)
+            right = min(image.shape[1], x + width + padding_x)
+            bottom = min(image.shape[0], y + height + padding_y)
+            crop = image[top:bottom, left:right]
+            if crop.size == 0:
+                return jsonify({'verified': False, 'error': 'Keep your face clearly visible during the live check.'}), 200
+            face_crops.append(cv2.resize(cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY), (96, 96)))
+
+        width = float(decode_image(frames[0]).shape[1])
+        horizontal_motion = (max(point[0] for point in centers) - min(point[0] for point in centers)) / max(width, 1.0)
+        area_min = min(areas)
+        area_max = max(areas)
+        stable_face = area_min > 0 and (area_max / area_min) <= 2.5
+        appearance_motion = sum(
+            float(np.mean(cv2.absdiff(face_crops[index], face_crops[index + 1]))) / 255.0
+            for index in range(len(face_crops) - 1)
+        )
+        verified = stable_face and (horizontal_motion >= 0.04 or appearance_motion >= 0.035)
+        return jsonify({
+            'verified': verified,
+            'is_real': verified,
+            'method': 'active-motion',
+            'confidence': round(min(1.0, max(horizontal_motion / 0.12, appearance_motion / 0.12)), 3),
+            'frame_count': len(frames),
+            'error': None if verified else 'Move your head slightly left or right while the camera is active.',
+        })
+    except ValueError as e:
+        return jsonify({'verified': False, 'error': str(e)}), 400
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'verified': False, 'error': f"Liveness engine error: {str(e)}"}), 500
 
 
 @app.route('/validate', methods=['POST'])

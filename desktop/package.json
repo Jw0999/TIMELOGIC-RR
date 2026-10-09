@@ -24,12 +24,29 @@
   "build": {
     "appId": "com.timelogic.admin",
     "productName": "TimeLogic Admin",
-    "directories": { "output": "release" },
-    "files": ["dist/**/*", "electron/**/*", "package.json", "!**/*.bat"],
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json",
+      "!**/*.bat"
+    ],
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] },
-        { "target": "portable", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "../mobile/assets/icon.png",
       "artifactName": "TimeLogic-Admin-${version}-Setup.${ext}"
@@ -40,14 +57,23 @@
       "createStartMenuShortcut": true,
       "deleteAppDataOnUninstall": false
     },
-    "publish": [{
-      "provider": "github",
-      "owner": "Jw0999",
-      "repo": "TIMELOGIC-RR",
-      "releaseType": "release"
-    }],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Jw0999",
+        "repo": "TIMELOGIC-RR",
+        "releaseType": "release"
+      }
+    ],
     "linux": {
-      "target": [{ "target": "deb", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "../mobile/assets/icon.png",
       "category": "Office",
       "synopsis": "TimeLogic attendance administration",
@@ -78,13 +104,14 @@
     "lucide-react": "^0.460.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^7.18.2"
+    "react-router-dom": "^7.18.2",
+    "recharts": "^3.10.1"
   },
   "devDependencies": {
-    "7zip-bin": "^5.2.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.0",
+    "7zip-bin": "^5.2.0",
     "autoprefixer": "^10.4.0",
     "concurrently": "^9.0.0",
     "electron": "^33.0.0",

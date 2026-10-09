@@ -138,11 +138,25 @@ class AuthenticationService {
     await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: loginAt } });
 
     let adminLogin = null;
-    if (user.role === 'ADMIN') {
+    let boundDesktopDevice = null;
+    if (user.role === 'ADMIN' && user.orgId && user.orgId !== 'platform-org') {
       adminLogin = await require('./AttendanceService').recordAdminLogin(user.id, loginAt, {
         ipAddress: context.ipAddress,
         userAgent: context.userAgent,
       });
+
+      // Desktop Admin Hardware Device Binding & Quota Enforcement
+      const incomingDeviceId = context.deviceId ? String(context.deviceId).trim() : null;
+      if (incomingDeviceId) {
+        const bindResult = await PlanPolicy.evaluateDesktopDeviceBinding(user.orgId, incomingDeviceId, {
+          deviceName: context.deviceName,
+          platform: context.platform,
+          firmwareVersion: context.firmwareVersion,
+          ipAddress: context.ipAddress,
+          userAgent: context.userAgent,
+        });
+        boundDesktopDevice = bindResult.device;
+      }
     }
 
     const accessToken = this._signAccess(user);
@@ -153,13 +167,19 @@ class AuthenticationService {
       accessToken, refreshToken,
       user: { ...this._safeUser(user), lastLoginAt: loginAt, organization: { ...org, subscription } },
       adminLogin,
+      boundDevice: boundDesktopDevice,
     };
   }
 
   async stationLogin(identifier, password, context = {}) {
     const normalizedIdentifier = String(identifier || '').trim();
-    const user = await prisma.user.findUnique({
-      where: { email: normalizedIdentifier.toLowerCase() },
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: normalizedIdentifier.toLowerCase() },
+          { employeeCode: normalizedIdentifier },
+        ],
+      },
       include: {
         organization: {
           select: {
@@ -226,6 +246,7 @@ class AuthenticationService {
         const bindResult = await PlanPolicy.evaluateKioskDeviceBinding(user.orgId, incomingDeviceId, {
           deviceName: context.deviceName,
           platform: context.platform,
+          firmwareVersion: context.firmwareVersion,
           ipAddress: context.ipAddress,
           userAgent: context.userAgent,
         });

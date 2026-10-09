@@ -37,12 +37,14 @@ interface OrgFormData {
   subscriptionTier: 'starter' | 'enterprise' | 'custom';
   maxEmployees: number | null;
   maxKiosks: number | null;
+  maxDesktopAdmins: number | null;
   allowDeviceCheckIn: boolean; allowManualCheckIn: boolean; hasStudents: boolean;
   timezone: string;
   shiftSchedules: ShiftSchedules;
   offices: {
     name: string; address: string; timezone: string; wifiSSID: string; publicIp: string;
     breakMinutes: number;
+    overtimeStartAfterCloseMinutes: number; overtimeFeePerHour: number;
     weeklySchedule: WeeklySchedule;
     graceMinutes: number; lateAfterMinutes: number; gracePenalty: number; latePenalty: number; completelyLatePenalty: number; absentPenalty: number;
     overstayPenalty: number;
@@ -54,6 +56,7 @@ interface OrgFormData {
 const newOffice = () => ({
   name: '', address: '', timezone: 'Africa/Lagos', wifiSSID: '', publicIp: '',
   breakMinutes: 60,
+  overtimeStartAfterCloseMinutes: 0, overtimeFeePerHour: 0,
   weeklySchedule: weeklySchedule(),
   graceMinutes: 30, lateAfterMinutes: 90, gracePenalty: 0, latePenalty: 0, completelyLatePenalty: 0, absentPenalty: 0,
   overstayPenalty: 0,
@@ -64,6 +67,7 @@ const defaultForm = (): OrgFormData => ({
   subscriptionTier: 'starter',
   maxEmployees: 20,
   maxKiosks: 1,
+  maxDesktopAdmins: 1,
   allowDeviceCheckIn: true, allowManualCheckIn: false, hasStudents: false,
   timezone: 'Africa/Lagos',
   shiftSchedules: defaultShiftSchedules(),
@@ -123,6 +127,7 @@ function OrgModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
         subscriptionTier: form.subscriptionTier,
         maxEmployees: form.maxEmployees,
         maxKiosks: form.maxKiosks,
+        maxDesktopAdmins: form.maxDesktopAdmins,
         allowDeviceCheckIn: form.allowDeviceCheckIn,
         allowManualCheckIn: form.allowManualCheckIn,
         hasStudents: form.hasStudents,
@@ -222,7 +227,7 @@ function OrgModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div
-                  onClick={() => setForm((p) => ({ ...p, subscriptionTier: 'starter', maxEmployees: 20, maxKiosks: 1 }))}
+                  onClick={() => setForm((p) => ({ ...p, subscriptionTier: 'starter', maxEmployees: 20, maxKiosks: 1, maxDesktopAdmins: 1 }))}
                   className={`p-3.5 rounded-xl border cursor-pointer transition ${
                     form.subscriptionTier === 'starter'
                       ? 'border-primary-600 bg-primary-50/20 dark:bg-primary-950/30 ring-2 ring-primary-500/20'
@@ -234,11 +239,11 @@ function OrgModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
                     <span className="text-[11px] font-semibold text-[var(--text-muted)]">₦20k/mo</span>
                   </div>
                   <p className="text-xs font-bold text-[var(--text-main)]">20 Employees</p>
-                  <p className="text-[11px] text-[var(--text-muted)] mt-1">1 Kiosk Terminal · Single Office</p>
+                  <p className="text-[11px] text-[var(--text-muted)] mt-1">1 Desktop Admin · 1 Kiosk · Single Office</p>
                 </div>
 
                 <div
-                  onClick={() => setForm((p) => ({ ...p, subscriptionTier: 'enterprise', maxEmployees: 60, maxKiosks: null }))}
+                  onClick={() => setForm((p) => ({ ...p, subscriptionTier: 'enterprise', maxEmployees: 60, maxKiosks: null, maxDesktopAdmins: 3 }))}
                   className={`p-3.5 rounded-xl border cursor-pointer transition ${
                     form.subscriptionTier === 'enterprise'
                       ? 'border-purple-600 bg-purple-50/20 dark:bg-purple-950/30 ring-2 ring-purple-500/20'
@@ -250,11 +255,11 @@ function OrgModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
                     <span className="text-[11px] font-semibold text-[var(--text-muted)]">₦60k/mo</span>
                   </div>
                   <p className="text-xs font-bold text-[var(--text-main)]">60 Employees</p>
-                  <p className="text-[11px] text-[var(--text-muted)] mt-1">Unlimited Kiosks · Multi-Office</p>
+                  <p className="text-[11px] text-[var(--text-muted)] mt-1">3 Desktop Admins · Unlimited Kiosks</p>
                 </div>
 
                 <div
-                  onClick={() => setForm((p) => ({ ...p, subscriptionTier: 'custom', maxEmployees: p.maxEmployees || 100, maxKiosks: p.maxKiosks }))}
+                  onClick={() => setForm((p) => ({ ...p, subscriptionTier: 'custom', maxEmployees: p.maxEmployees || 100, maxKiosks: p.maxKiosks, maxDesktopAdmins: p.maxDesktopAdmins }))}
                   className={`p-3.5 rounded-xl border cursor-pointer transition ${
                     form.subscriptionTier === 'custom'
                       ? 'border-sky-600 bg-sky-50/20 dark:bg-sky-950/30 ring-2 ring-sky-500/20'
@@ -266,32 +271,43 @@ function OrgModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
                     <span className="text-[11px] font-semibold text-[var(--text-muted)]">Custom</span>
                   </div>
                   <p className="text-xs font-bold text-[var(--text-main)]">Flexible Headcount</p>
-                  <p className="text-[11px] text-[var(--text-muted)] mt-1">Custom Kiosks & Facilities</p>
+                  <p className="text-[11px] text-[var(--text-muted)] mt-1">Custom Desktops & Kiosks</p>
                 </div>
               </div>
 
               {form.subscriptionTier === 'custom' && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[var(--border)]">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-[var(--border)]">
                   <div>
-                    <label className={lbl}>Max Employees (leave empty for unlimited)</label>
+                    <label className={lbl}>Max Employees (empty = unlimited)</label>
                     <input
                       type="number"
                       min={1}
                       className={inp}
                       value={form.maxEmployees ?? ''}
                       onChange={(e) => setForm((p) => ({ ...p, maxEmployees: e.target.value ? parseInt(e.target.value, 10) : null }))}
-                      placeholder="e.g. 150 (empty = unlimited)"
+                      placeholder="e.g. 150"
                     />
                   </div>
                   <div>
-                    <label className={lbl}>Max Kiosk Terminals (leave empty for unlimited)</label>
+                    <label className={lbl}>Max Desktop Admins (empty = unlimited)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      className={inp}
+                      value={form.maxDesktopAdmins ?? ''}
+                      onChange={(e) => setForm((p) => ({ ...p, maxDesktopAdmins: e.target.value ? parseInt(e.target.value, 10) : null }))}
+                      placeholder="e.g. 5"
+                    />
+                  </div>
+                  <div>
+                    <label className={lbl}>Max Kiosks (empty = unlimited)</label>
                     <input
                       type="number"
                       min={1}
                       className={inp}
                       value={form.maxKiosks ?? ''}
                       onChange={(e) => setForm((p) => ({ ...p, maxKiosks: e.target.value ? parseInt(e.target.value, 10) : null }))}
-                      placeholder="e.g. 5 (empty = unlimited)"
+                      placeholder="e.g. 10"
                     />
                   </div>
                 </div>
@@ -334,9 +350,18 @@ function OrgModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
               <p className="text-[11px] text-[var(--text-muted)]">Weekly schedule controls opening, closing, check-in, and checkout for each day.</p>
               <div className="pt-2 border-t border-[var(--border)]"><p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide mb-2">Weekly schedule</p>{DAYS.map((day) => <div key={day} className="grid grid-cols-[1fr_1fr_1fr] gap-2 items-end mb-2"><span className="text-xs font-semibold capitalize text-[var(--text-main)]">{day}</span><input className={inp} type="time" value={o.weeklySchedule?.[day]?.openTime ?? ''} onChange={(e) => updateOffice(i, 'weeklySchedule', { ...o.weeklySchedule, [day]: { ...o.weeklySchedule?.[day], openTime: e.target.value } })} /><input className={inp} type="time" value={o.weeklySchedule?.[day]?.closeTime ?? ''} onChange={(e) => updateOffice(i, 'weeklySchedule', { ...o.weeklySchedule, [day]: { ...o.weeklySchedule?.[day], closeTime: e.target.value } })} /></div>)}</div>
 
+              <div className="pt-2 border-t border-[var(--border)]">
+                <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wide mb-2">Overstay / Overtime (+ Added to salary for hours stayed after close)</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div><label className={lbl}>Overstay delay after close (min)</label><input className={inp} type="number" min={0} step={1} value={o.overtimeStartAfterCloseMinutes} onChange={(e) => updateOffice(i, 'overtimeStartAfterCloseMinutes', e.target.value)} /></div>
+                  <div><label className={lbl}>Overstay fee per hour (₦) — Added to salary</label><input className={inp} type="number" min={0} step={0.01} value={o.overtimeFeePerHour} onChange={(e) => updateOffice(i, 'overtimeFeePerHour', e.target.value)} /></div>
+                </div>
+                <p className="text-[11px] text-[var(--text-muted)] mt-1">Overstay begins after office closing time and adds to gross salary (e.g. 2 hours stayed = 2 × rate).</p>
+              </div>
+
               {/* Lateness grace + penalties (salary deductions) */}
               <div className="pt-2 border-t border-[var(--border)]">
-                <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide mb-2">Lateness & Penalties</p>
+                <p className="text-xs font-bold text-red-700 dark:text-red-400 uppercase tracking-wide mb-2">Lateness & Disciplinary Deductions (- Deducted from salary)</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div><label className={lbl}>Grace (min, no penalty)</label><input className={inp} type="number" min={0} value={o.graceMinutes} onChange={(e) => updateOffice(i,'graceMinutes',e.target.value)}/></div>
                   <div><label className={lbl}>Late after (min from open)</label><input className={inp} type="number" min={0} value={o.lateAfterMinutes} onChange={(e) => updateOffice(i,'lateAfterMinutes',e.target.value)}/></div>
@@ -344,9 +369,9 @@ function OrgModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
                   <div><label className={lbl}>Late penalty (₦)</label><input className={inp} type="number" min={0} value={o.latePenalty} onChange={(e) => updateOffice(i,'latePenalty',e.target.value)}/></div>
                   <div><label className={lbl}>Completely late penalty (₦)</label><input className={inp} type="number" min={0} value={o.completelyLatePenalty} onChange={(e) => updateOffice(i,'completelyLatePenalty',e.target.value)}/></div>
                   <div><label className={lbl}>Unauthorized absence penalty (₦)</label><input className={inp} type="number" min={0} value={o.absentPenalty} onChange={(e) => updateOffice(i,'absentPenalty',e.target.value)}/></div>
-                  <div><label className={lbl}>Overstayed break penalty (₦)</label><input className={inp} type="number" min={0} value={o.overstayPenalty ?? 0} onChange={(e) => updateOffice(i,'overstayPenalty',e.target.value)}/></div>
+                  <div><label className={lbl}>Break overstay penalty (₦) — Deducted for overbreak</label><input className={inp} type="number" min={0} value={o.overstayPenalty ?? 0} onChange={(e) => updateOffice(i,'overstayPenalty',e.target.value)}/></div>
                 </div>
-                <p className="text-[11px] text-[var(--text-muted)] mt-1">Deducted from salary. On-time within grace = ₦0. After grace = grace penalty. After "late after" = marked LATE + late penalty.</p>
+                <p className="text-[11px] text-[var(--text-muted)] mt-1">Deducted from salary. Break overstay penalty applies when an employee exceeds their allowed break window or duration.</p>
               </div>
 
               {/* Break window */}
@@ -618,6 +643,7 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
   );
   const [maxEmployees, setMaxEmployees] = useState<number | null>(org.maxEmployees ?? (org.subscriptionTier === 'enterprise' ? 60 : 20));
   const [maxKiosks, setMaxKiosks] = useState<number | null>(org.maxKiosks ?? (org.subscriptionTier === 'enterprise' ? null : 1));
+  const [maxDesktopAdmins, setMaxDesktopAdmins] = useState<number | null>(org.maxDesktopAdmins !== undefined ? org.maxDesktopAdmins : (org.subscriptionTier === 'enterprise' ? 3 : 1));
   const [allowDeviceCheckIn, setAllowDeviceCheckIn] = useState(org.allowDeviceCheckIn ?? true);
   const [allowManualCheckIn, setAllowManualCheckIn] = useState(org.allowManualCheckIn ?? false);
   const [hasStudents, setHasStudents] = useState(org.hasStudents ?? false);
@@ -627,6 +653,8 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
     id: o.id, name: o.name ?? '', address: o.address ?? '', timezone: o.timezone ?? 'Africa/Lagos',
     wifiSSID: o.wifiSSID ?? '', publicIp: o.publicIp ?? '',
     breakMinutes: o.breakMinutes ?? 60,
+    overtimeStartAfterCloseMinutes: o.overtimeStartAfterCloseMinutes ?? 0,
+    overtimeFeePerHour: o.overtimeFeePerHour ?? 0,
     graceMinutes: o.graceMinutes ?? 30, lateAfterMinutes: o.lateAfterMinutes ?? 90,
     gracePenalty: o.gracePenalty ?? 0, latePenalty: o.latePenalty ?? 0, completelyLatePenalty: o.completelyLatePenalty ?? 0, absentPenalty: o.absentPenalty ?? 0,
     overstayPenalty: o.overstayPenalty ?? 0,
@@ -659,6 +687,7 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
         subscriptionTier,
         maxEmployees,
         maxKiosks,
+        maxDesktopAdmins,
         allowDeviceCheckIn,
         allowManualCheckIn,
         hasStudents,
@@ -692,7 +721,7 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div
-                onClick={() => { setSubscriptionTier('starter'); setMaxEmployees(20); setMaxKiosks(1); }}
+                onClick={() => { setSubscriptionTier('starter'); setMaxEmployees(20); setMaxKiosks(1); setMaxDesktopAdmins(1); }}
                 className={`p-3 rounded-xl border cursor-pointer transition ${
                   subscriptionTier === 'starter'
                     ? 'border-primary-600 bg-primary-50/20 dark:bg-primary-950/30 ring-2 ring-primary-500/20'
@@ -703,11 +732,11 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
                   <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Starter</span>
                   <span className="text-[10px] font-semibold text-[var(--text-muted)]">₦20k</span>
                 </div>
-                <p className="text-xs font-bold text-[var(--text-main)]">20 Staff · 1 Kiosk</p>
+                <p className="text-xs font-bold text-[var(--text-main)]">20 Staff · 1 Desktop · 1 Kiosk</p>
               </div>
 
               <div
-                onClick={() => { setSubscriptionTier('enterprise'); setMaxEmployees(60); setMaxKiosks(null); }}
+                onClick={() => { setSubscriptionTier('enterprise'); setMaxEmployees(60); setMaxKiosks(null); setMaxDesktopAdmins(3); }}
                 className={`p-3 rounded-xl border cursor-pointer transition ${
                   subscriptionTier === 'enterprise'
                     ? 'border-purple-600 bg-purple-50/20 dark:bg-purple-950/30 ring-2 ring-purple-500/20'
@@ -718,7 +747,7 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
                   <span className="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">Enterprise</span>
                   <span className="text-[10px] font-semibold text-[var(--text-muted)]">₦60k</span>
                 </div>
-                <p className="text-xs font-bold text-[var(--text-main)]">60 Staff · Unlimited Kiosks</p>
+                <p className="text-xs font-bold text-[var(--text-main)]">60 Staff · 3 Desktops · ∞ Kiosks</p>
               </div>
 
               <div
@@ -738,7 +767,7 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
             </div>
 
             {subscriptionTier === 'custom' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[var(--border)]">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-[var(--border)]">
                 <div>
                   <label className={lbl}>Max Employees (empty = unlimited)</label>
                   <input
@@ -751,6 +780,17 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
                   />
                 </div>
                 <div>
+                  <label className={lbl}>Max Desktop Admins (empty = unlimited)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    className={inp}
+                    value={maxDesktopAdmins ?? ''}
+                    onChange={(e) => setMaxDesktopAdmins(e.target.value ? parseInt(e.target.value, 10) : null)}
+                    placeholder="e.g. 5"
+                  />
+                </div>
+                <div>
                   <label className={lbl}>Max Kiosks (empty = unlimited)</label>
                   <input
                     type="number"
@@ -758,7 +798,7 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
                     className={inp}
                     value={maxKiosks ?? ''}
                     onChange={(e) => setMaxKiosks(e.target.value ? parseInt(e.target.value, 10) : null)}
-                    placeholder="e.g. 5"
+                    placeholder="e.g. 10"
                   />
                 </div>
               </div>
@@ -849,7 +889,16 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
               </div>
               <div><label className={lbl}>Address</label><input className={inp} value={o.address} onChange={(e) => updOffice(i,'address',e.target.value)}/></div>
               <div><label className={lbl}>Break allowance (min)</label><input className={inp} type="number" min={0} value={o.breakMinutes} onChange={(e) => updOffice(i,'breakMinutes',e.target.value)}/></div>
+              <div className="pt-2 border-t border-[var(--border)]">
+                <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wide mb-2">Overstay / Overtime (+ Added to salary for hours stayed after close)</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div><label className={lbl}>Overstay delay after close (min)</label><input className={inp} type="number" min={0} step={1} value={o.overtimeStartAfterCloseMinutes ?? 0} onChange={(e) => updOffice(i, 'overtimeStartAfterCloseMinutes', e.target.value)}/></div>
+                  <div><label className={lbl}>Overstay fee per hour (₦) — Added to salary</label><input className={inp} type="number" min={0} step={0.01} value={o.overtimeFeePerHour ?? 0} onChange={(e) => updOffice(i, 'overtimeFeePerHour', e.target.value)}/></div>
+                </div>
+                <p className="text-[11px] text-[var(--text-muted)] mt-1">Overstay begins after office closing time and adds to gross salary (e.g. 2 hours stayed = 2 × rate).</p>
+              </div>
               <div className="pt-2 border-t border-[var(--border)]"><p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wide mb-2">Weekly schedule</p>{DAYS.map((day) => <div key={day} className="grid grid-cols-[1fr_1fr_1fr] gap-2 items-end mb-2"><span className="text-xs font-semibold capitalize text-[var(--text-main)]">{day}</span><input className={inp} type="time" value={o.weeklySchedule?.[day]?.openTime ?? ''} onChange={(e) => updOffice(i, 'weeklySchedule', { ...o.weeklySchedule, [day]: { ...o.weeklySchedule?.[day], openTime: e.target.value } })} /><input className={inp} type="time" value={o.weeklySchedule?.[day]?.closeTime ?? ''} onChange={(e) => updOffice(i, 'weeklySchedule', { ...o.weeklySchedule, [day]: { ...o.weeklySchedule?.[day], closeTime: e.target.value } })} /></div>)}</div>
+              <div className="pt-2 border-t border-[var(--border)]"><p className="text-xs font-bold text-red-700 dark:text-red-400 uppercase tracking-wide mb-2">Lateness & Disciplinary Deductions (- Deducted from salary)</p></div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div><label className={lbl}>Grace (min, no penalty)</label><input className={inp} type="number" min={0} value={o.graceMinutes} onChange={(e) => updOffice(i,'graceMinutes',e.target.value)}/></div>
                 <div><label className={lbl}>Late after (min from open)</label><input className={inp} type="number" min={0} value={o.lateAfterMinutes} onChange={(e) => updOffice(i,'lateAfterMinutes',e.target.value)}/></div>
@@ -857,7 +906,7 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
                 <div><label className={lbl}>Late penalty (₦)</label><input className={inp} type="number" min={0} value={o.latePenalty} onChange={(e) => updOffice(i,'latePenalty',e.target.value)}/></div>
                 <div><label className={lbl}>Completely late penalty (₦)</label><input className={inp} type="number" min={0} value={o.completelyLatePenalty} onChange={(e) => updOffice(i,'completelyLatePenalty',e.target.value)}/></div>
                 <div><label className={lbl}>Unauthorized absence penalty (₦)</label><input className={inp} type="number" min={0} value={o.absentPenalty} onChange={(e) => updOffice(i,'absentPenalty',e.target.value)}/></div>
-                <div><label className={lbl}>Overstayed break penalty (₦)</label><input className={inp} type="number" min={0} value={o.overstayPenalty ?? 0} onChange={(e) => updOffice(i,'overstayPenalty',e.target.value)}/></div>
+                <div><label className={lbl}>Break overstay penalty (₦) — Deducted for overbreak</label><input className={inp} type="number" min={0} value={o.overstayPenalty ?? 0} onChange={(e) => updOffice(i,'overstayPenalty',e.target.value)}/></div>
                 <div><label className={lbl}>Break Start</label><input className={inp} type="time" value={o.breakStart} onChange={(e) => updOffice(i,'breakStart',e.target.value)}/></div>
                 <div><label className={lbl}>Break End</label><input className={inp} type="time" value={o.breakEnd} onChange={(e) => updOffice(i,'breakEnd',e.target.value)}/></div>
               </div>

@@ -98,6 +98,7 @@ export interface ManualAttendanceResult {
   clockInTime?: string | null;
   clockOutTime?: string | null;
   serverTime?: string | null;
+  ruleEvaluation?: { ruleVersion?: string; explanation?: string; lateMinutes?: number; overtimeMinutes?: number } | null;
 }
 
 export interface ApiEnvelope<T> {

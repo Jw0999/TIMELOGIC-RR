@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Search, AlertTriangle, Wifi, Smartphone, Flag, UserCheck, RefreshCw } from 'lucide-react';
+import { Search, AlertTriangle, Wifi, Smartphone, Flag, UserCheck, RefreshCw, ShieldCheck } from 'lucide-react';
 import Header from '../components/Header';
 import { fetchAttendance, fetchLiveAttendance, fetchAttendanceForDate, fetchMonthlyPenalties, flagRecord, approveRecord, waiveRecordPenalty } from '../services';
 import { useAuth } from '../context/AuthContext';
+import WorkforceTimelineModal from '../components/WorkforceTimelineModal';
 
 const STATUS_STYLE: Record<string, string> = {
   PRESENT: 'bg-emerald-100 text-emerald-700',
@@ -33,6 +34,7 @@ export default function Attendance() {
   const [view, setView] = useState<'today' | 'past' | 'all'>('today');
   const [pastDate, setPastDate] = useState('');
   const [monthlyPenalties, setMonthlyPenalties] = useState<any>(null);
+  const [selectedTimelineRecord, setSelectedTimelineRecord] = useState<any | null>(null);
 
   const load = async () => {
     try {
@@ -178,6 +180,13 @@ export default function Attendance() {
                     <td className="sticky right-0 bg-white px-4 py-3 shadow-[-4px_0_6px_rgba(0,0,0,0.06)] z-10">
                       <div className="flex items-center gap-1.5">
                         <button
+                          onClick={() => setSelectedTimelineRecord(r)}
+                          className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-primary-50 text-primary-700 hover:bg-primary-100 transition flex items-center gap-1"
+                          title="View verified 12-stage workforce timeline"
+                        >
+                          <ShieldCheck size={12} /> Timeline
+                        </button>
+                        <button
                           onClick={async () => {
                             if (r.flagged) await approveRecord(r.id);
                             else await flagRecord(r.id, 'Manually flagged');
@@ -208,7 +217,16 @@ export default function Attendance() {
               </tbody>
               </table>
             </div>
-            {filtered.length === 0 && <div className="text-center py-12 text-slate-400 text-sm">No records found</div>}
+            {filtered.length === 0 && (
+              <div className="text-center py-12 text-slate-400 text-sm">
+                {view === 'today' && records.length === 0 && filter === 'All' && !search ? (
+                  <div className="space-y-3">
+                    <p>No attendance has been recorded for today.</p>
+                    <button onClick={() => setView('all')} className="text-primary-700 font-semibold hover:underline">View all history</button>
+                  </div>
+                ) : 'No records match the selected filters'}
+              </div>
+            )}
           </div>
         )}
         {view === 'past' && monthlyPenalties && (
@@ -236,6 +254,15 @@ export default function Attendance() {
               </table>
             </div>
           </div>
+        )}
+
+        {selectedTimelineRecord && (
+          <WorkforceTimelineModal
+            employeeId={selectedTimelineRecord.employeeId}
+            recordId={selectedTimelineRecord.id}
+            date={selectedTimelineRecord.date ? new Date(selectedTimelineRecord.date).toISOString().slice(0, 10) : undefined}
+            onClose={() => setSelectedTimelineRecord(null)}
+          />
         )}
       </div>
     </div>

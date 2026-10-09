@@ -22,6 +22,7 @@ mobile/dist-android/
 
 # Uploaded user data (face photos) — never commit
 backend/uploads/
+uploads/
 
 # Logs
 **/*.log

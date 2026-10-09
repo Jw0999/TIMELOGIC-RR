@@ -1,0 +1,1 @@
+ALTER TABLE "payslip_records" ADD COLUMN "overtimeEarnings" DOUBLE PRECISION NOT NULL DEFAULT 0;

@@ -9,7 +9,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://timelogic.onrender.com/api"
+        "EXPO_PUBLIC_API_URL": "https://timelogic-backend.onrender.com/api"
       }
     },
     "production": {
@@ -17,7 +17,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://timelogic.onrender.com/api"
+        "EXPO_PUBLIC_API_URL": "https://timelogic-backend.onrender.com/api"
       }
     }
   },

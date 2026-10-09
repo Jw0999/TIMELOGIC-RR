@@ -1,6 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
 const { prisma } = require('../config/database');
 const NotificationService = require('./NotificationService');
+const WorkEventService = require('./WorkEventService');
 
 class LeaveService {
   async withLifecycleStatus(leaves) {
@@ -26,10 +27,13 @@ class LeaveService {
 
   async requestLeave(employeeId, data) {
     const { leaveType, startDate, endDate, reason, attachmentUrls = [] } = data;
+    const employee = await prisma.user.findUnique({ where: { id: employeeId }, select: { id: true, orgId: true } });
+    if (!employee) throw Object.assign(new Error('Employee not found.'), { status: 404 });
 
     const start = new Date(startDate);
     const end = new Date(endDate);
     const totalDays = this._calcDays(start, end);
+    const autoApproved = false;
 
     const balance = await prisma.leaveBalance.findFirst({
       where: { employeeId, leaveType, year: start.getFullYear() },
@@ -60,12 +64,26 @@ class LeaveService {
         totalDays,
         reason,
         attachmentUrls,
-        status: 'PENDING',
+        status: autoApproved ? 'APPROVED' : 'PENDING',
+        ...(autoApproved ? { approvedAt: new Date() } : {}),
       },
     });
+    await this._recordWorkEvent(
+      leave,
+      employee.orgId,
+      employeeId,
+      autoApproved ? null : employeeId,
+      autoApproved ? 'LEAVE_APPROVED' : 'LEAVE_REQUESTED',
+      autoApproved ? 'POLICY' : 'EMPLOYEE',
+      { autoApproved },
+    );
 
-    // Update pending balance
-    if (balance) {
+    if (balance && autoApproved) {
+      await this._adjustBalance(employeeId, leaveType, start.getFullYear(), {
+        usedDelta: totalDays,
+        remainingDelta: -totalDays,
+      });
+    } else if (balance) {
       await prisma.leaveBalance.update({
         where: { id: balance.id },
         data: { pending: { increment: totalDays } },
@@ -73,11 +91,15 @@ class LeaveService {
     }
 
     // Notify admins
-    const admins = await prisma.user.findMany({
-      where: { role: { in: ['ADMIN', 'SUPER_ADMIN'] }, status: 'ACTIVE' },
-    });
-    for (const admin of admins) {
-      await NotificationService.notifyAdmin(admin.id, `New leave request from employee ${employeeId}`);
+    if (autoApproved) {
+      await NotificationService.notifyEmployee(employeeId, `Your ${leaveType} leave was automatically approved by organization policy`);
+    } else {
+      const admins = await prisma.user.findMany({
+        where: { orgId: employee.orgId, role: { in: ['ADMIN', 'SUPER_ADMIN'] }, status: 'ACTIVE' },
+      });
+      for (const admin of admins) {
+        await NotificationService.notifyAdmin(admin.id, `New leave request from employee ${employeeId}`);
+      }
     }
 
     return leave;
@@ -101,6 +123,7 @@ class LeaveService {
     const leave = await prisma.leaveRequest.create({
       data: { id: uuidv4(), employeeId, leaveType, startDate: start, endDate: end, totalDays, reason, attachmentUrls: [], status: 'APPROVED', approvedBy: adminId, approvedAt: new Date() },
     });
+    await this._recordWorkEvent(leave, orgId, employeeId, adminId, 'LEAVE_APPROVED', 'ADMIN');
     if (balance) await this._adjustBalance(employeeId, leaveType, start.getFullYear(), { usedDelta: totalDays, remainingDelta: -totalDays });
     await NotificationService.notifyEmployee(employeeId, `Your ${leaveType} leave has been approved by an administrator`);
     return leave;
@@ -113,6 +136,8 @@ class LeaveService {
       where: { id: leaveId },
       data: { status: 'APPROVED', approvedBy: adminId, approvedAt: new Date() },
     });
+    const employee = await prisma.user.findUnique({ where: { id: leave.employeeId }, select: { orgId: true } });
+    await this._recordWorkEvent(updated, employee?.orgId, leave.employeeId, adminId, 'LEAVE_APPROVED', 'ADMIN');
 
     await this._adjustBalance(leave.employeeId, leave.leaveType, leave.startDate.getFullYear(), {
       pendingDelta: -leave.totalDays,
@@ -131,6 +156,8 @@ class LeaveService {
       where: { id: leaveId },
       data: { status: 'REJECTED', approvedBy: adminId, approvedAt: new Date(), rejectionReason },
     });
+    const employee = await prisma.user.findUnique({ where: { id: leave.employeeId }, select: { orgId: true } });
+    await this._recordWorkEvent(updated, employee?.orgId, leave.employeeId, adminId, 'LEAVE_REJECTED', 'ADMIN', { rejectionReason });
 
     await this._adjustBalance(leave.employeeId, leave.leaveType, leave.startDate.getFullYear(), {
       pendingDelta: -leave.totalDays,
@@ -151,6 +178,8 @@ class LeaveService {
       where: { id: leaveId },
       data: { status: 'CANCELLED' },
     });
+    const employeeOrg = await prisma.user.findUnique({ where: { id: employeeId }, select: { orgId: true } });
+    await this._recordWorkEvent(updated, employeeOrg?.orgId, employeeId, employeeId, 'LEAVE_CANCELLED', 'EMPLOYEE');
 
     const balanceDelta = leave.status === 'PENDING'
       ? { pendingDelta: -leave.totalDays }
@@ -165,6 +194,7 @@ class LeaveService {
     if (!leave) throw Object.assign(new Error('Approved leave not found.'), { status: 404 });
     const today = new Date();
     const updated = await prisma.leaveRequest.update({ where: { id: leaveId }, data: { status: 'CANCELLED', rejectionReason: `Stopped by administrator ${adminId}` } });
+    await this._recordWorkEvent(updated, orgId, leave.employeeId, adminId, 'LEAVE_CANCELLED', 'ADMIN');
     if (leave.startDate <= today) {
       await this._adjustBalance(leave.employeeId, leave.leaveType, leave.startDate.getFullYear(), { usedDelta: -leave.totalDays, remainingDelta: leave.totalDays });
     } else {
@@ -278,6 +308,28 @@ class LeaveService {
   }
 
   // ── private ──────────────────────────────────────────────────────────────────
+
+  async _recordWorkEvent(leave, orgId, employeeId, actorId, type, source, metadata = {}) {
+    if (!orgId) return;
+    return WorkEventService.record({
+      orgId,
+      employeeId,
+      actorId,
+      type,
+      occurredAt: leave.approvedAt || leave.updatedAt || leave.createdAt,
+      source,
+      sourceType: 'LeaveRequest',
+      sourceId: leave.id,
+      ruleVersion: 'leave-legacy-v1',
+      dedupeKey: `leave:${leave.id}:${type}:${leave.updatedAt.toISOString()}`,
+      metadata: {
+        leaveType: leave.leaveType, startDate: leave.startDate, endDate: leave.endDate,
+        totalDays: leave.totalDays, status: leave.status,
+        policySnapshot: { version: 'leave-legacy-v1' },
+        ...metadata,
+      },
+    });
+  }
 
   async _findPendingLeave(leaveId) {
     const leave = await prisma.leaveRequest.findFirst({ where: { id: leaveId, status: 'PENDING' } });

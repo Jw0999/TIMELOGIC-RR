@@ -38,6 +38,22 @@ import {
   downloadPayslipPdf,
 } from '../services';
 
+interface PayrollLineItem {
+  id: string;
+  type: string;
+  category: string;
+  amount: number;
+  currency: string;
+  description: string;
+  date?: string | null;
+  minutes?: number;
+  ratePerHour?: number;
+  ruleVersion?: string;
+  sourceType?: string;
+  sourceId?: string;
+  calculation?: Record<string, unknown> | null;
+}
+
 interface EmployeePayroll {
   id: string;
   firstName: string;
@@ -56,6 +72,8 @@ interface EmployeePayroll {
   accountNumber?: string;
   accountName?: string;
   totalWorkHours: number;
+  overtimeEarnings: number;
+  grossSalary: number;
   totalPresentDays: number;
   totalLateDays: number;
   attendancePenalties: number;
@@ -63,6 +81,13 @@ interface EmployeePayroll {
   manualPenalties: number;
   totalDeductions: number;
   netSalary: number;
+  calculationHash?: string | null;
+  calculationVersion?: string | null;
+  calculationSnapshot?: {
+    summary?: Record<string, number>;
+    lineItems?: PayrollLineItem[];
+  } | null;
+  lineItems?: PayrollLineItem[];
   payslipId: string | null;
   payslipStatus: string;
   whatsappStatus: string;
@@ -72,6 +97,8 @@ interface EmployeePayroll {
 interface PayrollSummary {
   totalEmployees: number;
   totalBasePayroll: number;
+  totalGrossPayroll?: number;
+  totalOvertimeEarnings?: number;
   totalDeductions: number;
   totalNetPayout: number;
   salaryPayoutDay: number;
@@ -249,7 +276,7 @@ export default function Salary() {
     setSuccessMsg('');
     try {
       await calculatePayroll({ year: selectedYear, month: selectedMonth });
-      setSuccessMsg(`Payroll finalized and deductions updated for ${monthLabel}.`);
+      setSuccessMsg(`Payroll calculation updated for ${monthLabel}.`);
       await loadPayroll();
     } catch (err: any) {
       setErrorMsg(err?.message || 'Failed to calculate payroll');
@@ -373,7 +400,9 @@ export default function Salary() {
       }
 
       const res = await sendPayslipEmail(payslipId);
-      if (res?.success) {
+      if (res?.status === 'SKIPPED') {
+        setSuccessMsg(`The saved payslip for ${emp.name} has already been sent and remains locked.`);
+      } else if (res?.success) {
         setSuccessMsg(`Official payslip PDF emailed successfully to ${emp.name} (${emp.email}).`);
       } else {
         alert(res?.error || 'Failed to dispatch email.');
@@ -387,7 +416,7 @@ export default function Salary() {
   };
 
   const handleCompletePayout = async () => {
-    if (!window.confirm(`Are you sure you want to complete payout and dispatch official payslips via email to all employees for ${monthLabel}?`)) {
+    if (!window.confirm(`Calculate and email official payslip PDFs to employees for ${monthLabel}? TimeLogic will not transfer funds.`)) {
       return;
     }
 
@@ -397,7 +426,7 @@ export default function Salary() {
     try {
       await calculatePayroll({ year: selectedYear, month: selectedMonth });
       const res = await completePayout({ year: selectedYear, month: selectedMonth });
-      setSuccessMsg(`Complete Payout finalized! ${res.sent || 0} payslip(s) emailed to employees, ${res.skipped || 0} skipped.`);
+      setSuccessMsg(`Payroll calculation saved. ${res.sent || 0} payslip email(s) sent, ${res.skipped || 0} skipped. No funds were transferred.`);
       await loadPayroll();
     } catch (err: any) {
       setErrorMsg(err?.message || 'Failed to complete payout dispatch');
@@ -458,10 +487,10 @@ export default function Salary() {
               onClick={handleCompletePayout}
               disabled={batchSending}
               className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition shadow-sm disabled:opacity-60"
-              title="Finalize payroll and complete payout by emailing official payslip PDFs to all employees"
+              title="Save payroll calculations and email payslip PDFs; this does not transfer funds"
             >
               <CheckCircle2 size={14} className={batchSending ? 'animate-spin' : ''} />
-              <span>{batchSending ? 'Dispatching...' : 'Complete Payout'}</span>
+              <span>{batchSending ? 'Sending...' : 'Calculate & Send Payslips'}</span>
             </button>
           </div>
         }
@@ -577,11 +606,11 @@ export default function Salary() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-[var(--card-bg)] p-4 rounded-2xl border border-[var(--border)] shadow-sm">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-[var(--text-muted)]">Base Payroll</span>
+              <span className="text-xs font-semibold text-[var(--text-muted)]">Gross Payroll</span>
               <Banknote size={16} className="text-primary-600" />
             </div>
             <p className="text-xl font-bold text-[var(--text-main)] mt-2">
-              {formatMoney(summary?.totalBasePayroll || 0, currency)}
+              {formatMoney(summary?.totalGrossPayroll ?? summary?.totalBasePayroll ?? 0, currency)}
             </p>
             <p className="text-[11px] text-[var(--text-muted)] mt-1 flex items-center gap-1">
               <Users size={11} /> {employees.length} employees on file
@@ -603,24 +632,24 @@ export default function Salary() {
 
           <div className="bg-[var(--card-bg)] p-4 rounded-2xl border border-[var(--border)] shadow-sm">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-[var(--text-muted)]">Net Payout</span>
+              <span className="text-xs font-semibold text-[var(--text-muted)]">Net Pay</span>
               <Wallet size={16} className="text-emerald-600" />
             </div>
             <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-2">
               {formatMoney(summary?.totalNetPayout || 0, currency)}
             </p>
-            <p className="text-[11px] text-[var(--text-muted)] mt-1">Base minus Deductions</p>
+            <p className="text-[11px] text-[var(--text-muted)] mt-1">Calculated pay; no funds transferred</p>
           </div>
 
           <div className="bg-[var(--card-bg)] p-4 rounded-2xl border border-[var(--border)] shadow-sm">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-[var(--text-muted)]">Salary Status</span>
-              <CheckCircle2 size={16} className="text-blue-500" />
+              <span className="text-xs font-semibold text-[var(--text-muted)]">Overstay / Overtime</span>
+              <Clock size={16} className="text-emerald-500" />
             </div>
-            <p className="text-xl font-bold text-[var(--text-main)] mt-2">
-              {employees.filter((e) => e.baseSalary > 0).length} / {employees.length}
+            <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-2">
+              +{formatMoney(summary?.totalOvertimeEarnings || 0, currency)}
             </p>
-            <p className="text-[11px] text-[var(--text-muted)] mt-1">Staff with base salary set</p>
+            <p className="text-[11px] text-[var(--text-muted)] mt-1">Salary addition for staying past closing</p>
           </div>
         </div>
 
@@ -631,7 +660,7 @@ export default function Salary() {
             <div>
               <h2 className="font-bold text-[var(--text-main)]">Employee Compensation & Deductions</h2>
               <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                Manage base salary rates, view attendance lateness & HR deductions, generate payslips, and complete payout via email.
+                Manage base salaries, inspect calculation lines, and email payslips. TimeLogic does not transfer funds.
               </p>
             </div>
 
@@ -747,6 +776,11 @@ export default function Salary() {
                                   {formatMoney(emp.baseSalary, emp.currency)}
                                 </span>
                                 <span className="block text-[10px] text-[var(--text-muted)]">Monthly rate</span>
+                                {emp.overtimeEarnings > 0 && (
+                                  <span className="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                                    +{formatMoney(emp.overtimeEarnings, emp.currency)} Overstay
+                                  </span>
+                                )}
                               </div>
                             ) : (
                               <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded text-[11px] font-semibold border border-amber-200 dark:border-amber-800">
@@ -784,7 +818,9 @@ export default function Salary() {
                                 </span>
                                 <span className="block text-[10px] text-[var(--text-muted)]">
                                   Late: {formatMoney(emp.attendancePenalties, emp.currency)}
-                                  {emp.breakPenalties > 0 && ` + Break: ${formatMoney(emp.breakPenalties, emp.currency)}`}
+                                  {emp.breakPenalties > 0 && (
+                                    <span className="font-semibold text-red-600 dark:text-red-400">{` + Break: ${formatMoney(emp.breakPenalties, emp.currency)}`}</span>
+                                  )}
                                   {emp.manualPenalties > 0 && ` + HR: ${formatMoney(emp.manualPenalties, emp.currency)}`}
                                 </span>
                               </button>
@@ -795,12 +831,14 @@ export default function Salary() {
 
                           {/* Net Payable */}
                           <td className="px-4 py-3">
-                            <span className={`font-bold text-sm ${emp.netSalary > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-[var(--text-muted)]'}`}>
-                              {formatMoney(emp.netSalary, emp.currency)}
-                            </span>
-                            <span className="block text-[10px] text-[var(--text-muted)]">
-                              {emp.payslipStatus === 'GENERATED' ? 'Snapshot Ready' : 'Live Estimate'}
-                            </span>
+                            <button onClick={() => setBreakdownModalEmployee(emp)} className="text-left group" title="View explainable pay calculation">
+                              <span className={`font-bold text-sm group-hover:underline ${emp.netSalary > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-[var(--text-muted)]'}`}>
+                                {formatMoney(emp.netSalary, emp.currency)}
+                              </span>
+                              <span className="block text-[10px] text-[var(--text-muted)]">
+                                {['GENERATED', 'SENT', 'PAID'].includes(emp.payslipStatus) ? 'Calculation snapshot' : 'View estimate'}
+                              </span>
+                            </button>
                           </td>
 
                           {/* Email Delivery Status */}
@@ -850,9 +888,9 @@ export default function Salary() {
                               {/* Email Dispatch */}
                               <button
                                 onClick={() => handleSendEmail(emp)}
-                                disabled={sendingId === emp.id}
+                                disabled={sendingId === emp.id || ['SENT', 'PAID'].includes(emp.payslipStatus)}
                                 className="p-1.5 rounded-xl border border-blue-300 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition shadow-sm disabled:opacity-50"
-                                title="Email official PDF payslip directly to employee"
+                                title={['SENT', 'PAID'].includes(emp.payslipStatus) ? 'Payslip already sent and locked' : 'Email official PDF payslip directly to employee'}
                               >
                                 <Mail size={14} className={sendingId === emp.id ? 'animate-spin' : ''} />
                               </button>
@@ -1226,13 +1264,13 @@ export default function Salary() {
         </div>
       )}
 
-      {/* ── MODAL: PENALTIES BREAKDOWN ── */}
+      {/* ── MODAL: PAY CALCULATION ── */}
       {breakdownModalEmployee && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border)]">
               <div>
-                <h2 className="text-lg font-bold text-[var(--text-main)]">Penalties & Deductions</h2>
+                <h2 className="text-lg font-bold text-[var(--text-main)]">Pay calculation</h2>
                 <p className="text-xs text-[var(--text-muted)] mt-0.5">
                   {breakdownModalEmployee.name} • {monthLabel}
                 </p>
@@ -1246,44 +1284,58 @@ export default function Salary() {
             </div>
 
             <div className="p-6 space-y-4">
-              <div className="p-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-2xl flex items-center justify-between">
-                <span className="text-xs font-semibold text-red-800 dark:text-red-300">Total Deductions</span>
-                <span className="text-base font-bold text-red-700 dark:text-red-400">
-                  -{formatMoney(breakdownModalEmployee.totalDeductions, breakdownModalEmployee.currency)}
-                </span>
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--hover-bg)] p-4 space-y-2 text-sm">
+                <div className="flex justify-between gap-3"><span>Base monthly salary</span><span>{formatMoney(breakdownModalEmployee.baseSalary, breakdownModalEmployee.currency)}</span></div>
+                <div className="flex justify-between gap-3 text-emerald-700 dark:text-emerald-400 font-medium">
+                  <span>Overstay past closing (+ Added to salary)</span>
+                  <span className="font-bold">+{formatMoney(breakdownModalEmployee.overtimeEarnings, breakdownModalEmployee.currency)}</span>
+                </div>
+                <div className="flex justify-between gap-3 border-t border-[var(--border)] pt-2 font-semibold"><span>Gross earnings</span><span>{formatMoney(breakdownModalEmployee.grossSalary, breakdownModalEmployee.currency)}</span></div>
+                <div className="flex justify-between gap-3 text-red-700 dark:text-red-400 border-t border-[var(--border)] pt-2 font-semibold"><span>Total deductions (-)</span><span>-{formatMoney(breakdownModalEmployee.totalDeductions, breakdownModalEmployee.currency)}</span></div>
+                {breakdownModalEmployee.breakPenalties > 0 && (
+                  <div className="flex justify-between gap-3 text-xs text-red-600 dark:text-red-400 pl-3">
+                    <span>↳ Break penalty (overbreak)</span>
+                    <span>-{formatMoney(breakdownModalEmployee.breakPenalties, breakdownModalEmployee.currency)}</span>
+                  </div>
+                )}
+                {breakdownModalEmployee.attendancePenalties > 0 && (
+                  <div className="flex justify-between gap-3 text-xs text-red-600 dark:text-red-400 pl-3">
+                    <span>↳ Attendance lateness penalty</span>
+                    <span>-{formatMoney(breakdownModalEmployee.attendancePenalties, breakdownModalEmployee.currency)}</span>
+                  </div>
+                )}
+                {breakdownModalEmployee.manualPenalties > 0 && (
+                  <div className="flex justify-between gap-3 text-xs text-red-600 dark:text-red-400 pl-3">
+                    <span>↳ HR administrative penalty</span>
+                    <span>-{formatMoney(breakdownModalEmployee.manualPenalties, breakdownModalEmployee.currency)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between gap-3 border-t border-[var(--border)] pt-2 font-bold text-emerald-700 dark:text-emerald-400 text-base"><span>Net payable</span><span>{formatMoney(breakdownModalEmployee.netSalary, breakdownModalEmployee.currency)}</span></div>
               </div>
 
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)]">
-                  <div>
-                    <p className="font-semibold text-xs text-[var(--text-main)]">Attendance Lateness Deductions</p>
-                    <p className="text-[11px] text-[var(--text-muted)]">Automatic lateness & grace overage penalties</p>
-                  </div>
-                  <span className="font-bold text-xs text-red-600 dark:text-red-400">
-                    -{formatMoney(breakdownModalEmployee.attendancePenalties, breakdownModalEmployee.currency)}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)]">
-                  <div>
-                    <p className="font-semibold text-xs text-[var(--text-main)]">Break Overstay Deductions</p>
-                    <p className="text-[11px] text-[var(--text-muted)]">Automatic deductions for exceeded break limits</p>
-                  </div>
-                  <span className="font-bold text-xs text-red-600 dark:text-red-400">
-                    -{formatMoney(breakdownModalEmployee.breakPenalties || 0, breakdownModalEmployee.currency)}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)]">
-                  <div>
-                    <p className="font-semibold text-xs text-[var(--text-main)]">HR Administrative Penalties</p>
-                    <p className="text-[11px] text-[var(--text-muted)]">Manual disciplinary or policy violation adjustments</p>
-                  </div>
-                  <span className="font-bold text-xs text-red-600 dark:text-red-400">
-                    -{formatMoney(breakdownModalEmployee.manualPenalties, breakdownModalEmployee.currency)}
-                  </span>
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wide text-[var(--text-muted)] mb-2">Calculation lines</h3>
+                <div className="divide-y divide-[var(--border)] border-y border-[var(--border)]">
+                  {(breakdownModalEmployee.calculationSnapshot?.lineItems || breakdownModalEmployee.lineItems || []).map((item) => (
+                    <div key={item.id} className="py-2.5 flex items-start justify-between gap-3 text-xs">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-[var(--text-main)]">{item.description}</p>
+                        <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
+                          {[item.date, item.minutes != null ? `${item.minutes} min` : null, item.ratePerHour != null ? `${formatMoney(item.ratePerHour, item.currency)}/hr` : null, item.ruleVersion, item.sourceType ? `${item.sourceType} ${item.sourceId}` : null].filter(Boolean).join(' · ')}
+                        </p>
+                      </div>
+                      <span className={`font-bold whitespace-nowrap ${item.category === 'EARNING' ? 'text-emerald-700' : 'text-red-700'}`}>
+                        {item.category === 'EARNING' ? '+' : '-'}{formatMoney(item.amount, item.currency)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
+              {breakdownModalEmployee.calculationHash && (
+                <p className="text-[10px] text-[var(--text-muted)] break-all" title={breakdownModalEmployee.calculationHash}>
+                  {['GENERATED', 'SENT', 'PAID'].includes(breakdownModalEmployee.payslipStatus) ? 'Saved' : 'Preview'} calculation · {breakdownModalEmployee.calculationVersion} · {breakdownModalEmployee.calculationHash.slice(0, 16)}
+                </p>
+              )}
             </div>
 
             <div className="flex justify-end px-6 pb-6 pt-3 border-t border-[var(--border)]">

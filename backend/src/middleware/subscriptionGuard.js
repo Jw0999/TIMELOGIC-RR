@@ -1,3 +1,4 @@
+const jwt = require('jsonwebtoken');
 const { prisma } = require('../config/database');
 const { getOrgSubscriptionStatus } = require('../utils/subscription');
 
@@ -8,13 +9,26 @@ const { getOrgSubscriptionStatus } = require('../utils/subscription');
  */
 async function checkSubscription(req, res, next) {
   try {
+    let userRole = req.user?.role;
+    let userOrgId = req.user?.orgId || req.user?.organizationId;
+
+    if (!userRole && req.headers?.authorization?.startsWith('Bearer ')) {
+      try {
+        const decoded = jwt.decode(req.headers.authorization.slice(7));
+        if (decoded && typeof decoded === 'object') {
+          userRole = decoded.role;
+          userOrgId = decoded.orgId;
+        }
+      } catch (_) {}
+    }
+
     // Super Admins are never blocked by organization subscription
-    if (req.user && req.user.role === 'SUPER_ADMIN') {
+    if (userRole === 'SUPER_ADMIN') {
       return next();
     }
 
-    // Identify orgId from authenticated user or request parameters
-    const orgId = req.user?.orgId || req.user?.organizationId || req.orgId || req.params?.orgId || req.body?.orgId;
+    // Identify orgId from authenticated user, custom headers, or request parameters
+    const orgId = userOrgId || req.orgId || req.headers?.['x-organization-id'] || req.params?.orgId || req.body?.orgId;
 
     if (!orgId) {
       // If no org context, allow downstream handlers or auth guards to deal with it

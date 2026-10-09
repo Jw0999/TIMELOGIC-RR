@@ -406,6 +406,7 @@ function App() {
   // Form states in modal
   const [password, setPassword] = useState('');
   const [faceImage, setFaceImage] = useState('');
+  const [livenessFrames, setLivenessFrames] = useState<string[]>([]);
   const [actionBusy, setActionBusy] = useState(false);
 
   // Breaks state
@@ -709,6 +710,7 @@ function App() {
     setPendingAction(null);
     setPassword('');
     setFaceImage('');
+    setLivenessFrames([]);
     setActionBusy(false);
   }
 
@@ -758,7 +760,7 @@ function App() {
   }
 
   // Handle Check-In and Check-Out
-  async function handleAttendanceAction() {
+  async function handleAttendanceAction(faceOverride?: string, framesOverride?: string[]) {
     if (!pendingAction || !password) return;
     const { type, employee } = pendingAction;
 
@@ -773,8 +775,14 @@ function App() {
     const faceRegistered = hasEnrolledFace(employee);
 
     // Face verification is strictly enforced ONLY on check_in
-    if (type === 'check_in' && faceRegistered && !faceImage) {
+    const currentFaceImage = faceOverride ?? faceImage;
+    const currentLivenessFrames = framesOverride ?? livenessFrames;
+    if (type === 'check_in' && faceRegistered && !currentFaceImage) {
       setError('Live camera verification is required. Please snap your face photo below.');
+      return;
+    }
+    if (type === 'check_in' && faceRegistered && currentLivenessFrames.length < 3) {
+      setError('Complete the left and right head movement first.');
       return;
     }
 
@@ -784,7 +792,7 @@ function App() {
       const empName = `${employee.firstName} ${employee.lastName}`;
       const result =
         type === 'check_in'
-          ? await manualCheckIn(employee.id, sessionId, password, faceImage || undefined, empName)
+          ? await manualCheckIn(employee.id, sessionId, password, currentFaceImage || undefined, currentLivenessFrames, empName)
           : await manualCheckOut(employee.id, employee.attendance?.sessionId || sessionId || undefined, password, empName);
 
       const actionText = type === 'check_in' ? 'checked in' : 'checked out';
@@ -2049,7 +2057,7 @@ function App() {
 
               {/* Camera Capture Viewfinder */}
               <FaceCapture
-                onCapture={setFaceImage}
+                onCapture={(image) => setFaceImage(image)}
                 onError={(err) => setError(err)}
                 disabled={actionBusy}
               />
@@ -2177,9 +2185,17 @@ function App() {
                       Face Verification
                     </label>
                     <FaceCapture
-                      onCapture={setFaceImage}
+                      onCapture={(image, frames) => {
+                        setFaceImage(image);
+                        setLivenessFrames(frames || []);
+                        if (password && frames && frames.length >= 3) {
+                          window.setTimeout(() => void handleAttendanceAction(image, frames), 0);
+                        }
+                      }}
                       onError={(msg) => setError(msg)}
                       disabled={actionBusy}
+                      activeLiveness
+                      canStart={Boolean(password)}
                     />
                   </div>
                 )}
@@ -2198,7 +2214,7 @@ function App() {
                       hasEnrolledFace(pendingAction.employee) &&
                       !faceImage)
                   }
-                  onClick={handleAttendanceAction}
+                  onClick={() => void handleAttendanceAction()}
                 >
                   {actionBusy ? (
                     <>

@@ -61,6 +61,11 @@ export default function Dashboard() {
               <StatCard label="Open Fraud Alerts" value={stats.openAlerts ?? 0} icon={ShieldAlert} color="text-red-600" bgColor="bg-red-100" />
               <StatCard label="Active Sessions" value={stats.activeSessions ?? 0} icon={Activity} color="text-primary-700" bgColor="bg-primary-100" />
             </div>
+            {(stats.notRecorded ?? 0) > 0 && (
+              <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                {stats.notRecorded} active employee{stats.notRecorded === 1 ? ' has' : 's have'} no attendance record for today ({stats.serverDate}).
+              </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Attendance breakdown */}

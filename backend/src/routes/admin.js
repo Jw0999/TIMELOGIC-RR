@@ -24,7 +24,9 @@ router.post('/manual-attendance/check-in', authenticate, isAdmin, stationLimiter
   body('sessionId').isUUID(),
   body('password').notEmpty(),
   body('faceImage').optional({ nullable: true }).isString(),
+  body('livenessFrames').optional({ nullable: true }).isArray({ min: 3, max: 5 }),
   body('timestamp').optional({ nullable: true }).isISO8601(),
+  body('idempotencyKey').optional().isString().isLength({ min: 8, max: 200 }),
 ], validate, ctrl.manualCheckIn);
 router.post('/manual-attendance/check-out', authenticate, isAdmin, stationLimiter, [
   body('employeeId').isUUID(),
@@ -32,6 +34,7 @@ router.post('/manual-attendance/check-out', authenticate, isAdmin, stationLimite
   body('password').notEmpty(),
   body('faceImage').optional({ nullable: true }).isString(),
   body('timestamp').optional({ nullable: true }).isISO8601(),
+  body('idempotencyKey').optional().isString().isLength({ min: 8, max: 200 }),
 ], validate, ctrl.manualCheckOut);
 router.post('/manual-attendance/batch-sync', authenticate, isAdmin, [
   body('records').isArray({ min: 1 }).withMessage('records must be an array with at least one record'),

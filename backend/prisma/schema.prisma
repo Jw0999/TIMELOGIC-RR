@@ -8,84 +8,92 @@ datasource db {
 }
 
 model Organization {
-  id                 String            @id @default(uuid())
-  name               String
-  industry           String?
-  subscriptionTier   String            @default("basic")
-  subscriptionStatus String            @default("ACTIVE")
-  subscriptionStart  DateTime          @default(now())
-  subscriptionExpiresAt DateTime?
-  lastActivatedAt    DateTime?
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
-  leavePolicy        Json?
-  allowDeviceCheckIn Boolean           @default(true)
-  allowManualCheckIn Boolean           @default(false)
-  hasStudents              Boolean           @default(false)
-  requireFaceVerification  Boolean           @default(false)
-  openingTime              String            @default("08:00")
-  timezone           String            @default("Africa/Lagos")
-  kioskPasswordHash  String?
-  shiftSchedules     Json?
-  maxEmployees       Int?              @default(20)
-  maxKiosks          Int?              @default(1)
-  maxOffices         Int?              @default(1)
-  adminLoginEvents   AdminLoginEvent[]
-  departments        Department[]
-  offices            Office[]
-  students           Student[]
-  users              User[]
-  manualPenalties    ManualPenalty[]
-  activationCodes    ActivationCode[]
-  kioskDevices       KioskDevice[]
-  salaryPayoutDay          Int               @default(28)
-  salaryAutomationEnabled  Boolean           @default(true)
-  salaryCurrency           String            @default("NGN")
-  whatsappProvider         String?           @default("META")
-  whatsappPhoneId          String?
-  whatsappApiToken         String?
-  whatsappSenderNumber     String?
-  smtpHost                 String?
-  smtpPort                 Int?              @default(587)
-  smtpUser                 String?
-  smtpPass                 String?
-  smtpFrom                 String?
-  smtpSecure               Boolean?          @default(false)
-  payslipRecords           PayslipRecord[]
+  id                      String            @id @default(uuid())
+  name                    String
+  industry                String?
+  subscriptionTier        String            @default("basic")
+  subscriptionStatus      String            @default("ACTIVE")
+  subscriptionStart       DateTime          @default(now())
+  subscriptionExpiresAt   DateTime?
+  lastActivatedAt         DateTime?
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+  leavePolicy             Json?
+  allowDeviceCheckIn      Boolean           @default(true)
+  allowManualCheckIn      Boolean           @default(false)
+  hasStudents             Boolean           @default(false)
+  requireFaceVerification Boolean           @default(false)
+  openingTime             String            @default("08:00")
+  timezone                String            @default("Africa/Lagos")
+  kioskPasswordHash       String?
+  shiftSchedules          Json?
+  maxEmployees            Int?              @default(20)
+  maxKiosks               Int?              @default(1)
+  maxDesktopAdmins        Int?              @default(1)
+  maxOffices              Int?              @default(1)
+  adminLoginEvents        AdminLoginEvent[]
+  departments             Department[]
+  offices                 Office[]
+  students                Student[]
+  users                   User[]
+  manualPenalties         ManualPenalty[]
+  activationCodes         ActivationCode[]
+  kioskDevices            KioskDevice[]
+  salaryPayoutDay         Int               @default(28)
+  salaryAutomationEnabled Boolean           @default(true)
+  salaryCurrency          String            @default("NGN")
+  whatsappProvider        String?           @default("META")
+  whatsappPhoneId         String?
+  whatsappApiToken        String?
+  whatsappSenderNumber    String?
+  smtpHost                String?
+  smtpPort                Int?              @default(587)
+  smtpUser                String?
+  smtpPass                String?
+  smtpFrom                String?
+  smtpSecure              Boolean?          @default(false)
+  payslipRecords          PayslipRecord[]
+  attendanceEvents        AttendanceEvent[]
+  workEvents              WorkEvent[]
+  salesImports            SalesBatchImport[]
+  salesTransactions       SalesTransaction[]
+  salesMonthlySummaries   SalesMonthlySummary[]
 
   @@map("organizations")
 }
 
 model Office {
-  id                    String              @id @default(uuid())
-  orgId                 String
-  name                  String
-  address               String?
-  timezone              String              @default("Africa/Lagos")
-  isActive              Boolean             @default(true)
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @updatedAt
-  wifiSSID              String?
-  breakMinutes          Int                 @default(60)
-  closeTime             String              @default("17:00")
-  openTime              String              @default("08:00")
-  autoSessionMinutes    Int                 @default(60)
-  breakEnd              String?
-  breakStart            String?
-  graceMinutes          Int                 @default(30)
-  gracePenalty          Int                 @default(0)
-  lateAfterMinutes      Int                 @default(90)
-  latePenalty           Int                 @default(0)
-  publicIp              String?
-  weeklySchedule        Json?
-  completelyLatePenalty Int                 @default(0)
-  absentPenalty         Int                 @default(0)
-  overstayPenalty       Int                 @default(0)
-  sessions              AttendanceSession[]
-  organization          Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  employees             User[]              @relation("OfficeEmployees")
-  securitySettings      SecuritySettings?
-  wifiFingerprints      WiFiFingerprint[]
+  id                             String              @id @default(uuid())
+  orgId                          String
+  name                           String
+  address                        String?
+  timezone                       String              @default("Africa/Lagos")
+  isActive                       Boolean             @default(true)
+  createdAt                      DateTime            @default(now())
+  updatedAt                      DateTime            @updatedAt
+  wifiSSID                       String?
+  breakMinutes                   Int                 @default(60)
+  closeTime                      String              @default("17:00")
+  overtimeStartAfterCloseMinutes Int                 @default(0)
+  overtimeFeePerHour             Float               @default(0)
+  openTime                       String              @default("08:00")
+  autoSessionMinutes             Int                 @default(60)
+  breakEnd                       String?
+  breakStart                     String?
+  graceMinutes                   Int                 @default(30)
+  gracePenalty                   Int                 @default(0)
+  lateAfterMinutes               Int                 @default(90)
+  latePenalty                    Int                 @default(0)
+  publicIp                       String?
+  weeklySchedule                 Json?
+  completelyLatePenalty          Int                 @default(0)
+  absentPenalty                  Int                 @default(0)
+  overstayPenalty                Int                 @default(0)
+  sessions                       AttendanceSession[]
+  organization                   Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  employees                      User[]              @relation("OfficeEmployees")
+  securitySettings               SecuritySettings?
+  wifiFingerprints               WiFiFingerprint[]
 
   @@map("offices")
 }
@@ -106,62 +114,66 @@ model Department {
 }
 
 model User {
-  id                 String                @id @default(uuid())
-  orgId              String
-  departmentId       String?
-  officeId           String?
-  firstName          String
-  lastName           String
-  email              String                @unique
-  passwordHash       String
-  role               UserRole              @default(EMPLOYEE)
-  profileImageUrl    String?
-  faceEncodingData   Bytes?
-  status             UserStatus            @default(ACTIVE)
-  shiftType          ShiftType             @default(FLEXIBLE)
-  adminLevel         Int?
-  lastLoginAt        DateTime?
-  createdAt          DateTime              @default(now())
-  updatedAt          DateTime              @updatedAt
-  employeeCode       String?
-  checkInMethod      EmployeeCheckInMethod @default(PHONE)
-  phone              String?
-  faceBlockedUntil   DateTime?
-  faceMismatchCount  Int                   @default(0)
-  faceLastMismatchAt DateTime?
-  adminLoginEvents   AdminLoginEvent[]
-  adminPermissions   AdminPermission[]
-  manualCheckIns     AttendanceRecord[]    @relation("ManualCheckInRecorder")
-  manualCheckOuts    AttendanceRecord[]    @relation("ManualCheckOutRecorder")
-  attendanceRecords  AttendanceRecord[]
-  reviewedRecords    AttendanceRecord[]    @relation("RecordReviewer")
-  generatedReports   AttendanceReport[]
-  createdSessions    AttendanceSession[]   @relation("SessionCreator")
-  breakRecords       BreakRecord[]
-  managedDepts       Department[]          @relation("DepartmentManager")
-  emergencyControls  EmergencyControl[]
-  fraudAlerts        FraudAlert[]          @relation("FraudAlertEmployee")
-  resolvedAlerts     FraudAlert[]          @relation("FraudAlertResolver")
-  leaveBalances      LeaveBalance[]
-  approvedLeaves     LeaveRequest[]        @relation("LeaveApprover")
-  leaveRequests      LeaveRequest[]
-  refreshTokens      RefreshToken[]
-  devices            RegisteredDevice[]
-  scanAttempts       ScanAttempt[]
-  updatedSecSettings SecuritySettings[]    @relation("SettingsUpdater")
-  studentCheckIns    StudentAttendance[]   @relation("StudentCheckInRecorder")
-  studentCheckOuts   StudentAttendance[]   @relation("StudentCheckOutRecorder")
-  manualPenalties    ManualPenalty[]       @relation("EmployeeManualPenalties")
-  createdPenalties   ManualPenalty[]       @relation("CreatedManualPenalties")
-  baseSalary         Float?                @default(0)
-  salaryCurrency     String                @default("NGN")
-  bankName           String?
-  accountNumber      String?
-  accountName        String?
-  payslipRecords     PayslipRecord[]
-  department         Department?           @relation("DepartmentEmployees", fields: [departmentId], references: [id])
-  office             Office?               @relation("OfficeEmployees", fields: [officeId], references: [id])
-  organization       Organization          @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  id                      String                @id @default(uuid())
+  orgId                   String
+  departmentId            String?
+  officeId                String?
+  firstName               String
+  lastName                String
+  email                   String                @unique
+  passwordHash            String
+  role                    UserRole              @default(EMPLOYEE)
+  profileImageUrl         String?
+  faceEncodingData        Bytes?
+  status                  UserStatus            @default(ACTIVE)
+  shiftType               ShiftType             @default(FLEXIBLE)
+  adminLevel              Int?
+  lastLoginAt             DateTime?
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+  employeeCode            String?
+  checkInMethod           EmployeeCheckInMethod @default(PHONE)
+  phone                   String?
+  faceBlockedUntil        DateTime?
+  faceMismatchCount       Int                   @default(0)
+  faceLastMismatchAt      DateTime?
+  adminLoginEvents        AdminLoginEvent[]
+  adminPermissions        AdminPermission[]
+  manualCheckIns          AttendanceRecord[]    @relation("ManualCheckInRecorder")
+  manualCheckOuts         AttendanceRecord[]    @relation("ManualCheckOutRecorder")
+  attendanceRecords       AttendanceRecord[]
+  reviewedRecords         AttendanceRecord[]    @relation("RecordReviewer")
+  generatedReports        AttendanceReport[]
+  createdSessions         AttendanceSession[]   @relation("SessionCreator")
+  breakRecords            BreakRecord[]
+  managedDepts            Department[]          @relation("DepartmentManager")
+  emergencyControls       EmergencyControl[]
+  fraudAlerts             FraudAlert[]          @relation("FraudAlertEmployee")
+  resolvedAlerts          FraudAlert[]          @relation("FraudAlertResolver")
+  leaveBalances           LeaveBalance[]
+  approvedLeaves          LeaveRequest[]        @relation("LeaveApprover")
+  leaveRequests           LeaveRequest[]
+  refreshTokens           RefreshToken[]
+  devices                 RegisteredDevice[]
+  scanAttempts            ScanAttempt[]
+  updatedSecSettings      SecuritySettings[]    @relation("SettingsUpdater")
+  studentCheckIns         StudentAttendance[]   @relation("StudentCheckInRecorder")
+  studentCheckOuts        StudentAttendance[]   @relation("StudentCheckOutRecorder")
+  manualPenalties         ManualPenalty[]       @relation("EmployeeManualPenalties")
+  createdPenalties        ManualPenalty[]       @relation("CreatedManualPenalties")
+  baseSalary              Float?                @default(0)
+  salaryCurrency          String                @default("NGN")
+  bankName                String?
+  accountNumber           String?
+  accountName             String?
+  payslipRecords          PayslipRecord[]
+  attendanceEvents        AttendanceEvent[]
+  attendanceEventsAsActor AttendanceEvent[]     @relation("AttendanceEventActor")
+  workEvents              WorkEvent[]
+  workEventsAsActor       WorkEvent[]           @relation("WorkEventActor")
+  department              Department?           @relation("DepartmentEmployees", fields: [departmentId], references: [id])
+  office                  Office?               @relation("OfficeEmployees", fields: [officeId], references: [id])
+  organization            Organization          @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@unique([orgId, employeeCode])
   @@map("users")
@@ -331,6 +343,7 @@ model AttendanceSession {
   fraudAlerts       FraudAlert[]
   qrTokens          QRToken[]
   scanAttempts      ScanAttempt[]
+  attendanceEvents  AttendanceEvent[]
 
   @@map("attendance_sessions")
 }
@@ -359,6 +372,10 @@ model AttendanceRecord {
   clockOutTime         DateTime?
   status               AttendanceStatus  @default(ABSENT)
   totalWorkHours       Float?
+  overtimeMinutes      Int               @default(0)
+  overtimeEarnings     Float             @default(0)
+  overtimeRuleVersion  String?
+  overtimeDetails      Json?
   totalBreakMinutes    Int               @default(0)
   scanResult           ScanResult?
   wifiVerified         Boolean           @default(false)
@@ -376,15 +393,83 @@ model AttendanceRecord {
   checkOutSource       AttendanceSource?
   checkInRecordedById  String?
   checkOutRecordedById String?
+  lifecycleState       String            @default("FINALIZED")
+  recordHash           String?
+  rulesSnapshot        Json?
+  evidencePackage      Json?
+  calculatedSummary    Json?
   checkInRecorder      User?             @relation("ManualCheckInRecorder", fields: [checkInRecordedById], references: [id])
   checkOutRecorder     User?             @relation("ManualCheckOutRecorder", fields: [checkOutRecordedById], references: [id])
   employee             User              @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   reviewer             User?             @relation("RecordReviewer", fields: [reviewedBy], references: [id])
   session              AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   breakRecords         BreakRecord[]
+  attendanceEvents     AttendanceEvent[]
 
   @@unique([employeeId, sessionId, date])
   @@map("attendance_records")
+}
+
+model AttendanceEvent {
+  id                 String             @id @default(uuid())
+  orgId              String
+  employeeId         String
+  actorId            String?
+  sessionId          String?
+  attendanceRecordId String?
+  eventType          String
+  source             AttendanceSource
+  result             String
+  idempotencyKey     String
+  serverTimestamp    DateTime           @default(now())
+  clientTimestamp    DateTime?
+  deviceId           String?
+  networkEvidence    Json?
+  identityEvidence   Json?
+  livenessEvidence   Json?
+  ruleVersion        String?
+  outcome            Json?
+  createdAt          DateTime           @default(now())
+  organization       Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  employee           User               @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  actor              User?              @relation("AttendanceEventActor", fields: [actorId], references: [id], onDelete: SetNull)
+  session            AttendanceSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  attendanceRecord   AttendanceRecord?  @relation(fields: [attendanceRecordId], references: [id], onDelete: SetNull)
+
+  @@unique([orgId, idempotencyKey])
+  @@index([orgId, serverTimestamp])
+  @@index([employeeId, serverTimestamp])
+  @@index([attendanceRecordId])
+  @@map("attendance_events")
+}
+
+model WorkEvent {
+  id             String       @id @default(uuid())
+  orgId          String
+  employeeId     String
+  actorId        String?
+  type           String
+  occurredAt     DateTime
+  recordedAt     DateTime     @default(now())
+  source         String
+  status         String       @default("FINALIZED")
+  sessionId      String?
+  deviceId       String?
+  verificationId String?
+  ruleVersion    String?
+  sourceType     String?
+  sourceId       String?
+  dedupeKey      String       @unique
+  metadata       Json?
+  organization   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  employee       User         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  actor          User?        @relation("WorkEventActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, occurredAt])
+  @@index([employeeId, occurredAt])
+  @@index([employeeId, type, occurredAt])
+  @@index([sourceType, sourceId])
+  @@map("work_events")
 }
 
 model ScanAttempt {
@@ -426,16 +511,16 @@ model BreakRecord {
 }
 
 model ManualPenalty {
-  id          String       @id @default(uuid())
-  orgId       String
-  employeeId  String
-  amount      Int
-  reason      String
-  createdById String
-  createdAt   DateTime     @default(now())
+  id           String       @id @default(uuid())
+  orgId        String
+  employeeId   String
+  amount       Int
+  reason       String
+  createdById  String
+  createdAt    DateTime     @default(now())
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  employee    User         @relation("EmployeeManualPenalties", fields: [employeeId], references: [id], onDelete: Cascade)
-  createdBy   User         @relation("CreatedManualPenalties", fields: [createdById], references: [id])
+  employee     User         @relation("EmployeeManualPenalties", fields: [employeeId], references: [id], onDelete: Cascade)
+  createdBy    User         @relation("CreatedManualPenalties", fields: [createdById], references: [id])
 
   @@index([orgId, employeeId, createdAt])
   @@map("manual_penalties")
@@ -734,75 +819,155 @@ model ActivationCode {
 }
 
 model KioskDevice {
-  id                String       @id @default(uuid())
-  orgId             String
-  deviceId          String       // Client-generated persistent hardware UUID
-  deviceName        String?      // e.g. "Front Desk PC - Windows"
-  platform          String?      // "Windows", "Linux", "macOS", "Android"
-  ipAddress         String?
-  userAgent         String?
-  isBound           Boolean      @default(true)
-  boundAt           DateTime     @default(now())
-  lastLoginAt       DateTime     @default(now())
-  releasedAt        DateTime?
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
-  organization      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  id              String       @id @default(uuid())
+  orgId           String
+  deviceId        String // Client-generated persistent hardware UUID
+  deviceName      String? // e.g. "Front Desk PC - Windows"
+  deviceType      String       @default("KIOSK") // "DESKTOP_ADMIN" or "KIOSK"
+  platform        String? // "Windows", "Linux", "macOS", "Android"
+  firmwareVersion String? // OS version, app version, architecture
+  ipAddress       String?
+  userAgent       String?
+  isBound         Boolean      @default(true)
+  boundAt         DateTime     @default(now())
+  lastLoginAt     DateTime     @default(now())
+  releasedAt      DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  organization    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@unique([orgId, deviceId])
   @@index([orgId, isBound])
+  @@index([orgId, deviceType])
   @@map("kiosk_devices")
 }
 
 model PayslipRecord {
-  id                  String       @id @default(uuid())
-  orgId               String
-  employeeId          String
-  year                Int
-  month               Int          // 1 to 12
-  periodStart         DateTime     @db.Date
-  periodEnd           DateTime     @db.Date
-  
+  id          String   @id @default(uuid())
+  orgId       String
+  employeeId  String
+  year        Int
+  month       Int // 1 to 12
+  periodStart DateTime @db.Date
+  periodEnd   DateTime @db.Date
+
   // Earnings
   baseSalary          Float
-  currency            String       @default("NGN")
-  
+  grossSalary         Float   @default(0)
+  overtimeEarnings    Float   @default(0)
+  currency            String  @default("NGN")
+  calculationVersion  String?
+  calculationHash     String?
+  calculationSnapshot Json?
+
   // Work & Lateness Metrics
-  totalWorkHours      Float        @default(0)
-  totalPresentDays    Int          @default(0)
-  totalLateDays       Int          @default(0)
-  totalLateMinutes    Int          @default(0)
-  
+  totalWorkHours   Float @default(0)
+  totalPresentDays Int   @default(0)
+  totalLateDays    Int   @default(0)
+  totalLateMinutes Int   @default(0)
+
   // Deductions
-  attendancePenalties Float        @default(0)
-  breakPenalties      Float        @default(0)
-  manualPenalties     Float        @default(0)
-  totalDeductions     Float        @default(0)
+  attendancePenalties Float @default(0)
+  breakPenalties      Float @default(0)
+  manualPenalties     Float @default(0)
+  totalDeductions     Float @default(0)
   netSalary           Float
-  
+
   // Itemized breakdown JSON: [{ date, type, minutes, amount, reason }]
-  breakdownJson       Json?
-  
+  breakdownJson Json?
+
   // Status & Delivery
-  status              String       @default("DRAFT") // DRAFT, GENERATED, SENT, PAID
-  pdfUrl              String?
-  pdfPath             String?
-  
+  status  String  @default("DRAFT") // DRAFT, GENERATED, SENT (locked), PAID (legacy)
+  pdfUrl  String?
+  pdfPath String?
+
   // WhatsApp Telemetry
-  whatsappStatus      String       @default("PENDING") // PENDING, SENT, FAILED, SKIPPED
-  whatsappSentAt      DateTime?
-  whatsappError       String?
-  whatsappMessageId   String?
-  
-  createdAt           DateTime     @default(now())
-  updatedAt           DateTime     @updatedAt
-  
-  organization        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  employee            User         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  whatsappStatus    String    @default("PENDING") // PENDING, SENT, FAILED, SKIPPED
+  whatsappSentAt    DateTime?
+  whatsappError     String?
+  whatsappMessageId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  employee     User         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@unique([employeeId, year, month])
   @@index([orgId, year, month])
   @@map("payslip_records")
 }
 
+model SalesBatchImport {
+  id             String             @id @default(uuid())
+  orgId          String
+  fileName       String
+  fileFormat     String             // XLSX, CSV, SQLITE, JSON
+  fileHash       String             // SHA-256
+  totalRows      Int                @default(0)
+  importedRows   Int                @default(0)
+  skippedRows    Int                @default(0)
+  detectedPeriod String             // e.g. "January 2026"
+  uploadedById   String
+  uploadedAt     DateTime           @default(now())
+  metadata       Json?
+  organization   Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  transactions   SalesTransaction[]
+
+  @@index([orgId, uploadedAt])
+  @@map("sales_batch_imports")
+}
+
+model SalesTransaction {
+  id              String           @id @default(uuid())
+  orgId           String
+  importBatchId   String
+  transactionDate DateTime         @db.Date
+  year            Int
+  month           Int              // 1-12
+  day             Int
+  invoiceId       String?
+  productName     String
+  productSku      String?
+  categoryName    String?
+  quantity        Float            @default(1)
+  unitPrice       Float            @default(0)
+  revenue         Float            @default(0)
+  unitCost        Float?
+  totalCost       Float?
+  profit          Float?
+  profitMargin    Float?           // percentage e.g. 35.5
+  customerName    String?
+  salespersonName String?
+  dedupeHash      String           @unique
+  createdAt       DateTime         @default(now())
+  organization    Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  batch           SalesBatchImport @relation(fields: [importBatchId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, year, month])
+  @@index([orgId, productName])
+  @@index([orgId, categoryName])
+  @@map("sales_transactions")
+}
+
+model SalesMonthlySummary {
+  id                String       @id @default(uuid())
+  orgId             String
+  year              Int
+  month             Int          // 1-12
+  totalRevenue      Float        @default(0)
+  totalCost         Float?
+  totalProfit       Float?
+  profitMargin      Float?
+  totalUnitsSold    Float        @default(0)
+  uniqueProducts    Int          @default(0)
+  totalTransactions Int          @default(0)
+  averageOrderValue Float        @default(0)
+  hasCostData       Boolean      @default(false)
+  updatedAt         DateTime     @updatedAt
+  organization      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, year, month])
+  @@map("sales_monthly_summaries")
+}
 

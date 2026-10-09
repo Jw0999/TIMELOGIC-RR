@@ -13,6 +13,7 @@ import SecuritySettings from './pages/SecuritySettings';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import FraudAlerts from './pages/FraudAlerts';
+import Devices from './pages/Devices';
 
 function Guard({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
@@ -38,10 +39,11 @@ function AppRoutes() {
       <Route path="/" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
       <Route path="/dashboard"     element={<Guard><Layout><Dashboard /></Layout></Guard>} />
       <Route path="/organizations" element={<Guard><Layout><Organizations /></Layout></Guard>} />
+      <Route path="/devices"       element={<Guard><Layout><Devices /></Layout></Guard>} />
       <Route path="/offices"       element={<Guard><Layout><Offices /></Layout></Guard>} />
       <Route path="/departments"   element={<Guard><Layout><Departments /></Layout></Guard>} />
       <Route path="/users"         element={<Guard><Layout><Users /></Layout></Guard>} />
-      <Route path="/fraud-alerts"   element={<Guard><Layout><FraudAlerts /></Layout></Guard>} />
+      <Route path="/fraud-alerts"  element={<Guard><Layout><FraudAlerts /></Layout></Guard>} />
       <Route path="/security"      element={<Guard><Layout><SecuritySettings /></Layout></Guard>} />
       <Route path="/reports"       element={<Guard><Layout><Reports /></Layout></Guard>} />
       <Route path="/settings"      element={<Guard><Layout><Settings /></Layout></Guard>} />

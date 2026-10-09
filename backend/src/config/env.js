@@ -32,7 +32,7 @@ const localServiceUrl = (key, fallback) => {
 
 const defaultCorsOrigins = isProduction
   ? 'https://timelogic-superadmin.pages.dev,https://timelogic.pages.dev,https://timelogic-admin.pages.dev'
-  : 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,http://localhost:5173,http://127.0.0.1:5173';
+  : 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174';
 const localCorsOrigins = `${defaultCorsOrigins},${process.env.CORS_ORIGINS || ''}`
   .split(',')
   .map((origin) => origin.trim())
@@ -47,7 +47,7 @@ const localCorsOrigins = `${defaultCorsOrigins},${process.env.CORS_ORIGINS || ''
     return origin;
   });
 
-const LOCAL_FRONTEND_PORTS = new Set(['', '80', '443', '3000', '3001', '5173', '5180', '5190']);
+const LOCAL_FRONTEND_PORTS = new Set(['', '80', '443', '3000', '3001', '5173', '5174', '5180', '5190']);
 const isAllowedFrontendOrigin = (origin) => {
   if (localCorsOrigins.includes(origin)) return true;
   let parsed;
@@ -86,7 +86,6 @@ module.exports = {
   // ── Session automation windows (minutes) ──
   CHECKIN_WINDOW_MIN:     parseInt(process.env.CHECKIN_WINDOW_MIN || '40', 10),  // fallback when an office has no late-after policy
     AUTO_SESSION_LEAD_MIN:  parseInt(process.env.AUTO_SESSION_LEAD_MIN || '40', 10), // auto-create before office opening
-  AUTO_CHECKOUT_LAG_MIN:  parseInt(process.env.AUTO_CHECKOUT_LAG_MIN || '40', 10), // auto check-out at closeTime+40
 
   UPLOAD_DIR: process.env.UPLOAD_DIR || 'uploads',
   MAX_FILE_SIZE_MB: parseInt(process.env.MAX_FILE_SIZE_MB || '5', 10),

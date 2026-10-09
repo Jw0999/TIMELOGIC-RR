@@ -4,6 +4,8 @@ const PDFDocument = require('pdfkit');
 const nodemailer = require('nodemailer');
 const { prisma } = require('../config/database');
 const logger = require('../config/logger');
+const WorkEventService = require('./WorkEventService');
+const { calculatePayroll } = require('./PayrollCalculationEngine');
 
 class PayrollService {
   /**
@@ -168,6 +170,10 @@ class PayrollService {
           status: true,
           penalty: true,
           totalWorkHours: true,
+          overtimeEarnings: true,
+          overtimeMinutes: true,
+          overtimeRuleVersion: true,
+          overtimeDetails: true,
           clockInTime: true,
         },
       }),
@@ -225,46 +231,62 @@ class PayrollService {
       breakByEmployee.get(br.employeeId).push(br);
     }
 
-    const employeeRows = employees.map((emp) => {
+    const employeeRows = await Promise.all(employees.map(async (emp) => {
       const existing = payslipMap.get(emp.id);
       const userAtt = attendanceByEmployee.get(emp.id) || [];
       const userMp = manualPenaltiesByEmployee.get(emp.id) || [];
       const userBr = breakByEmployee.get(emp.id) || [];
-
-      const baseSalary = Number(emp.baseSalary || 0);
       const currency = emp.salaryCurrency || org?.salaryCurrency || 'NGN';
+      const liveCalculation = calculatePayroll({
+        employeeId: emp.id,
+        year: y,
+        month: m,
+        periodStart: startDate,
+        periodEnd: endDate,
+        currency,
+        baseSalary: emp.baseSalary,
+        attendanceRecords: userAtt,
+        breakRecords: userBr,
+        manualPenalties: userMp,
+      });
+      const isCurrentCycle = now >= startDate && now <= endDate;
+      // Only lock calculation snapshot if payslip is for a closed past cycle AND has been finalized/paid
+      const isHistoricalLocked = !isCurrentCycle && existing?.status === 'PAID';
+      const calculation = (isHistoricalLocked && existing?.calculationSnapshot)
+        ? { ...liveCalculation, ...existing.calculationSnapshot.summary, snapshot: existing.calculationSnapshot, calculationHash: existing.calculationHash }
+        : liveCalculation;
 
-      // Attendance Metrics
-      let totalWorkHours = 0;
-      let totalPresentDays = 0;
-      let totalLateDays = 0;
-      let attendancePenalties = 0;
-
-      for (const a of userAtt) {
-        const hasCheckedIn = Boolean(a.clockInTime) || ['PRESENT', 'LATE', 'COMPLETELY_LATE', 'HALF_DAY', 'REVIEW_REQUIRED'].includes(a.status);
-        if (hasCheckedIn && a.status !== 'ABSENT') {
-          totalPresentDays += 1;
+      // Sync active un-locked payslip record with live calculation so DB, overview, and subsequent dispatches remain 100% consistent
+      if (existing && !isHistoricalLocked) {
+        try {
+          await prisma.payslipRecord.update({
+            where: { id: existing.id },
+            data: {
+              baseSalary: calculation.baseSalary,
+              grossSalary: calculation.grossSalary,
+              totalWorkHours: calculation.totalWorkHours,
+              overtimeEarnings: calculation.overtimeEarnings,
+              totalPresentDays: calculation.totalPresentDays,
+              totalLateDays: calculation.totalLateDays,
+              attendancePenalties: calculation.attendancePenalties,
+              breakPenalties: calculation.breakPenalties,
+              manualPenalties: calculation.manualPenalties,
+              totalDeductions: calculation.totalDeductions,
+              netSalary: calculation.netSalary,
+              breakdownJson: calculation.lineItems,
+              calculationVersion: calculation.calculationVersion,
+              calculationHash: calculation.calculationHash,
+              calculationSnapshot: calculation.snapshot,
+            },
+          });
+        } catch (err) {
+          logger.warn('Failed to sync payslip record with live calculation:', err.message);
         }
-        if (a.status === 'LATE' || a.status === 'COMPLETELY_LATE') {
-          totalLateDays += 1;
-        }
-        totalWorkHours += a.totalWorkHours || 0;
-        attendancePenalties += Number(a.penalty || 0);
       }
 
-      let breakPenaltiesTotal = 0;
-      for (const b of userBr) {
-        breakPenaltiesTotal += Number(b.penalty || 0);
-      }
-
-      let manualPenaltiesTotal = 0;
-      for (const m of userMp) {
-        manualPenaltiesTotal += Number(m.amount || 0);
-      }
-
-      // Sum ALL penalties: Lateness + Break Overstay + HR Manual
-      const totalDeductions = attendancePenalties + breakPenaltiesTotal + manualPenaltiesTotal;
-      const netSalary = Math.max(0, baseSalary - totalDeductions);
+      const { baseSalary, totalWorkHours, overtimeEarnings, totalPresentDays, totalLateDays,
+        attendancePenalties, breakPenalties, manualPenalties: manualPenaltiesTotal,
+        totalDeductions, grossSalary, netSalary } = calculation;
 
       return {
         id: emp.id,
@@ -283,22 +305,30 @@ class PayrollService {
         bankName: emp.bankName || '',
         accountNumber: emp.accountNumber || '',
         accountName: emp.accountName || '',
-        totalWorkHours: Math.round(totalWorkHours * 10) / 10,
+        totalWorkHours,
+        overtimeEarnings,
         totalPresentDays,
         totalLateDays,
         attendancePenalties,
-        breakPenalties: breakPenaltiesTotal,
+        breakPenalties,
         manualPenalties: manualPenaltiesTotal,
         totalDeductions,
+        grossSalary,
         netSalary,
+        calculationSnapshot: calculation.snapshot,
+        calculationHash: calculation.calculationHash,
+        calculationVersion: calculation.calculationVersion,
+        lineItems: calculation.lineItems,
         payslipId: existing?.id || null,
         payslipStatus: existing?.status || 'DRAFT',
         whatsappStatus: existing?.whatsappStatus || 'PENDING',
         whatsappSentAt: existing?.whatsappSentAt || null,
       };
-    });
+    }));
 
     const totalBase = employeeRows.reduce((acc, r) => acc + r.baseSalary, 0);
+    const totalGross = employeeRows.reduce((acc, r) => acc + r.grossSalary, 0);
+    const totalOvertime = employeeRows.reduce((acc, r) => acc + r.overtimeEarnings, 0);
     const totalDeductions = employeeRows.reduce((acc, r) => acc + r.totalDeductions, 0);
     const totalNet = employeeRows.reduce((acc, r) => acc + r.netSalary, 0);
 
@@ -318,6 +348,8 @@ class PayrollService {
       summary: {
         totalEmployees: employeeRows.length,
         totalBasePayroll: totalBase,
+        totalGrossPayroll: totalGross,
+        totalOvertimeEarnings: totalOvertime,
         totalDeductions,
         totalNetPayout: totalNet,
         salaryPayoutDay: payoutDay,
@@ -470,7 +502,7 @@ class PayrollService {
 
     const { startDate, endDate } = this.getMonthDateRange(y, m, payoutDay);
 
-    const [employees, attendanceRecords, manualPenalties, breakRecords] = await Promise.all([
+    const [employees, attendanceRecords, manualPenalties, breakRecords, existingPayslips] = await Promise.all([
       prisma.user.findMany({
         where: {
           orgId,
@@ -509,6 +541,7 @@ class PayrollService {
         },
         orderBy: { startTime: 'asc' },
       }),
+      prisma.payslipRecord.findMany({ where: { orgId, year: y, month: m } }),
     ]);
 
     const currency = org?.salaryCurrency || 'NGN';
@@ -530,72 +563,33 @@ class PayrollService {
       breakByEmployee.get(br.employeeId).push(br);
     }
 
+    const payslipByEmployee = new Map(existingPayslips.map((payslip) => [payslip.employeeId, payslip]));
     const savedPayslips = [];
 
+    const isCurrentCycle = now >= startDate && now <= endDate;
+
     for (const emp of employees) {
-      const baseSalary = Number(emp.baseSalary || 0);
+      const existingPayslip = payslipByEmployee.get(emp.id);
+      if (existingPayslip?.status === 'SENT' || (!isCurrentCycle && existingPayslip?.status === 'PAID')) {
+        savedPayslips.push(existingPayslip);
+        continue;
+      }
+
       const userAtt = attendanceByEmployee.get(emp.id) || [];
       const userMp = manualByEmployee.get(emp.id) || [];
       const userBr = breakByEmployee.get(emp.id) || [];
-
-      let totalWorkHours = 0;
-      let totalPresentDays = 0;
-      let totalLateDays = 0;
-      let totalLateMinutes = 0;
-      let attendancePenalties = 0;
-      const itemizedDeductions = [];
-
-      for (const a of userAtt) {
-        const hasCheckedIn = Boolean(a.clockInTime) || ['PRESENT', 'LATE', 'COMPLETELY_LATE', 'HALF_DAY', 'REVIEW_REQUIRED'].includes(a.status);
-        if (hasCheckedIn && a.status !== 'ABSENT') {
-          totalPresentDays += 1;
-        }
-        if (a.status === 'LATE' || a.status === 'COMPLETELY_LATE') {
-          totalLateDays += 1;
-        }
-        totalWorkHours += a.totalWorkHours || 0;
-        const pen = Number(a.penalty || 0);
-        if (pen > 0) {
-          attendancePenalties += pen;
-          itemizedDeductions.push({
-            date: a.date.toISOString().split('T')[0],
-            type: 'ATTENDANCE_PENALTY',
-            status: a.status,
-            amount: pen,
-            reason: a.status === 'COMPLETELY_LATE' ? 'Exceeded late threshold' : 'Late check-in',
-          });
-        }
-      }
-
-      let breakPenaltiesTotal = 0;
-      for (const br of userBr) {
-        const pen = Number(br.penalty || 0);
-        if (pen > 0) {
-          breakPenaltiesTotal += pen;
-          itemizedDeductions.push({
-            date: br.startTime.toISOString().split('T')[0],
-            type: 'BREAK_PENALTY',
-            amount: pen,
-            reason: `Break overstay penalty (${br.breakType || 'Break'})`,
-          });
-        }
-      }
-
-      let manualPenaltiesTotal = 0;
-      for (const mp of userMp) {
-        const amt = Number(mp.amount || 0);
-        manualPenaltiesTotal += amt;
-        itemizedDeductions.push({
-          date: mp.createdAt.toISOString().split('T')[0],
-          type: 'MANUAL_PENALTY',
-          amount: amt,
-          reason: mp.reason || 'HR Administrative penalty',
-        });
-      }
-
-      // Sum ALL penalties: Lateness + Break Overstay + HR Administrative
-      const totalDeductions = attendancePenalties + breakPenaltiesTotal + manualPenaltiesTotal;
-      const netSalary = Math.max(0, baseSalary - totalDeductions);
+      const calculation = calculatePayroll({
+        employeeId: emp.id,
+        year: y,
+        month: m,
+        periodStart: startDate,
+        periodEnd: endDate,
+        currency: emp.salaryCurrency || currency,
+        baseSalary: emp.baseSalary,
+        attendanceRecords: userAtt,
+        breakRecords: userBr,
+        manualPenalties: userMp,
+      });
 
       const payslip = await prisma.payslipRecord.upsert({
         where: {
@@ -612,36 +606,71 @@ class PayrollService {
           month: m,
           periodStart: startDate,
           periodEnd: endDate,
-          baseSalary,
+          baseSalary: calculation.baseSalary,
+          grossSalary: calculation.grossSalary,
           currency: emp.salaryCurrency || currency,
-          totalWorkHours: Math.round(totalWorkHours * 10) / 10,
-          totalPresentDays,
-          totalLateDays,
-          totalLateMinutes,
-          attendancePenalties,
-          breakPenalties: breakPenaltiesTotal,
-          manualPenalties: manualPenaltiesTotal,
-          totalDeductions,
-          netSalary,
-          breakdownJson: itemizedDeductions,
+          totalWorkHours: calculation.totalWorkHours,
+          overtimeEarnings: calculation.overtimeEarnings,
+          totalPresentDays: calculation.totalPresentDays,
+          totalLateDays: calculation.totalLateDays,
+          totalLateMinutes: 0,
+          attendancePenalties: calculation.attendancePenalties,
+          breakPenalties: calculation.breakPenalties,
+          manualPenalties: calculation.manualPenalties,
+          totalDeductions: calculation.totalDeductions,
+          netSalary: calculation.netSalary,
+          breakdownJson: calculation.lineItems,
+          calculationVersion: calculation.calculationVersion,
+          calculationHash: calculation.calculationHash,
+          calculationSnapshot: calculation.snapshot,
           status: 'GENERATED',
         },
         update: {
           periodStart: startDate,
           periodEnd: endDate,
-          baseSalary,
+          baseSalary: calculation.baseSalary,
+          grossSalary: calculation.grossSalary,
           currency: emp.salaryCurrency || currency,
-          totalWorkHours: Math.round(totalWorkHours * 10) / 10,
-          totalPresentDays,
-          totalLateDays,
-          totalLateMinutes,
-          attendancePenalties,
-          breakPenalties: breakPenaltiesTotal,
-          manualPenalties: manualPenaltiesTotal,
-          totalDeductions,
-          netSalary,
-          breakdownJson: itemizedDeductions,
-          status: 'GENERATED',
+          totalWorkHours: calculation.totalWorkHours,
+          overtimeEarnings: calculation.overtimeEarnings,
+          totalPresentDays: calculation.totalPresentDays,
+          totalLateDays: calculation.totalLateDays,
+          totalLateMinutes: 0,
+          attendancePenalties: calculation.attendancePenalties,
+          breakPenalties: calculation.breakPenalties,
+          manualPenalties: calculation.manualPenalties,
+          totalDeductions: calculation.totalDeductions,
+          netSalary: calculation.netSalary,
+          breakdownJson: calculation.lineItems,
+          calculationVersion: calculation.calculationVersion,
+          calculationHash: calculation.calculationHash,
+          calculationSnapshot: calculation.snapshot,
+          status: existingPayslip?.status === 'SENT' ? 'SENT' : 'GENERATED',
+        },
+      });
+
+      await WorkEventService.record({
+        orgId,
+        employeeId: emp.id,
+        type: 'PAYROLL_CALCULATED',
+        occurredAt: payslip.updatedAt,
+        source: 'PAYROLL',
+        status: payslip.status === 'GENERATED' ? 'FINALIZED' : payslip.status,
+        ruleVersion: 'payroll-calculation-v1',
+        sourceType: 'PayslipRecord',
+        sourceId: payslip.id,
+        dedupeKey: `payslip-calculated:${payslip.id}:${payslip.updatedAt.toISOString()}`,
+        metadata: {
+          year: y,
+          month: m,
+          totalWorkHours: payslip.totalWorkHours,
+          totalDeductions: payslip.totalDeductions,
+          overtimeEarnings: payslip.overtimeEarnings,
+          calculationVersion: payslip.calculationVersion,
+          calculationHash: payslip.calculationHash,
+          calculationSnapshot: payslip.calculationSnapshot,
+          netSalary: payslip.netSalary,
+          breakdown: payslip.breakdownJson,
         },
       });
 
@@ -699,6 +728,10 @@ class PayrollService {
           penalty: true,
           totalWorkHours: true,
           clockInTime: true,
+          overtimeEarnings: true,
+          overtimeMinutes: true,
+          overtimeRuleVersion: true,
+          overtimeDetails: true,
         },
         orderBy: { date: 'asc' },
       }),
@@ -734,7 +767,8 @@ class PayrollService {
     let displayLateDays = 0;
     let displayWorkHours = 0;
     let attendancePenalties = 0;
-    const itemizedDeductions = [];
+    let totalOvertimeEarnings = 0;
+    let itemizedDeductions = [];
 
     for (const a of atts) {
       const hasCheckedIn = Boolean(a.clockInTime) || ['PRESENT', 'LATE', 'COMPLETELY_LATE', 'HALF_DAY', 'REVIEW_REQUIRED'].includes(a.status);
@@ -745,6 +779,8 @@ class PayrollService {
         displayLateDays += 1;
       }
       displayWorkHours += a.totalWorkHours || 0;
+      totalOvertimeEarnings += Number(a.overtimeEarnings || 0);
+
       const pen = Number(a.penalty || 0);
       if (pen > 0) {
         attendancePenalties += pen;
@@ -784,33 +820,53 @@ class PayrollService {
       });
     }
 
+    const now = new Date();
+    const isCurrentCycle = now >= periodStart && now <= periodEnd;
+    const isHistoricalLocked = !isCurrentCycle && payslip.status === 'PAID';
+    const savedCalculation = isHistoricalLocked ? payslip.calculationSnapshot : null;
+    if (savedCalculation?.summary) {
+      displayPresentDays = savedCalculation.summary.totalPresentDays ?? displayPresentDays;
+      displayLateDays = savedCalculation.summary.totalLateDays ?? displayLateDays;
+      displayWorkHours = savedCalculation.summary.totalWorkHours ?? displayWorkHours;
+      attendancePenalties = savedCalculation.summary.attendancePenalties ?? attendancePenalties;
+      breakPenalties = savedCalculation.summary.breakPenalties ?? breakPenalties;
+      manualPenalties = savedCalculation.summary.manualPenalties ?? manualPenalties;
+      itemizedDeductions = (savedCalculation.lineItems || []).filter((item) => item.category === 'DEDUCTION');
+    }
+
     // Sort all itemized penalties chronologically
     itemizedDeductions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    const baseSalary = Number(payslip.employee?.baseSalary || payslip.baseSalary || 0);
-    const totalDeductions = attendancePenalties + breakPenalties + manualPenalties;
-    const netSalary = Math.max(0, baseSalary - totalDeductions);
+    const baseSalary = Number(payslip.baseSalary || payslip.employee?.baseSalary || 0);
+    const overtimeEarnings = Number(savedCalculation?.summary?.overtimeEarnings ?? totalOvertimeEarnings);
+    const grossSalary = Number(savedCalculation?.summary?.grossSalary ?? (baseSalary + overtimeEarnings));
+    const totalDeductions = Number(savedCalculation?.summary?.totalDeductions ?? (attendancePenalties + breakPenalties + manualPenalties));
+    const netSalary = Number(savedCalculation?.summary?.netSalary ?? Math.max(0, grossSalary - totalDeductions));
     const roundedWorkHours = Math.round(displayWorkHours * 10) / 10;
 
-    // Persist live recalculated metrics to PayslipRecord
+    // Refresh payslip record cache for un-locked payslips to guarantee consistency with live calculations
     try {
-      await prisma.payslipRecord.update({
-        where: { id: payslip.id },
-        data: {
-          periodStart,
-          periodEnd,
-          baseSalary,
-          totalWorkHours: roundedWorkHours,
-          totalPresentDays: displayPresentDays,
-          totalLateDays: displayLateDays,
-          attendancePenalties,
-          breakPenalties,
-          manualPenalties,
-          totalDeductions,
-          netSalary,
-          breakdownJson: itemizedDeductions,
-        },
-      });
+      if (!isHistoricalLocked) {
+        await prisma.payslipRecord.update({
+          where: { id: payslip.id },
+          data: {
+            periodStart,
+            periodEnd,
+            baseSalary,
+            grossSalary,
+            overtimeEarnings,
+            totalWorkHours: roundedWorkHours,
+            totalPresentDays: displayPresentDays,
+            totalLateDays: displayLateDays,
+            attendancePenalties,
+            breakPenalties,
+            manualPenalties,
+            totalDeductions,
+            netSalary,
+            breakdownJson: itemizedDeductions,
+          },
+        });
+      }
     } catch (updErr) {
       logger.warn('Failed to update payslip record cache during PDF generation:', updErr);
     }
@@ -896,7 +952,7 @@ class PayrollService {
 
       doc.fillColor('#475569').fontSize(8.5).font('Helvetica')
         .text(`Period: ${periodLabel}`, 300, 60, { width: 255, align: 'right' })
-        .text(`Payout Cycle: ${monthStr}   |   Status: Disbursed`, 300, 71, { width: 255, align: 'right' });
+        .text(`Payroll Period: ${monthStr}   |   Status: ${['SENT', 'PAID'].includes(payslip.status) ? 'Payslip sent' : 'Prepared'}`, 300, 71, { width: 255, align: 'right' });
 
       // Elegant double divider rule
       doc.moveTo(40, 88).lineTo(555, 88).lineWidth(1.2).strokeColor('#0f172a').stroke();
@@ -987,6 +1043,14 @@ class PayrollService {
           dedColor: attendancePenalties > 0 ? '#b91c1c' : '#94a3b8',
         },
         {
+          earnLabel: 'Overtime Earnings',
+          earnVal: overtimeEarnings > 0 ? `+${this.formatMoneyPdf(overtimeEarnings, currency)}` : '—',
+          earnColor: overtimeEarnings > 0 ? '#047857' : '#94a3b8',
+          dedLabel: '—',
+          dedVal: '—',
+          dedColor: '#94a3b8',
+        },
+        {
           earnLabel: '—',
           earnVal: '—',
           earnColor: '#94a3b8',
@@ -1035,7 +1099,7 @@ class PayrollService {
       doc.fillColor('#0f172a').fontSize(8).font('Helvetica-Bold')
         .text('TOTAL GROSS EARNINGS', 50, currentY + 7);
       doc.fillColor('#047857').font('Helvetica-Bold')
-        .text(`+${this.formatMoneyPdf(baseSalary, currency)}`, 195, currentY + 7, { width: 92, align: 'right' });
+        .text(`+${this.formatMoneyPdf(grossSalary, currency)}`, 195, currentY + 7, { width: 92, align: 'right' });
 
       doc.fillColor('#0f172a').font('Helvetica-Bold')
         .text('TOTAL DEDUCTIONS APPLIED', 308, currentY + 7);
@@ -1054,13 +1118,13 @@ class PayrollService {
       doc.rect(40, currentY, 4, netBoxH).fill('#0f172a');
 
       doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold')
-        .text('NET SALARY PAYABLE (DISBURSED)', 54, currentY + 10);
+        .text('NET PAY', 54, currentY + 10);
       doc.fillColor('#0f172a').fontSize(16).font('Helvetica-Bold')
         .text(this.formatMoneyPdf(netSalary, currency), 54, currentY + 22);
 
       doc.fillColor('#475569').fontSize(8).font('Helvetica')
         .text('Disbursement Method: Direct Deposit / Bank Transfer', 280, currentY + 12, { width: 265, align: 'right' })
-        .text('Disbursed & Processed via TimeLogic Payroll', 280, currentY + 26, { width: 265, align: 'right' });
+        .text('Prepared by TimeLogic Payroll', 280, currentY + 26, { width: 265, align: 'right' });
 
       currentY += netBoxH + 12;
 
@@ -1134,7 +1198,7 @@ class PayrollService {
           doc.fillColor('#64748b').fontSize(7.5).font('Helvetica')
             .text(item.date, 48, currentY + 5);
 
-          const catName = item.type === 'ATTENDANCE_LATE' ? 'ATTENDANCE'
+          const catName = item.type === 'ATTENDANCE_PENALTY' || item.type === 'ATTENDANCE_LATE' ? 'ATTENDANCE'
             : item.type === 'BREAK_PENALTY' ? 'BREAK OVERSTAY'
             : 'DISCIPLINARY';
 
@@ -1142,7 +1206,7 @@ class PayrollService {
             .text(catName, 125, currentY + 5);
 
           doc.fillColor('#334155').fontSize(7.5).font('Helvetica')
-            .text(item.reason || item.type, 230, currentY + 5, { width: 220, ellipsis: true });
+            .text(`${item.description || item.reason || item.type}${item.sourceType ? ` · ${item.sourceType} ${String(item.sourceId || '').slice(0, 8)}` : ''}`, 230, currentY + 5, { width: 220, ellipsis: true });
 
           doc.fillColor('#b91c1c').fontSize(7.5).font('Helvetica-Bold')
             .text(`-${this.formatMoneyPdf(item.amount, currency)}`, 465, currentY + 5, { width: 80, align: 'right' });
@@ -1159,6 +1223,23 @@ class PayrollService {
         doc.fillColor('#047857').fontSize(8).font('Helvetica-Bold')
           .text('✓ No statutory deductions or disciplinary penalties incurred for this pay period.', 52, currentY + 7);
         currentY += 34;
+      }
+
+      const overtimeItems = (savedCalculation?.lineItems || []).filter((item) => item.type === 'OVERTIME');
+      if (overtimeItems.length > 0 && currentY < 690) {
+        doc.fillColor('#0f172a').fontSize(8.5).font('Helvetica-Bold')
+          .text('OVERTIME CALCULATION SOURCES', 40, currentY);
+        currentY += 16;
+        for (const item of overtimeItems) {
+          const overtimeRule = item.calculation || {};
+          const source = `Attendance ${String(item.sourceId || '').slice(0, 8)} · ${item.ruleVersion || 'office-overtime-v1'}`;
+          const detail = `${item.date || ''} · ${item.minutes || 0} min after ${overtimeRule.startAfterCloseMinutes ?? 0} min delay · ${this.formatMoneyPdf(item.ratePerHour || 0, currency)}/hour`;
+          doc.fillColor('#334155').fontSize(7.5).font('Helvetica')
+            .text(detail, 48, currentY, { width: 350, ellipsis: true });
+          doc.fillColor('#64748b').fontSize(7).font('Helvetica')
+            .text(source, 405, currentY, { width: 140, align: 'right', ellipsis: true });
+          currentY += 14;
+        }
       }
 
       // ─────────────────────────────────────────────────────────────
@@ -1180,6 +1261,10 @@ class PayrollService {
           footerY + 18,
           { width: 515, align: 'center' }
         );
+      if (payslip.calculationHash) {
+        doc.fillColor('#64748b').fontSize(6.5).font('Helvetica')
+          .text(`Calculation ${payslip.calculationVersion || 'payroll-calculation-v1'} · SHA-256 ${payslip.calculationHash}`, 40, footerY + 28, { width: 515, align: 'center' });
+      }
 
       doc.end();
 
@@ -1208,7 +1293,13 @@ class PayrollService {
       },
     });
 
-    if (!payslip) throw new Error('Payslip not found');
+    const now = new Date();
+    const isCurrentCycle = payslip.periodStart && payslip.periodEnd
+      ? (now >= payslip.periodStart && now <= payslip.periodEnd)
+      : false;
+    if (!options.force && (payslip.status === 'SENT' || (!isCurrentCycle && payslip.status === 'PAID'))) {
+      return { success: true, status: 'SKIPPED', reason: 'This payslip has already been finalized and locked.' };
+    }
 
     const email = payslip.employee.email;
     if (!email || !email.includes('@')) {
@@ -1309,7 +1400,7 @@ class PayrollService {
       </div>
 
       <div class="payout-box">
-        <div class="payout-label">NET SALARY PAYABLE (DISBURSED)</div>
+        <div class="payout-label">NET PAY</div>
         <div class="payout-amount">${this.formatMoney(freshPayslip.netSalary, currency)}</div>
       </div>
 
@@ -1317,6 +1408,14 @@ class PayrollService {
         <div class="row">
           <span class="row-label">Base Monthly Salary:</span>
           <span class="row-val" style="color: #047857;">+${this.formatMoney(freshPayslip.baseSalary, currency)}</span>
+        </div>
+        <div class="row">
+          <span class="row-label">Overstay / Overtime Addition:</span>
+          <span class="row-val" style="color: #047857;">+${this.formatMoney(freshPayslip.overtimeEarnings || 0, currency)}</span>
+        </div>
+        <div class="row">
+          <span class="row-label">Gross pay:</span>
+          <span class="row-val">${this.formatMoney(freshPayslip.grossSalary || (freshPayslip.baseSalary + (freshPayslip.overtimeEarnings || 0)), currency)}</span>
         </div>
         <div class="row">
           <span class="row-label">Total Penalties & Deductions:</span>
@@ -1422,7 +1521,7 @@ class PayrollService {
     const updated = await prisma.payslipRecord.update({
       where: { id: payslip.id },
       data: {
-        status: emailSent ? 'PAID' : 'GENERATED',
+        status: emailSent ? 'SENT' : 'GENERATED',
         whatsappStatus: emailSent ? 'SENT' : 'FAILED',
         whatsappSentAt: emailSent ? new Date() : null,
         whatsappMessageId: messageId,

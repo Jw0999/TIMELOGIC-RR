@@ -1,5 +1,5 @@
 const configuredApiUrl = process.env.EXPO_PUBLIC_API_URL?.trim().replace(/\/$/, '');
-export const API_URL = configuredApiUrl || 'https://timelogic-api-fbd3128caa55.herokuapp.com/api';
+export const API_URL = configuredApiUrl || 'https://timelogic-backend.onrender.com/api';
 export const SOCKET_URL = API_URL.replace('/api', '');
 
 // Visible in the Metro logs so you can confirm the phone is hitting the right IP

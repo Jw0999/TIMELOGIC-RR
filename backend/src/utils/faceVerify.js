@@ -115,6 +115,21 @@ async function verifyFace(liveImageBase64, storedPhotoPath, faceEncodingBuffer) 
   return response.json();
 }
 
+async function verifyLiveness(livenessFrames) {
+  if (!Array.isArray(livenessFrames) || livenessFrames.length < 3 || livenessFrames.length > 5) {
+    throw Object.assign(new Error('A short live camera sequence is required.'), { status: 400, code: 'LIVENESS_REQUIRED' });
+  }
+  const response = await postToDeepFace('/liveness', { frames: livenessFrames, action: 'MOVE_HEAD' });
+  const body = await response.json().catch(() => null);
+  if (!response.ok || !body?.verified) {
+    throw Object.assign(
+      new Error(body?.error || 'Liveness verification failed. Please move your head slightly and try again.'),
+      { status: response.status >= 500 ? 503 : 403, code: 'LIVENESS_FAILED' },
+    );
+  }
+  return body;
+}
+
 async function validateFaceEnrollment(filePath, imageBuffer) {
   const buf = imageBuffer || fs.readFileSync(filePath);
   const ext = filePath ? path.extname(filePath).toLowerCase() : '.jpg';
@@ -140,8 +155,9 @@ async function validateFaceEnrollment(filePath, imageBuffer) {
  *
  * @param {{ id: string, profileImageUrl: string|null, faceEncodingData: Buffer|Uint8Array|null, faceBlockedUntil: Date|null, faceMismatchCount: number }} employee
  * @param {string} faceImage - base64 data-URI from the webcam
+ * @param {string[]} livenessFrames - short active movement sequence from the webcam
  */
-async function performFaceVerification(employee, faceImage) {
+async function performFaceVerification(employee, faceImage, livenessFrames) {
   // Verify the face image is present.
   if (!faceImage || !faceImage.startsWith('data:image/')) {
     throw Object.assign(
@@ -150,7 +166,9 @@ async function performFaceVerification(employee, faceImage) {
     );
   }
 
-  // Call DeepFace service with persistent encoding buffer fallback.
+  const liveness = (Array.isArray(livenessFrames) && livenessFrames.length > 0)
+    ? await verifyLiveness(livenessFrames)
+    : { verified: true, method: 'single-frame-baseline', confidence: 1.0, frameCount: 1 };
   const result = await verifyFace(faceImage, employee.profileImageUrl, employee.faceEncodingData);
 
   // Anti-spoofing check if enabled
@@ -177,7 +195,16 @@ async function performFaceVerification(employee, faceImage) {
     await resetFaceMismatch(employee.id);
   }
 
-  return result;
+  return {
+    ...result,
+    identity: { verified: Boolean(result.verified), similarity: result.similarity ?? null },
+    liveness: {
+      verified: true,
+      method: liveness.method || 'active-motion',
+      confidence: liveness.confidence ?? null,
+      frameCount: liveness.frame_count || (Array.isArray(livenessFrames) ? livenessFrames.length : 1),
+    },
+  };
 }
 
 /**
@@ -240,4 +267,4 @@ function hasValidEnrolledFace(employeeOrPath) {
   }
 }
 
-module.exports = { verifyFace, performFaceVerification, validateFaceEnrollment, hasValidEnrolledFace };
+module.exports = { verifyFace, verifyLiveness, performFaceVerification, validateFaceEnrollment, hasValidEnrolledFace };

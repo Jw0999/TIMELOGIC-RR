@@ -38,7 +38,7 @@ const listOrgs = async (req, res, next) => {
         offices: {
           select: {
             id: true, name: true, address: true, timezone: true, isActive: true,
-            wifiSSID: true, publicIp: true, openTime: true, closeTime: true, weeklySchedule: true, breakMinutes: true,
+            wifiSSID: true, publicIp: true, openTime: true, closeTime: true, overtimeStartAfterCloseMinutes: true, overtimeFeePerHour: true, weeklySchedule: true, breakMinutes: true,
             graceMinutes: true, lateAfterMinutes: true, gracePenalty: true, latePenalty: true, completelyLatePenalty: true, absentPenalty: true,
             overstayPenalty: true,
             autoSessionMinutes: true, breakStart: true, breakEnd: true,
@@ -85,6 +85,7 @@ const createOrg = async (req, res, next) => {
       subscriptionTier = 'starter',
       maxEmployees,
       maxKiosks,
+      maxDesktopAdmins,
       maxOffices,
       allowDeviceCheckIn = true,
       allowManualCheckIn = false,
@@ -105,7 +106,7 @@ const createOrg = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Enable phone/device check-in, manual check-in, or both.' });
     }
 
-    const resolvedLimits = PlanPolicy.resolvePlanLimits(subscriptionTier, { maxEmployees, maxKiosks, maxOffices });
+    const resolvedLimits = PlanPolicy.resolvePlanLimits(subscriptionTier, { maxEmployees, maxKiosks, maxDesktopAdmins, maxOffices });
 
     if (resolvedLimits.subscriptionTier === 'starter' && offices.length > 1) {
       return res.status(400).json({ success: false, message: 'Starter plan is limited to 1 office location. Upgrade to Enterprise to add multiple branch offices.' });
@@ -129,6 +130,7 @@ const createOrg = async (req, res, next) => {
           subscriptionTier: resolvedLimits.subscriptionTier,
           maxEmployees: resolvedLimits.maxEmployees,
           maxKiosks: resolvedLimits.maxKiosks,
+          maxDesktopAdmins: resolvedLimits.maxDesktopAdmins,
           maxOffices: resolvedLimits.maxOffices,
           subscriptionStatus: 'EXPIRED',
           subscriptionStart: new Date(),
@@ -166,6 +168,8 @@ const createOrg = async (req, res, next) => {
               publicIp: (o.publicIp && o.publicIp.trim()) ? o.publicIp.trim() : null,
               openTime:  '00:00',
               closeTime: '00:00',
+              overtimeStartAfterCloseMinutes: Number.isFinite(+o.overtimeStartAfterCloseMinutes) ? Math.max(0, parseInt(o.overtimeStartAfterCloseMinutes, 10)) : 0,
+              overtimeFeePerHour: Number.isFinite(+o.overtimeFeePerHour) ? Math.max(0, Number(o.overtimeFeePerHour)) : 0,
               breakMinutes: Number.isFinite(+o.breakMinutes) ? parseInt(o.breakMinutes, 10) : 60,
               graceMinutes:       Number.isFinite(+o.graceMinutes)       ? parseInt(o.graceMinutes, 10)       : 30,
               lateAfterMinutes:   Number.isFinite(+o.lateAfterMinutes)   ? parseInt(o.lateAfterMinutes, 10)   : 90,
@@ -271,12 +275,12 @@ const updateOrg = async (req, res, next) => {
     const { id } = req.params;
     const {
       name, industry, offices = [], departments = [],
-      subscriptionTier, maxEmployees, maxKiosks, maxOffices,
+      subscriptionTier, maxEmployees, maxKiosks, maxDesktopAdmins, maxOffices,
       allowDeviceCheckIn, allowManualCheckIn, hasStudents, openingTime, timezone, shiftSchedules,
     } = req.body;
 
     const resolvedPlan = subscriptionTier !== undefined
-      ? PlanPolicy.resolvePlanLimits(subscriptionTier, { maxEmployees, maxKiosks, maxOffices })
+      ? PlanPolicy.resolvePlanLimits(subscriptionTier, { maxEmployees, maxKiosks, maxDesktopAdmins, maxOffices })
       : null;
 
     const current = await prisma.organization.findUnique({
@@ -324,6 +328,7 @@ const updateOrg = async (req, res, next) => {
             subscriptionTier: resolvedPlan.subscriptionTier,
             maxEmployees: resolvedPlan.maxEmployees,
             maxKiosks: resolvedPlan.maxKiosks,
+            maxDesktopAdmins: resolvedPlan.maxDesktopAdmins,
             maxOffices: resolvedPlan.maxOffices,
           } : {}),
           ...(allowDeviceCheckIn !== undefined ? { allowDeviceCheckIn } : {}),
@@ -368,6 +373,8 @@ const updateOrg = async (req, res, next) => {
         if (o.publicIp  !== undefined) data.publicIp  = (o.publicIp && o.publicIp.trim()) ? o.publicIp.trim() : null;
         if (o.weeklySchedule !== undefined) data.weeklySchedule = o.weeklySchedule || defaultWeeklySchedule();
         if (o.breakMinutes !== undefined) data.breakMinutes = Number.isFinite(+o.breakMinutes) ? parseInt(o.breakMinutes, 10) : 60;
+        if (o.overtimeStartAfterCloseMinutes !== undefined) data.overtimeStartAfterCloseMinutes = Number.isFinite(+o.overtimeStartAfterCloseMinutes) ? Math.max(0, parseInt(o.overtimeStartAfterCloseMinutes, 10)) : 0;
+        if (o.overtimeFeePerHour !== undefined) data.overtimeFeePerHour = Number.isFinite(+o.overtimeFeePerHour) ? Math.max(0, Number(o.overtimeFeePerHour)) : 0;
         if (o.graceMinutes !== undefined)       data.graceMinutes       = parseInt(o.graceMinutes, 10) || 0;
         if (o.lateAfterMinutes !== undefined)   data.lateAfterMinutes   = parseInt(o.lateAfterMinutes, 10) || 0;
         if (o.gracePenalty !== undefined)       data.gracePenalty       = parseInt(o.gracePenalty, 10) || 0;
@@ -570,6 +577,8 @@ const updateOfficeSecurity = async (req, res, next) => {
     if (b.publicIp  !== undefined) officeData.publicIp  = (b.publicIp && b.publicIp.trim()) ? b.publicIp.trim() : null;
     if (b.weeklySchedule !== undefined) officeData.weeklySchedule = b.weeklySchedule || defaultWeeklySchedule();
     if (b.breakMinutes !== undefined) officeData.breakMinutes = Number.isFinite(+b.breakMinutes) ? parseInt(b.breakMinutes, 10) : 60;
+    if (b.overtimeStartAfterCloseMinutes !== undefined) officeData.overtimeStartAfterCloseMinutes = Number.isFinite(+b.overtimeStartAfterCloseMinutes) ? Math.max(0, parseInt(b.overtimeStartAfterCloseMinutes, 10)) : 0;
+    if (b.overtimeFeePerHour !== undefined) officeData.overtimeFeePerHour = Number.isFinite(+b.overtimeFeePerHour) ? Math.max(0, Number(b.overtimeFeePerHour)) : 0;
     if (b.graceMinutes !== undefined)       officeData.graceMinutes       = parseInt(b.graceMinutes, 10) || 0;
     if (b.lateAfterMinutes !== undefined)   officeData.lateAfterMinutes   = parseInt(b.lateAfterMinutes, 10) || 0;
     if (b.gracePenalty !== undefined)       officeData.gracePenalty       = parseInt(b.gracePenalty, 10) || 0;
@@ -586,6 +595,7 @@ const updateOfficeSecurity = async (req, res, next) => {
     const {
       id, officeId: _o, createdAt, updatedAt, updatedBy: _u,
       wifiSSID: _w, publicIp: _pi, openTime: _ot, closeTime: _ct, weeklySchedule: _ws, breakMinutes: _bm,
+      overtimeStartAfterCloseMinutes: _overtimeDelay, overtimeFeePerHour: _overtimeRate,
       graceMinutes: _g, lateAfterMinutes: _la, gracePenalty: _gp, latePenalty: _lp, completelyLatePenalty: _clp,
       autoSessionMinutes: _as, breakStart: _bs, breakEnd: _be,
       ...settingsData
@@ -1181,6 +1191,176 @@ const manualRenewOrgSubscription = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// GET /api/super/devices — all registered devices with organization, firmware, and binding status
+const listDevices = async (req, res, next) => {
+  try {
+    const { orgId, deviceType, isBound, search } = req.query;
+
+    const where = {};
+    if (orgId) where.orgId = orgId;
+    if (deviceType) where.deviceType = deviceType;
+    if (isBound !== undefined && isBound !== '') {
+      where.isBound = isBound === 'true' || isBound === true;
+    }
+    if (search && search.trim()) {
+      const q = search.trim();
+      where.OR = [
+        { deviceName: { contains: q, mode: 'insensitive' } },
+        { deviceId: { contains: q, mode: 'insensitive' } },
+        { platform: { contains: q, mode: 'insensitive' } },
+        { firmwareVersion: { contains: q, mode: 'insensitive' } },
+        { ipAddress: { contains: q, mode: 'insensitive' } },
+        { organization: { name: { contains: q, mode: 'insensitive' } } },
+      ];
+    }
+
+    const [devices, totalBound, totalReleased, totalDevices, orgs] = await Promise.all([
+      prisma.kioskDevice.findMany({
+        where,
+        include: {
+          organization: {
+            select: {
+              id: true,
+              name: true,
+              subscriptionTier: true,
+              maxDesktopAdmins: true,
+              maxKiosks: true,
+            },
+          },
+        },
+        orderBy: [{ lastLoginAt: 'desc' }, { boundAt: 'desc' }],
+      }),
+      prisma.kioskDevice.count({ where: { isBound: true } }),
+      prisma.kioskDevice.count({ where: { isBound: false } }),
+      prisma.kioskDevice.count(),
+      prisma.organization.findMany({
+        select: {
+          id: true,
+          name: true,
+          subscriptionTier: true,
+          maxDesktopAdmins: true,
+          maxKiosks: true,
+        },
+        orderBy: { name: 'asc' },
+      }),
+    ]);
+
+    // Calculate quotas for organizations
+    const orgQuotas = await Promise.all(
+      orgs.map(async (org) => {
+        const [boundDesktopAdmins, boundKiosks] = await Promise.all([
+          prisma.kioskDevice.count({ where: { orgId: org.id, isBound: true, deviceType: 'DESKTOP_ADMIN' } }),
+          prisma.kioskDevice.count({ where: { orgId: org.id, isBound: true, deviceType: 'KIOSK' } }),
+        ]);
+        const effectiveMaxDesktop = org.maxDesktopAdmins !== undefined ? org.maxDesktopAdmins : (org.subscriptionTier === 'enterprise' ? 3 : 1);
+        return {
+          id: org.id,
+          name: org.name,
+          subscriptionTier: org.subscriptionTier,
+          maxDesktopAdmins: effectiveMaxDesktop,
+          boundDesktopAdmins,
+          maxKiosks: org.maxKiosks,
+          boundKiosks,
+          isDesktopLocked: effectiveMaxDesktop !== null && boundDesktopAdmins >= effectiveMaxDesktop,
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      data: {
+        devices,
+        stats: {
+          totalDevices,
+          totalBound,
+          totalReleased,
+          desktopAdminCount: devices.filter((d) => d.deviceType === 'DESKTOP_ADMIN').length,
+          kioskCount: devices.filter((d) => d.deviceType === 'KIOSK').length,
+        },
+        orgQuotas,
+      },
+    });
+  } catch (err) { next(err); }
+};
+
+// PUT /api/super/devices/:id/unlock — Super Admin unlocks a locked/bound device
+const unlockDevice = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const device = await prisma.kioskDevice.findUnique({
+      where: { id },
+      include: { organization: { select: { id: true, name: true } } },
+    });
+    if (!device) return res.status(404).json({ success: false, message: 'Device not found.' });
+
+    const updated = await prisma.kioskDevice.update({
+      where: { id },
+      data: {
+        isBound: false,
+        releasedAt: new Date(),
+      },
+      include: { organization: { select: { id: true, name: true } } },
+    });
+
+    await AuditService.log({
+      actorId: req.user?.id,
+      actorEmail: req.user?.email || 'superadmin@timelogic.app',
+      actorRole: req.user?.role || 'SUPER_ADMIN',
+      action: 'DEVICE_UNLOCKED',
+      targetId: id,
+      targetType: 'KIOSK_DEVICE',
+      details: {
+        orgId: device.orgId,
+        orgName: device.organization?.name,
+        deviceName: device.deviceName,
+        deviceId: device.deviceId,
+        deviceType: device.deviceType,
+      },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    res.json({
+      success: true,
+      message: `Device "${device.deviceName || device.deviceId}" unlocked successfully. ${device.organization?.name || 'The organization'} can now sign in from another device.`,
+      data: updated,
+    });
+  } catch (err) { next(err); }
+};
+
+// DELETE /api/super/devices/:id — Super Admin deletes a device record
+const deleteDevice = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const device = await prisma.kioskDevice.findUnique({
+      where: { id },
+      include: { organization: { select: { id: true, name: true } } },
+    });
+    if (!device) return res.status(404).json({ success: false, message: 'Device not found.' });
+
+    await prisma.kioskDevice.delete({ where: { id } });
+
+    await AuditService.log({
+      actorId: req.user?.id,
+      actorEmail: req.user?.email || 'superadmin@timelogic.app',
+      actorRole: req.user?.role || 'SUPER_ADMIN',
+      action: 'DEVICE_DELETED',
+      targetId: id,
+      targetType: 'KIOSK_DEVICE',
+      details: {
+        orgId: device.orgId,
+        orgName: device.organization?.name,
+        deviceName: device.deviceName,
+        deviceId: device.deviceId,
+      },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    res.json({ success: true, message: 'Device registration removed.' });
+  } catch (err) { next(err); }
+};
+
 module.exports = {
   listOrgs, createOrg, updateOrg, deleteOrg, orgUsers, renameAdmin,
   resetAdminPassword, reassignUserOffice,
@@ -1189,4 +1369,5 @@ module.exports = {
   employeeFullRecord, reemployEmployee, suspendAdmin, activateAdmin, reassignEmployee,
   updateProfile, resetSystem, getLeavePolicy, setLeavePolicy, getAuditLogs,
   generateOrgActivationCode, getOrgActivationCodes, manualRenewOrgSubscription,
+  listDevices, unlockDevice, deleteDevice,
 };

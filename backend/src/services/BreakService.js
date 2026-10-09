@@ -4,6 +4,7 @@ const NotificationService = require('./NotificationService');
 const logger = require('../config/logger');
 const { atZonedTime, dayBounds, zonedParts } = require('../utils/attendanceClock');
 const { getCurrentServerTime } = require('../utils/networkTime');
+const WorkEventService = require('./WorkEventService');
 
 const toMin = (hhmm) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
 
@@ -24,8 +25,9 @@ class BreakService {
     let isOverstayed = false;
 
     // 1. Overstayed past scheduled break window end time
-    if (policy?.breakEnd) {
-      const windowEnd = atZonedTime(startTime, policy.breakEnd, timezone);
+    const breakEndStr = policy?.breakEnd || office?.breakEnd;
+    if (breakEndStr) {
+      const windowEnd = atZonedTime(startTime, breakEndStr, timezone);
       if (windowEnd && endTime.getTime() > windowEnd.getTime()) {
         isOverstayed = true;
       }
@@ -45,7 +47,10 @@ class BreakService {
     const record = await prisma.attendanceRecord.findFirst({
       where: { employeeId, clockInTime: { not: null }, clockOutTime: null },
       orderBy: { clockInTime: 'desc' },
-      include: { session: { select: { office: { select: { timezone: true } } } } },
+      include: {
+        employee: { select: { orgId: true } },
+        session: { select: { office: { select: { timezone: true } } } },
+      },
     });
     if (!record) throw Object.assign(new Error('No active attendance record for today'), { status: 404 });
 
@@ -53,9 +58,11 @@ class BreakService {
     if (active) throw Object.assign(new Error('Already on a break'), { status: 409 });
 
     const policy = await this._getPolicy(employeeId);
+    const breakStart = policy?.breakStart;
+    const breakEnd = policy?.breakEnd;
 
     // ── Enforce the DEPARTMENT's break window (every employee must follow their department schedule) ──
-    if (!policy || !policy.breakStart || !policy.breakEnd) {
+    if (!policy || !breakStart || !breakEnd) {
       throw Object.assign(
         new Error('You cannot take a break because no department break schedule is assigned to you. Every employee must follow their assigned department break time.'),
         { status: 400 }
@@ -66,20 +73,20 @@ class BreakService {
     const timezone = record.session?.office?.timezone || 'Africa/Lagos';
     const local = zonedParts(now, timezone);
     const nowMin = local.hour * 60 + local.minute;
-    const startMin = toMin(policy.breakStart);
-    const endMin = toMin(policy.breakEnd);
-    const deptName = policy.department?.name || policy.policyName || 'Department';
+    const startMin = toMin(breakStart);
+    const endMin = toMin(breakEnd);
+    const deptName = policy?.department?.name || policy?.policyName || 'Organization';
 
     if (nowMin < startMin) {
       throw Object.assign(
-        new Error(`Cannot start break before your break time. ${deptName} break time is strictly between ${policy.breakStart} and ${policy.breakEnd}.`),
+        new Error(`Cannot start break before your break time. ${deptName} break time is strictly between ${breakStart} and ${breakEnd}.`),
         { status: 400 }
       );
     }
 
     if (nowMin >= endMin) {
       throw Object.assign(
-        new Error(`Cannot start break after your break time. ${deptName} break was between ${policy.breakStart} and ${policy.breakEnd} and has already ended for today.`),
+        new Error(`Cannot start break after your break time. ${deptName} break was between ${breakStart} and ${breakEnd} and has already ended for today.`),
         { status: 400 }
       );
     }
@@ -89,15 +96,33 @@ class BreakService {
       where: { attendanceRecordId: record.id },
       orderBy: { startTime: 'asc' },
     });
-    if (sessionBreaks.length > 0) {
-      throw Object.assign(new Error('Only one break is allowed per employee during this attendance session. A new break is available when the next session begins.'), { status: 400 });
+    const maxBreaks = 1;
+    if (sessionBreaks.length >= maxBreaks) {
+      throw Object.assign(new Error(`This policy allows at most ${maxBreaks} break(s) per attendance session.`), { status: 400, code: 'BREAK_LIMIT_REACHED' });
     }
     const check = await this.checkBreakPolicy(employeeId, policy, sessionBreaks, breakType);
     if (!check.allowed) throw Object.assign(new Error(check.reason), { status: 400 });
 
-    return prisma.breakRecord.create({
+    const created = await prisma.breakRecord.create({
       data: { id: uuidv4(), attendanceRecordId: record.id, employeeId, breakType, startTime: serverNow, notes, startedByAdmin },
     });
+    await WorkEventService.record({
+      orgId: record.employee.orgId,
+      employeeId,
+      type: 'BREAK_START',
+      occurredAt: created.startTime,
+      source: startedByAdmin ? 'ADMIN' : 'EMPLOYEE',
+      sessionId: record.sessionId,
+      ruleVersion: 'break-office-v1',
+      sourceType: 'BreakRecord',
+      sourceId: created.id,
+      dedupeKey: `break-start:${created.id}`,
+      metadata: {
+        breakType, notes, startedByAdmin, allowedWindow: { start: breakStart, end: breakEnd },
+        policySnapshot: { version: 'break-office-v1' },
+      },
+    });
+    return created;
   }
 
   async startBreakForEmployee(employeeId, breakType, notes = null) {
@@ -118,6 +143,7 @@ class BreakService {
                 },
               },
             },
+            employee: { select: { orgId: true } },
           },
         },
       },
@@ -133,6 +159,7 @@ class BreakService {
     const policy = await this._getPolicy(employeeId);
     const office = breakRecord.attendanceRecord?.session?.office;
     const timezone = office?.timezone || 'Africa/Lagos';
+    const legacyMaxMinutes = policy?.totalDailyBreakLimit || policy?.maxLunchMinutes || office?.breakMinutes || 60;
     const penalty = this._overstayPenalty(breakRecord.startTime, endTime, policy, timezone, office);
     const changed = await prisma.breakRecord.updateMany({
       where: { id: breakId, employeeId, endTime: null },
@@ -143,6 +170,22 @@ class BreakService {
     await prisma.attendanceRecord.update({
       where: { id: breakRecord.attendanceRecordId },
       data: { totalBreakMinutes: { increment: durationMinutes } },
+    });
+    await WorkEventService.record({
+      orgId: breakRecord.attendanceRecord.employee.orgId,
+      employeeId,
+      type: 'BREAK_END',
+      occurredAt: updated.endTime,
+      source: ctx.admin ? 'ADMIN' : 'EMPLOYEE',
+      sessionId: breakRecord.attendanceRecord.sessionId,
+      ruleVersion: 'break-office-v1',
+      sourceType: 'BreakRecord',
+      sourceId: updated.id,
+      dedupeKey: `break-end:${updated.id}:${updated.endTime.toISOString()}`,
+      metadata: {
+        durationMinutes, penalty, isAutoEnded: updated.isAutoEnded,
+        policySnapshot: { version: 'break-office-v1' },
+      },
     });
 
     // The employee is "back" only if they are on the company Wi-Fi. If they end a

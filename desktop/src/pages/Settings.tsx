@@ -28,8 +28,10 @@ export default function Settings() {
       subscriptionTier?: string;
       maxEmployees?: number | null;
       maxKiosks?: number | null;
+      maxDesktopAdmins?: number | null;
       activeEmployeesCount?: number;
       boundKiosksCount?: number;
+      boundDesktopAdminsCount?: number;
     };
     devices?: any[];
   } | null>(null);
@@ -201,19 +203,19 @@ export default function Settings() {
           </form>
         </div>
 
-        {/* Authorized Kiosk Terminals & Hardware Binding Card */}
+        {/* Authorized Kiosks & Desktop Admin Hardware Binding Card */}
         <div className="bg-[var(--card-bg)] rounded-2xl border border-[var(--border)] p-5">
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
             <div>
               <h3 className="font-bold text-[var(--text-main)] mb-1 flex items-center gap-2">
                 <Monitor size={16} className="text-primary-600" />
-                Authorized Attendance Kiosks & Hardware Binding
+                Authorized Hardware & System Device Bindings
               </h3>
               <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                Attendance kiosks are automatically bound to authorized physical computers. Once bound, other PCs cannot sign in until you release the terminal here.
+                Desktop Admin apps and Attendance Kiosks are locked to authorized physical systems. Desktop Admin locks can only be released by the Super Administrator.
               </p>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
               <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${
                 kioskData?.organization?.subscriptionTier === 'enterprise'
                   ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
@@ -221,10 +223,28 @@ export default function Settings() {
                   ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300'
                   : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
               }`}>
-                {kioskData?.organization?.subscriptionTier === 'enterprise' ? 'Enterprise (Unlimited Kiosks)' : kioskData?.organization?.subscriptionTier === 'custom' ? 'Custom Plan' : 'Starter Plan (1 Kiosk Max)'}
+                {kioskData?.organization?.subscriptionTier === 'enterprise' ? 'Enterprise (3 Desktop, Unlimited Kiosks)' : kioskData?.organization?.subscriptionTier === 'custom' ? 'Custom Plan (Unlimited)' : 'Starter Plan (1 Desktop, 1 Kiosk)'}
               </span>
             </div>
           </div>
+
+          {/* Quota overview */}
+          {kioskData?.organization && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 p-3 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)]">
+              <div>
+                <p className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Desktop Admin Systems</p>
+                <p className="text-sm font-black text-[var(--text-main)] mt-0.5">
+                  {kioskData.organization.boundDesktopAdminsCount ?? 0} / {kioskData.organization.maxDesktopAdmins !== null && kioskData.organization.maxDesktopAdmins !== undefined ? kioskData.organization.maxDesktopAdmins : 'Unlimited'} Active
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Attendance Kiosks</p>
+                <p className="text-sm font-black text-[var(--text-main)] mt-0.5">
+                  {kioskData.organization.boundKiosksCount ?? 0} / {kioskData.organization.maxKiosks !== null && kioskData.organization.maxKiosks !== undefined ? kioskData.organization.maxKiosks : 'Unlimited'} Active
+                </p>
+              </div>
+            </div>
+          )}
 
           {kioskMsg && (
             <div className={`p-3 rounded-xl text-xs font-semibold mt-4 ${kioskMsg.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
@@ -234,50 +254,66 @@ export default function Settings() {
 
           <div className="mt-4">
             {loadingKiosks ? (
-              <div className="py-6 text-center text-xs text-[var(--text-muted)]">Loading bound kiosk stations…</div>
+              <div className="py-6 text-center text-xs text-[var(--text-muted)]">Loading bound systems…</div>
             ) : !kioskData?.devices?.length ? (
               <div className="p-4 rounded-xl bg-[var(--hover-bg)] border border-[var(--border)] text-xs text-[var(--text-muted)] flex items-center justify-between">
-                <span>No kiosk stations currently bound. Log into PWA 2.0 on your kiosk PC with the Station Password to automatically bind it.</span>
-                <span className="text-[11px] font-bold text-emerald-600">Slot Open</span>
+                <span>No hardware devices currently registered. Log into Desktop Admin or PWA Kiosk to bind a device.</span>
+                <span className="text-[11px] font-bold text-emerald-600">Slots Available</span>
               </div>
             ) : (
               <div className="space-y-3">
-                {kioskData.devices.map((device: any) => (
-                  <div
-                    key={device.id}
-                    className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--hover-bg)] flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-[var(--text-main)]">
-                          {device.deviceName || 'Kiosk Terminal'}
-                        </span>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                          device.isBound
-                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-                            : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
-                        }`}>
-                          {device.isBound ? 'Bound & Locked' : 'Released / Open'}
-                        </span>
+                {kioskData.devices.map((device: any) => {
+                  const isDesktop = device.deviceType === 'DESKTOP_ADMIN';
+                  return (
+                    <div
+                      key={device.id}
+                      className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--hover-bg)] flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
+                            isDesktop
+                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
+                              : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300'
+                          }`}>
+                            {isDesktop ? 'Desktop Admin' : 'Kiosk Terminal'}
+                          </span>
+                          <span className="text-xs font-bold text-[var(--text-main)]">
+                            {device.deviceName || (isDesktop ? 'Desktop Admin PC' : 'Kiosk Terminal')}
+                          </span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            device.isBound
+                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                              : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                          }`}>
+                            {device.isBound ? 'Bound & Locked' : 'Released / Open'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[var(--text-muted)]">
+                          Platform: {device.platform || 'Unknown OS'} {device.firmwareVersion ? `(${device.firmwareVersion})` : ''} {device.ipAddress ? `· IP: ${device.ipAddress}` : ''} · Last active: {new Date(device.lastLoginAt).toLocaleString()}
+                        </p>
                       </div>
-                      <p className="text-[11px] text-[var(--text-muted)]">
-                        Platform: {device.platform || 'Unknown OS'} {device.ipAddress ? `· IP: ${device.ipAddress}` : ''} · Last active: {new Date(device.lastLoginAt).toLocaleString()}
-                      </p>
-                    </div>
 
-                    {device.isBound ? (
-                      <button
-                        onClick={() => handleReleaseKiosk(device.id, device.deviceName)}
-                        disabled={releasingId === device.id}
-                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition disabled:opacity-50 shrink-0 self-start sm:self-center"
-                      >
-                        {releasingId === device.id ? 'Releasing…' : 'Release Device Binding'}
-                      </button>
-                    ) : (
-                      <span className="text-xs font-semibold text-[var(--text-muted)] shrink-0">Unbound</span>
-                    )}
-                  </div>
-                ))}
+                      {device.isBound ? (
+                        isDesktop ? (
+                          <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-3 py-1.5 rounded-lg border border-amber-200 dark:border-amber-800 shrink-0 self-start sm:self-center">
+                            Locked (Super Admin Unlock Only)
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleReleaseKiosk(device.id, device.deviceName)}
+                            disabled={releasingId === device.id}
+                            className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition disabled:opacity-50 shrink-0 self-start sm:self-center"
+                          >
+                            {releasingId === device.id ? 'Releasing…' : 'Release Device Binding'}
+                          </button>
+                        )
+                      ) : (
+                        <span className="text-xs font-semibold text-[var(--text-muted)] shrink-0">Unbound</span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -326,15 +362,18 @@ export default function Settings() {
             {/* Work hours */}
             <div className="bg-[var(--card-bg)] rounded-2xl border border-[var(--border)] p-5">
               <h3 className="font-bold text-[var(--text-main)] mb-3 flex items-center gap-2"><Clock size={16} className="text-primary-600" />Work Hours</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                 {[
-                  { label: 'Opens (check-in)', value: selected?.openTime ?? '—' },
-                  { label: 'Closes (check-out)', value: selected?.closeTime ?? '—' },
-                  { label: 'Break allowance', value: `${selected?.breakMinutes ?? 0} min` },
+                  { label: 'Opens (check-in)', value: selected?.openTime ?? '—', sub: 'Session opens' },
+                  { label: 'Closes (check-out)', value: selected?.closeTime ?? '—', sub: 'Standard work close' },
+                  { label: 'Break allowance', value: `${selected?.breakMinutes ?? 0} min`, sub: 'Daily break limit' },
+                  { label: 'Overstay rate', value: `₦${Number(selected?.overtimeFeePerHour ?? 0).toLocaleString()}/hr`, sub: '+ Added to salary after close' },
+                  { label: 'Break penalty', value: `₦${Number(selected?.overstayPenalty ?? 0).toLocaleString()}`, sub: '- Deducted for overbreak' },
                 ].map((x) => (
-                  <div key={x.label} className="bg-[var(--hover-bg)] rounded-xl p-4 text-center">
-                    <p className="text-2xl font-black text-[var(--text-main)]">{x.value}</p>
-                    <p className="text-xs text-[var(--text-muted)] mt-1">{x.label}</p>
+                  <div key={x.label} className="bg-[var(--hover-bg)] rounded-xl p-3.5 text-center border border-[var(--border)]">
+                    <p className="text-xl font-black text-[var(--text-main)]">{x.value}</p>
+                    <p className="text-xs font-semibold text-[var(--text-muted)] mt-1">{x.label}</p>
+                    <p className="text-[10px] text-[var(--text-muted)] opacity-80 mt-0.5">{x.sub}</p>
                   </div>
                 ))}
               </div>

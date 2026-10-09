@@ -12,10 +12,11 @@
 
 const fs = require('fs');
 const path = require('path');
+const env = require('../src/config/env');
 const { performFaceVerification, hasValidEnrolledFace } = require('../src/utils/faceVerify');
 
-const DEEPFACE_URL = 'https://timelogic-deepface-f7dacc0dce8f.herokuapp.com';
-const INTERNAL_SECRET = 'c0cfee8288dd550a40d7b8e63b935e67b6fce8aabee73296990bd5fc91c9b54f';
+const DEEPFACE_URL = process.env.DEEPFACE_URL || 'http://127.0.0.1:5001';
+const INTERNAL_SECRET = env.INTERNAL_SERVICE_SECRET;
 
 // Test assets
 const FACE_1 = path.join(__dirname, '../uploads/faces/10759470-2606-4bf4-b805-dd597192b81f.jpeg');
