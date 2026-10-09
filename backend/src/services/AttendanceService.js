@@ -1281,10 +1281,11 @@ class AttendanceService {
   }
 
   _assertCheckoutAllowed(record, clockOutTime) {
-    const office = record.session?.office;
+    const office = record.session?.office || record.employee?.office;
     const shiftType = record.shiftTypeSnapshot || record.employee?.shiftType || 'FULL_TIME';
-    const shift = resolveShiftSchedule(office || {}, shiftType);
     const timezone = office?.timezone || 'Africa/Lagos';
+    const refDate = record.clockInTime || record.session?.startTime || record.date || clockOutTime || new Date();
+    const shift = resolveShiftSchedule(office || {}, shiftType, refDate, timezone);
 
     const closeAt = this._getScheduledOfficeClose(record, clockOutTime);
     if (closeAt && clockOutTime < closeAt) {
@@ -1296,10 +1297,11 @@ class AttendanceService {
   }
 
   _getScheduledOfficeClose(record, at, knownHours = null) {
-    const office = record.session?.office;
+    const office = record.session?.office || record.employee?.office;
     const shiftType = record.shiftTypeSnapshot || record.employee?.shiftType || 'FULL_TIME';
-    const shift = resolveShiftSchedule(office || {}, shiftType);
     const timezone = office?.timezone || 'Africa/Lagos';
+    const refDate = record.clockInTime || record.session?.startTime || record.date || at || new Date();
+    const shift = resolveShiftSchedule(office || {}, shiftType, refDate, timezone);
 
     return getShiftClosingInstant(record, shift, timezone);
   }
@@ -1481,7 +1483,7 @@ class AttendanceService {
 
       // Shift check: a shift worker should NOT be marked absent before their shift ends
       if (employee.shiftType && employee.shiftType !== 'FULL_TIME') {
-        const shift = resolveShiftSchedule(session.office, employee.shiftType);
+        const shift = resolveShiftSchedule(session.office, employee.shiftType, nowServer, tz);
         const shiftCloseAt = getShiftClosingInstant({ session, clockInTime: nowServer }, shift, tz);
         if (shiftCloseAt && nowServer < shiftCloseAt) {
           continue;
@@ -1933,8 +1935,8 @@ class AttendanceService {
     let hours = officeHoursFor(clockInTime, o);
 
     // Shift awareness: evaluate lateness against the employee's shift start time rather than office openTime.
-    if (employee?.shiftType) {
-      const shift = resolveShiftSchedule(o, employee.shiftType);
+    if (employee?.shiftType && employee.shiftType !== 'FULL_TIME') {
+      const shift = resolveShiftSchedule(o, employee.shiftType, clockInTime, o.timezone);
       if (shift?.openTime && shift?.closeTime) {
         hours = {
           openTime: shift.openTime,

@@ -48,6 +48,18 @@ function formatDate(date, timeZone = 'Africa/Lagos') {
   }
 }
 
+function formatTimeFromHhmm(hhmm) {
+  if (!hhmm || typeof hhmm !== 'string') return '';
+  const match = hhmm.trim().match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return hhmm;
+  const h = parseInt(match[1], 10);
+  const m = parseInt(match[2], 10);
+  if (Number.isNaN(h) || Number.isNaN(m)) return hhmm;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+}
+
 function stableStringify(value) {
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
   if (value && typeof value === 'object') {
@@ -70,6 +82,7 @@ function calculatePayroll({
   timezone = 'Africa/Lagos',
   officeOpenTime = '08:00',
   officeCloseTime = '17:00',
+  weeklySchedule = null,
 }) {
   const attendance = [...attendanceRecords].sort((left, right) => String(left.id).localeCompare(String(right.id)));
   const breaks = [...breakRecords].sort((left, right) => String(left.id).localeCompare(String(right.id)));
@@ -107,6 +120,22 @@ function calculatePayroll({
         ? `Overstay until ${clockOutStr} (${overtimeMinutes} min after closing)`
         : `${Math.round((overtimeMinutes / 60) * 10) / 10}h (${overtimeMinutes} min) overstay after closing`;
 
+      let closeDisplay = '';
+      if (record.overtimeDetails?.scheduledClose) {
+        closeDisplay = formatTime(record.overtimeDetails.scheduledClose, timezone);
+      } else if (weeklySchedule && (record.date || record.clockInTime)) {
+        const ref = record.date || record.clockInTime;
+        const p = new Date(ref);
+        const dayName = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][p.getUTCDay()];
+        const schedDay = weeklySchedule[dayName] || weeklySchedule[Object.keys(weeklySchedule).find((k) => k.toLowerCase() === dayName)];
+        if (schedDay?.closeTime && schedDay.closeTime !== '00:00') {
+          closeDisplay = formatTimeFromHhmm(schedDay.closeTime);
+        }
+      }
+      if (!closeDisplay && officeCloseTime && officeCloseTime !== '00:00') {
+        closeDisplay = formatTimeFromHhmm(officeCloseTime);
+      }
+
       earnings.push({
         id: `overtime:${record.id}`,
         type: 'OVERTIME',
@@ -123,9 +152,7 @@ function calculatePayroll({
         ruleVersion: record.overtimeRuleVersion || 'office-overtime-v1',
         calculation: record.overtimeDetails || null,
         description: overstayDesc,
-        subDetail: record.overtimeDetails?.feePerOvertimeHour
-          ? `Rate: ${currency} ${record.overtimeDetails.feePerOvertimeHour}/hr · Closed ${officeCloseTime}`
-          : `Office closed at ${officeCloseTime}`,
+        subDetail: closeDisplay ? `Closed ${closeDisplay}` : '',
         badgeBg: '#f0fdf4',
         categoryColor: '#059669',
         sourceType: 'AttendanceRecord',
@@ -146,12 +173,12 @@ function calculatePayroll({
         catLabel = 'COMPLETELY LATE';
         catColor = '#991b1b';
         desc = clockInStr ? `Exceeded late threshold (Arrival: ${clockInStr})` : 'Completely late attendance penalty';
-        subDetail = officeOpenTime ? `Expected opening: ${officeOpenTime}` : '';
+        subDetail = (officeOpenTime && officeOpenTime !== '00:00') ? `Expected opening: ${formatTimeFromHhmm(officeOpenTime)}` : '';
       } else if (record.status === 'LATE') {
         catLabel = 'LATE ARRIVAL';
         catColor = '#b91c1c';
         desc = clockInStr ? `Late arrival at ${clockInStr}` : 'Attendance penalty';
-        subDetail = officeOpenTime ? `Shift begins: ${officeOpenTime}` : '';
+        subDetail = (officeOpenTime && officeOpenTime !== '00:00') ? `Shift begins: ${formatTimeFromHhmm(officeOpenTime)}` : '';
       } else if (record.status === 'ABSENT') {
         catLabel = 'ABSENCE';
         catColor = '#c2410c';

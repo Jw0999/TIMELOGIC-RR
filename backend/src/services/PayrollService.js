@@ -6,8 +6,20 @@ const { prisma } = require('../config/database');
 const logger = require('../config/logger');
 const WorkEventService = require('./WorkEventService');
 const { calculatePayroll } = require('./PayrollCalculationEngine');
+const { officeHoursFor } = require('../utils/attendanceClock');
 
 class PayrollService {
+  formatTimeFromHhmm(hhmm) {
+    if (!hhmm || typeof hhmm !== 'string') return '';
+    const match = hhmm.trim().match(/^(\d{1,2}):(\d{2})/);
+    if (!match) return hhmm;
+    const h = parseInt(match[1], 10);
+    const m = parseInt(match[2], 10);
+    if (Number.isNaN(h) || Number.isNaN(m)) return hhmm;
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+  }
   /**
    * Format phone number to clean international standard (e.g., Nigerian numbers)
    */
@@ -194,7 +206,7 @@ class PayrollService {
           accountNumber: true,
           accountName: true,
           department: { select: { id: true, name: true } },
-          office: { select: { id: true, name: true, openTime: true, closeTime: true, timezone: true } },
+          office: { select: { id: true, name: true, openTime: true, closeTime: true, weeklySchedule: true, timezone: true } },
         },
         orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
       }),
@@ -295,6 +307,7 @@ class PayrollService {
         timezone: emp.office?.timezone || org?.timezone || 'Africa/Lagos',
         officeOpenTime: emp.office?.openTime || '08:00',
         officeCloseTime: emp.office?.closeTime || '17:00',
+        weeklySchedule: emp.office?.weeklySchedule || null,
       });
       const isCurrentCycle = now >= startDate && now <= endDate;
       // Only lock calculation snapshot if payslip is for a closed past cycle AND has been finalized/paid
@@ -569,6 +582,7 @@ class PayrollService {
             select: {
               openTime: true,
               closeTime: true,
+              weeklySchedule: true,
               timezone: true,
             },
           },
@@ -646,6 +660,7 @@ class PayrollService {
         timezone: emp.office?.timezone || org?.timezone || 'Africa/Lagos',
         officeOpenTime: emp.office?.openTime || '08:00',
         officeCloseTime: emp.office?.closeTime || '17:00',
+        weeklySchedule: emp.office?.weeklySchedule || null,
       });
 
       const payslip = await prisma.payslipRecord.upsert({
@@ -799,6 +814,7 @@ class PayrollService {
                 select: {
                   openTime: true,
                   closeTime: true,
+                  weeklySchedule: true,
                   timezone: true,
                 },
               },
@@ -877,13 +893,13 @@ class PayrollService {
           categoryColor = '#991b1b';
           badgeBg = '#fef2f2';
           desc = clockInStr ? `Exceeded late threshold (Arrival: ${clockInStr})` : 'Exceeded late threshold';
-          subDetail = officeOpenTime ? `Expected opening: ${officeOpenTime}` : '';
+          subDetail = (officeOpenTime && officeOpenTime !== '00:00') ? `Expected opening: ${this.formatTimeFromHhmm(officeOpenTime)}` : '';
         } else if (a.status === 'LATE') {
           category = 'LATE ARRIVAL';
           categoryColor = '#b91c1c';
           badgeBg = '#fef2f2';
           desc = clockInStr ? `Late arrival at ${clockInStr}` : 'Late check-in';
-          subDetail = officeOpenTime ? `Shift begins: ${officeOpenTime}` : '';
+          subDetail = (officeOpenTime && officeOpenTime !== '00:00') ? `Shift begins: ${this.formatTimeFromHhmm(officeOpenTime)}` : '';
         } else if (a.status === 'ABSENT') {
           category = 'ABSENCE';
           categoryColor = '#c2410c';
@@ -924,6 +940,21 @@ class PayrollService {
         const clockOutStr = a.clockOutTime ? this.formatTime(a.clockOutTime, tz) : '';
         const dateFormatted = this.formatDate(a.date, tz);
         const rate = a.overtimeDetails?.feePerOvertimeHour;
+        let closeFormatted = '';
+        if (a.overtimeDetails?.scheduledClose) {
+          closeFormatted = this.formatTime(a.overtimeDetails.scheduledClose, tz);
+        } else {
+          const off = a.session?.office || payslip.employee?.office;
+          const dayHours = officeHoursFor(a.date || a.clockInTime, off);
+          if (dayHours?.closeTime && dayHours.closeTime !== '00:00') {
+            closeFormatted = this.formatTimeFromHhmm(dayHours.closeTime);
+          } else if (officeCloseTime && officeCloseTime !== '00:00') {
+            closeFormatted = this.formatTimeFromHhmm(officeCloseTime);
+          }
+        }
+        const closedPart = closeFormatted ? `Closed ${closeFormatted}` : '';
+        const ratePart = rate ? `Rate: ${this.formatMoney(rate, payslip.currency || 'NGN')}/hr` : '';
+        const subDetail = [ratePart, closedPart].filter(Boolean).join(' · ');
 
         itemizedRecords.push({
           id: `overstay-${a.id}`,
@@ -940,9 +971,7 @@ class PayrollService {
           description: clockOutStr
             ? `Workday overstay until ${clockOutStr} (${otMinutes} min past close)`
             : `Workday overstay: ${Math.round((otMinutes / 60) * 10) / 10}h (${otMinutes} min)`,
-          subDetail: rate
-            ? `Rate: ${this.formatMoney(rate, payslip.currency || 'NGN')}/hr · Closed ${officeCloseTime}`
-            : `Office closed at ${officeCloseTime}`,
+          subDetail,
           rawTimestamp: a.clockOutTime || a.date,
         });
       }

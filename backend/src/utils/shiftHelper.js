@@ -1,4 +1,4 @@
-const { atZonedTime, safeTimeZone, zonedParts, dateKey, dateOnly } = require('./attendanceClock');
+const { atZonedTime, safeTimeZone, zonedParts, dateKey, dateOnly, weekdayKey, officeHoursFor } = require('./attendanceClock');
 
 const DEFAULT_SHIFT_SCHEDULES = {
   FULL_TIME: {
@@ -69,13 +69,32 @@ function isShiftOvernight(shiftConfig) {
 
 /**
  * Resolves the active shift schedule for an employee, taking into account
- * office-level or org-level overrides and falling back to default standards.
+ * office-level weekly schedules for the specific weekday, custom shift overrides,
+ * and falling back to default standards.
  */
-function resolveShiftSchedule(officeOrOrg = {}, shiftType = 'FULL_TIME') {
+function resolveShiftSchedule(officeOrOrg = {}, shiftType = 'FULL_TIME', referenceDate = null, timezone = null) {
+  const office = officeOrOrg?.office || officeOrOrg || {};
+  const org = officeOrOrg?.organization || officeOrOrg || {};
+  const tz = safeTimeZone(timezone || office?.timezone || org?.timezone || 'Africa/Lagos');
   const normalizedKey = (shiftType || 'FULL_TIME').toUpperCase();
-  const orgSchedules = officeOrOrg?.shiftSchedules ||
-    officeOrOrg?.organization?.shiftSchedules ||
-    officeOrOrg?.office?.shiftSchedules;
+
+  const refDate = referenceDate
+    ? (referenceDate instanceof Date ? referenceDate : new Date(referenceDate))
+    : new Date();
+
+  // Resolve weekday-specific schedule from office weeklySchedule
+  const weeklySchedule = office.weeklySchedule || org.weeklySchedule || officeOrOrg.weeklySchedule;
+  let daySchedule = null;
+  if (refDate && !Number.isNaN(refDate.getTime()) && weeklySchedule) {
+    const hours = officeHoursFor(refDate, { weeklySchedule, timezone: tz });
+    if (hours && hours.closeTime) {
+      daySchedule = hours;
+    }
+  }
+
+  const orgSchedules = office.shiftSchedules ||
+    org.shiftSchedules ||
+    officeOrOrg.shiftSchedules;
 
   let configured = null;
   if (orgSchedules && typeof orgSchedules === 'object') {
@@ -83,24 +102,58 @@ function resolveShiftSchedule(officeOrOrg = {}, shiftType = 'FULL_TIME') {
   }
 
   const fallback = DEFAULT_SHIFT_SCHEDULES[normalizedKey] || DEFAULT_SHIFT_SCHEDULES.FULL_TIME;
-  if (!configured) {
-    return { ...fallback };
+
+  // Determine openTime and closeTime
+  let openTime = fallback.openTime;
+  let closeTime = fallback.closeTime;
+
+  if (normalizedKey === 'FULL_TIME' || normalizedKey === 'FLEXIBLE') {
+    // Full-time and flexible workers strictly follow the office's weekly schedule for this day
+    if (daySchedule && daySchedule.closeTime) {
+      openTime = daySchedule.openTime || office.openTime || fallback.openTime;
+      closeTime = daySchedule.closeTime;
+    } else if (configured && (configured.closeTime || configured.close)) {
+      openTime = configured.openTime || configured.open || fallback.openTime;
+      closeTime = configured.closeTime || configured.close || fallback.closeTime;
+    } else if (office.closeTime && office.closeTime !== '00:00') {
+      openTime = office.openTime && office.openTime !== '00:00' ? office.openTime : fallback.openTime;
+      closeTime = office.closeTime;
+    }
+  } else {
+    // Specialized shifts (MORNING, AFTERNOON, EVENING, NIGHT)
+    if (configured && (configured.closeTime || configured.close)) {
+      openTime = configured.openTime || configured.open || fallback.openTime;
+      closeTime = configured.closeTime || configured.close || fallback.closeTime;
+    } else {
+      openTime = fallback.openTime;
+      closeTime = fallback.closeTime;
+    }
   }
 
-  const openTime = configured.openTime || configured.open || fallback.openTime;
-  const closeTime = configured.closeTime || configured.close || fallback.closeTime;
-  const isOvernight = configured.isOvernight !== undefined
+  const isOvernight = (configured?.isOvernight !== undefined)
     ? Boolean(configured.isOvernight)
     : isShiftOvernight({ openTime, closeTime });
 
+  const cutoffTime = office.dayShiftCutoffTime ||
+    org.autoCheckoutPolicy?.dayShiftCutoffTime ||
+    configured?.cutoffTime ||
+    fallback.cutoffTime ||
+    '00:00';
+
+  const maxHours = Number(office.nightShiftMaxHours) ||
+    Number(org.autoCheckoutPolicy?.nightShiftMaxHours) ||
+    Number(configured?.maxHours) ||
+    fallback.maxHours ||
+    14;
+
   return {
     key: normalizedKey,
-    name: configured.name || fallback.name,
+    name: configured?.name || fallback.name,
     openTime,
     closeTime,
     isOvernight,
-    cutoffTime: configured.cutoffTime || fallback.cutoffTime || '00:00',
-    maxHours: Number(configured.maxHours) || fallback.maxHours || 14,
+    cutoffTime,
+    maxHours,
   };
 }
 
@@ -110,12 +163,23 @@ function resolveShiftSchedule(officeOrOrg = {}, shiftType = 'FULL_TIME') {
  */
 function getShiftClosingInstant(record, shiftSchedule, timezone = 'Africa/Lagos') {
   const tz = safeTimeZone(timezone);
-  const referenceTime = record.clockInTime || record.session?.startTime || new Date();
-  const closeTime = shiftSchedule.closeTime || '17:00';
-  const openTime = shiftSchedule.openTime || '08:00';
+  const referenceTime = record.clockInTime || record.session?.startTime || record.date || new Date();
+  let closeTime = shiftSchedule?.closeTime || '17:00';
+  let openTime = shiftSchedule?.openTime || '08:00';
+
+  // Double-safeguard: if record or session has office weeklySchedule and shift is FULL_TIME,
+  // resolve closing time for the specific weekday to ensure exact match with office schedule
+  const office = record?.session?.office || record?.employee?.office || record?.office;
+  if (office && (!shiftSchedule?.key || shiftSchedule?.key === 'FULL_TIME')) {
+    const hours = officeHoursFor(referenceTime, office);
+    if (hours?.closeTime) {
+      closeTime = hours.closeTime;
+      if (hours.openTime) openTime = hours.openTime;
+    }
+  }
 
   let closeAt = atZonedTime(referenceTime, closeTime, tz);
-  const isOvernight = shiftSchedule.isOvernight || isShiftOvernight({ openTime, closeTime });
+  const isOvernight = shiftSchedule?.isOvernight || isShiftOvernight({ openTime, closeTime });
 
   if (isOvernight) {
     const [openH, openM] = openTime.split(':').map(Number);
@@ -161,7 +225,7 @@ function evaluateAutoCheckout(record, now = new Date(), timezone = 'Africa/Lagos
 
   const office = record.session?.office || {};
   const org = record.employee?.organization || office.organization || {};
-  const shiftSchedule = resolveShiftSchedule({ ...org, ...office }, shiftType);
+  const shiftSchedule = resolveShiftSchedule({ ...org, ...office }, shiftType, clockInTime, tz);
 
   const localNow = zonedParts(now, tz);
   const localClockIn = zonedParts(clockInTime, tz);
