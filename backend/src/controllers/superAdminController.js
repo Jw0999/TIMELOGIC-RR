@@ -7,6 +7,8 @@ const { redis, PREFIXES } = require('../config/redis');
 const EmployeePolicy = require('../services/EmployeePolicyService');
 const PlanPolicy = require('../services/PlanPolicyService');
 const AuditService = require('../services/AuditService');
+const WorkEventService = require('../services/WorkEventService');
+const { getCurrentServerTime } = require('../utils/networkTime');
 const { generate8DigitCode, getOrgSubscriptionStatus } = require('../utils/subscription');
 
 const defaultWeeklySchedule = (openTime = '08:00', closeTime = '17:00') => ({
@@ -876,7 +878,7 @@ const reemployEmployee = async (req, res, next) => {
     const { userId } = req.params;
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, status: true, firstName: true, lastName: true, email: true, orgId: true },
+      select: { id: true, status: true, firstName: true, lastName: true, email: true, orgId: true, updatedAt: true },
     });
     if (!user) return res.status(404).json({ success: false, message: 'Employee not found.' });
     if (user.status !== 'TERMINATED') {
@@ -888,6 +890,8 @@ const reemployEmployee = async (req, res, next) => {
       where: { id: userId },
       data: { status: 'ACTIVE' },
     });
+
+    const now = await getCurrentServerTime();
 
     logger.info(`Super Admin re-employed ${user.firstName} ${user.lastName} (${user.email})`);
 
@@ -902,6 +906,35 @@ const reemployEmployee = async (req, res, next) => {
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
     });
+
+    await WorkEventService.record({
+      orgId: user.orgId,
+      employeeId: userId,
+      actorId: req.user?.id,
+      type: 'REEMPLOYED',
+      occurredAt: now,
+      source: 'SUPER_ADMIN',
+      status: 'FINALIZED',
+      dedupeKey: `reemployed:${userId}:${now.getTime()}`,
+      metadata: { reemployedBy: req.user?.id },
+    }).catch(() => {});
+
+    // Delete any unclocked ABSENT records created for past dates while the employee was terminated
+    const prevTerm = await prisma.auditLog.findFirst({
+      where: { targetId: userId, action: 'EMPLOYEE_TERMINATED' },
+      orderBy: { createdAt: 'desc' },
+    });
+    const termCutoff = prevTerm?.createdAt || user.updatedAt;
+    if (termCutoff) {
+      await prisma.attendanceRecord.deleteMany({
+        where: {
+          employeeId: userId,
+          clockInTime: null,
+          status: 'ABSENT',
+          createdAt: { gte: termCutoff },
+        },
+      });
+    }
 
     res.json({
       success: true,

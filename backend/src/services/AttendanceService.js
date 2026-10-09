@@ -1288,6 +1288,33 @@ class AttendanceService {
     if (leave) throw Object.assign(new Error(`You are on approved ${leave.leaveType} leave and cannot check in until ${leave.endDate.toISOString().slice(0, 10)}.`), { status: 403, code: 'ON_LEAVE' });
   }
 
+  isEmployeeActiveOnDate(emp, targetDate, events = []) {
+    const empCreatedDate = new Date(emp.createdAt || 0);
+    if (targetDate < empCreatedDate) return false;
+    if (!events || events.length === 0) return emp.status !== 'TERMINATED';
+
+    const targetEnd = new Date(targetDate.getTime() + 24 * 60 * 60 * 1000 - 1);
+    const sorted = [...events].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+    let currentStatus = 'ACTIVE';
+    for (const ev of sorted) {
+      const evTime = new Date(ev.timestamp);
+      if (evTime <= targetEnd) {
+        if (ev.type === 'TERMINATED' || ev.type === 'EMPLOYEE_TERMINATED') {
+          currentStatus = 'TERMINATED';
+        } else if (ev.type === 'REEMPLOYED' || ev.type === 'EMPLOYEE_REEMPLOYED') {
+          currentStatus = 'ACTIVE';
+        }
+      } else {
+        if ((ev.type === 'REEMPLOYED' || ev.type === 'EMPLOYEE_REEMPLOYED') && currentStatus === 'ACTIVE') {
+          currentStatus = 'TERMINATED';
+        }
+        break;
+      }
+    }
+    return currentStatus === 'ACTIVE';
+  }
+
   async syncEmployeeAbsencesForSession(sessionId) {
     const session = await prisma.attendanceSession.findUnique({
       where: { id: sessionId },
@@ -1320,13 +1347,43 @@ class AttendanceService {
         role: 'EMPLOYEE',
         status: 'ACTIVE',
       },
-      select: { id: true, createdAt: true, shiftType: true },
+      select: { id: true, createdAt: true, shiftType: true, status: true },
     });
+    if (employees.length === 0) return;
+
+    const empIds = employees.map((e) => e.id);
+    const [auditEvents, workEvents] = await Promise.all([
+      prisma.auditLog.findMany({
+        where: {
+          targetId: { in: empIds },
+          action: { in: ['EMPLOYEE_TERMINATED', 'EMPLOYEE_REEMPLOYED'] },
+        },
+        orderBy: { createdAt: 'asc' },
+        select: { targetId: true, action: true, createdAt: true },
+      }),
+      prisma.workEvent.findMany({
+        where: {
+          employeeId: { in: empIds },
+          type: { in: ['TERMINATED', 'REEMPLOYED'] },
+        },
+        orderBy: { occurredAt: 'asc' },
+        select: { employeeId: true, type: true, occurredAt: true },
+      }),
+    ]);
+
+    const empLifecycleEvents = new Map();
+    for (const id of empIds) empLifecycleEvents.set(id, []);
+    for (const ev of auditEvents) empLifecycleEvents.get(ev.targetId)?.push({ type: ev.action, timestamp: ev.createdAt });
+    for (const ev of workEvents) empLifecycleEvents.get(ev.employeeId)?.push({ type: ev.type, timestamp: ev.occurredAt });
 
     const nowServer = await getCurrentServerTime();
     for (const employee of employees) {
       const empCreatedDate = dateOnly(employee.createdAt || new Date(), tz);
       if (date < empCreatedDate) continue;
+
+      if (!this.isEmployeeActiveOnDate(employee, date, empLifecycleEvents.get(employee.id) || [])) {
+        continue;
+      }
 
       // Shift check: an evening worker should not be marked absent during morning hours
       if (employee.shiftType === 'EVENING') {
@@ -1403,9 +1460,34 @@ class AttendanceService {
           role: 'EMPLOYEE',
           status: 'ACTIVE',
         },
-        select: { id: true, firstName: true, lastName: true, createdAt: true, shiftType: true },
+        select: { id: true, firstName: true, lastName: true, createdAt: true, shiftType: true, status: true },
       });
       if (activeEmployees.length === 0) continue;
+
+      const empIds = activeEmployees.map((e) => e.id);
+      const [auditEvents, workEvents] = await Promise.all([
+        prisma.auditLog.findMany({
+          where: {
+            targetId: { in: empIds },
+            action: { in: ['EMPLOYEE_TERMINATED', 'EMPLOYEE_REEMPLOYED'] },
+          },
+          orderBy: { createdAt: 'asc' },
+          select: { targetId: true, action: true, createdAt: true },
+        }),
+        prisma.workEvent.findMany({
+          where: {
+            employeeId: { in: empIds },
+            type: { in: ['TERMINATED', 'REEMPLOYED'] },
+          },
+          orderBy: { occurredAt: 'asc' },
+          select: { employeeId: true, type: true, occurredAt: true },
+        }),
+      ]);
+
+      const empLifecycleEvents = new Map();
+      for (const id of empIds) empLifecycleEvents.set(id, []);
+      for (const ev of auditEvents) empLifecycleEvents.get(ev.targetId)?.push({ type: ev.action, timestamp: ev.createdAt });
+      for (const ev of workEvents) empLifecycleEvents.get(ev.employeeId)?.push({ type: ev.type, timestamp: ev.occurredAt });
 
       let startDate;
       let endDate;
@@ -1421,10 +1503,24 @@ class AttendanceService {
         endDate = todayDate;
       }
 
+      // Never reconcile dates before organization or office creation
+      const orgCreatedDate = dateOnly(org.createdAt, tz);
+      const officeCreatedDate = dateOnly(office.createdAt, tz);
+      const earliestValidDate = orgCreatedDate > officeCreatedDate ? orgCreatedDate : officeCreatedDate;
+      if (startDate < earliestValidDate) {
+        startDate = new Date(earliestValidDate.getTime());
+      }
+      if (startDate > endDate) continue;
+
       const curr = new Date(startDate.getTime());
       while (curr <= endDate) {
         const targetDate = dateOnly(curr, tz);
         const targetKey = dateKey(curr, tz);
+
+        if (targetDate < earliestValidDate) {
+          curr.setUTCDate(curr.getUTCDate() + 1);
+          continue;
+        }
 
         const hours = officeHoursFor(curr, {
           ...office,
@@ -1455,21 +1551,13 @@ class AttendanceService {
               orderBy: { startTime: 'desc' },
             });
 
+            // NEVER fabricate attendance sessions for past days!
             if (!session) {
-              session = await prisma.attendanceSession.create({
-                data: {
-                  id: uuidv4(),
-                  sessionName: `${office.name} – ${targetKey}`,
-                  officeId: office.id,
-                  officeName: office.name,
-                  orgName: org.name,
-                  startTime: openAt,
-                  endTime: closeAt,
-                  status: 'ENDED',
-                  createdBy: admin?.id ?? null,
-                },
-              });
-            } else if (session.status === 'ACTIVE' || session.status === 'PAUSED') {
+              curr.setUTCDate(curr.getUTCDate() + 1);
+              continue;
+            }
+
+            if (session.status === 'ACTIVE' || session.status === 'PAUSED') {
               if (targetKey !== todayKey || now >= closeAt) {
                 await prisma.attendanceSession.update({
                   where: { id: session.id },
@@ -1481,6 +1569,12 @@ class AttendanceService {
             for (const emp of activeEmployees) {
               const empCreatedDate = dateOnly(emp.createdAt || new Date(), tz);
               if (targetDate < empCreatedDate) continue;
+
+              // Check if employee was active on targetDate (not terminated)
+              const events = empLifecycleEvents.get(emp.id) || [];
+              if (!this.isEmployeeActiveOnDate(emp, targetDate, events)) {
+                continue;
+              }
 
               // Shift check for today: an evening worker should not be marked absent during morning hours
               if (targetKey === todayKey && emp.shiftType === 'EVENING') {

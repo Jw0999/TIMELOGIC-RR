@@ -369,7 +369,7 @@ const getLiveAttendance = async (req, res, next) => {
     const today = new Date(`${dateKey(now, organization?.timezone || 'Africa/Lagos')}T00:00:00.000Z`);
     const records = await prisma.attendanceRecord.findMany({
       where: {
-        employee: { orgId: targetOrgId },
+        employee: { orgId: targetOrgId, status: { not: 'TERMINATED' } },
         OR: [
           { date: today },
           { session: { status: 'ACTIVE', office: { orgId: targetOrgId } } },

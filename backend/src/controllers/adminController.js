@@ -14,6 +14,8 @@ const fs = require('fs');
 const path = require('path');
 const env = require('../config/env');
 const logger = require('../config/logger');
+const { dateOnly } = require('../utils/attendanceClock');
+const { getCurrentServerTime } = require('../utils/networkTime');
 
 // ── Organization / Office / Department ────────────────────────────────────────
 
@@ -538,7 +540,18 @@ const getStationPasswordStatus = async (req, res, next) => {
 const deleteEmployee = async (req, res, next) => {
   try {
     const { userId } = req.params;
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { orgId: true, role: true, status: true } });
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        orgId: true,
+        role: true,
+        status: true,
+        office: { select: { timezone: true } },
+        organization: { select: { timezone: true } },
+      },
+    });
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
     if (user.role !== 'EMPLOYEE') return res.status(403).json({ success: false, message: 'Only employee accounts can be terminated here.' });
     if (user.orgId !== req.user.orgId) return res.status(403).json({ success: false, message: 'Access denied' });
@@ -552,6 +565,46 @@ const deleteEmployee = async (req, res, next) => {
 
     // Revoke all refresh tokens so the employee is immediately signed out
     await prisma.refreshToken.deleteMany({ where: { userId } });
+
+    const tz = user.office?.timezone || user.organization?.timezone || 'Africa/Lagos';
+    const now = await getCurrentServerTime();
+    const todayDate = dateOnly(now, tz);
+
+    // Clean up any unclocked records (absent or unrecorded) for today or future dates
+    // so terminated employee is never shown as absent today!
+    await prisma.attendanceRecord.deleteMany({
+      where: {
+        employeeId: userId,
+        clockInTime: null,
+        date: { gte: todayDate },
+      },
+    });
+
+    // Write audit log
+    await AuditService.log({
+      actorId: req.user?.id,
+      actorEmail: req.user?.email,
+      actorRole: req.user?.role,
+      action: 'EMPLOYEE_TERMINATED',
+      targetId: user.id,
+      targetType: 'USER',
+      details: { employeeEmail: user.email, orgId: user.orgId },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    // Write work event
+    await WorkEventService.record({
+      orgId: user.orgId,
+      employeeId: userId,
+      actorId: req.user?.id,
+      type: 'TERMINATED',
+      occurredAt: now,
+      source: 'ADMIN',
+      status: 'FINALIZED',
+      dedupeKey: `termination:${userId}:${now.getTime()}`,
+      metadata: { terminatedBy: req.user?.id, actorRole: req.user?.role },
+    }).catch(() => {});
 
     res.json({
       success: true,
