@@ -54,6 +54,46 @@ class PayrollService {
   }
 
   /**
+   * Format clock/record time cleanly according to organization/office timezone
+   * e.g. "09:42 AM"
+   */
+  formatTime(date, timeZone = 'Africa/Lagos') {
+    if (!date) return '';
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return '';
+    try {
+      return new Intl.DateTimeFormat('en-US', {
+        timeZone: timeZone || 'Africa/Lagos',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      }).format(d);
+    } catch {
+      return '';
+    }
+  }
+
+  /**
+   * Format date cleanly according to organization/office timezone
+   * e.g. "05 Oct 2026"
+   */
+  formatDate(date, timeZone = 'Africa/Lagos') {
+    if (!date) return '';
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return '';
+    try {
+      return new Intl.DateTimeFormat('en-GB', {
+        timeZone: timeZone || 'Africa/Lagos',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      }).format(d);
+    } catch {
+      return d.toISOString().split('T')[0];
+    }
+  }
+
+  /**
    * Get start and end date boundaries for a given year, month, and organization salaryPayoutDay.
    * If payday is D (e.g. 3rd):
    * - Pay cycle ends on target year/month on day D (or last day of month if D > daysInMonth) at 23:59:59.999 UTC.
@@ -154,7 +194,7 @@ class PayrollService {
           accountNumber: true,
           accountName: true,
           department: { select: { id: true, name: true } },
-          office: { select: { id: true, name: true } },
+          office: { select: { id: true, name: true, openTime: true, closeTime: true, timezone: true } },
         },
         orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
       }),
@@ -175,6 +215,7 @@ class PayrollService {
           overtimeRuleVersion: true,
           overtimeDetails: true,
           clockInTime: true,
+          clockOutTime: true,
         },
       }),
       prisma.manualPenalty.findMany({
@@ -201,6 +242,9 @@ class PayrollService {
           penalty: true,
           breakType: true,
           startTime: true,
+          endTime: true,
+          durationMinutes: true,
+          notes: true,
         },
       }),
       prisma.payslipRecord.findMany({
@@ -248,6 +292,9 @@ class PayrollService {
         attendanceRecords: userAtt,
         breakRecords: userBr,
         manualPenalties: userMp,
+        timezone: emp.office?.timezone || org?.timezone || 'Africa/Lagos',
+        officeOpenTime: emp.office?.openTime || '08:00',
+        officeCloseTime: emp.office?.closeTime || '17:00',
       });
       const isCurrentCycle = now >= startDate && now <= endDate;
       // Only lock calculation snapshot if payslip is for a closed past cycle AND has been finalized/paid
@@ -518,6 +565,13 @@ class PayrollService {
           employeeCode: true,
           baseSalary: true,
           salaryCurrency: true,
+          office: {
+            select: {
+              openTime: true,
+              closeTime: true,
+              timezone: true,
+            },
+          },
         },
       }),
       prisma.attendanceRecord.findMany({
@@ -589,6 +643,9 @@ class PayrollService {
         attendanceRecords: userAtt,
         breakRecords: userBr,
         manualPenalties: userMp,
+        timezone: emp.office?.timezone || org?.timezone || 'Africa/Lagos',
+        officeOpenTime: emp.office?.openTime || '08:00',
+        officeCloseTime: emp.office?.closeTime || '17:00',
       });
 
       const payslip = await prisma.payslipRecord.upsert({
@@ -728,10 +785,25 @@ class PayrollService {
           penalty: true,
           totalWorkHours: true,
           clockInTime: true,
+          clockOutTime: true,
           overtimeEarnings: true,
           overtimeMinutes: true,
           overtimeRuleVersion: true,
           overtimeDetails: true,
+          session: {
+            select: {
+              sessionName: true,
+              startTime: true,
+              endTime: true,
+              office: {
+                select: {
+                  openTime: true,
+                  closeTime: true,
+                  timezone: true,
+                },
+              },
+            },
+          },
         },
         orderBy: { date: 'asc' },
       }),
@@ -745,6 +817,9 @@ class PayrollService {
           penalty: true,
           breakType: true,
           startTime: true,
+          endTime: true,
+          durationMinutes: true,
+          notes: true,
         },
         orderBy: { startTime: 'asc' },
       }),
@@ -763,12 +838,16 @@ class PayrollService {
       }),
     ]);
 
+    const tz = payslip.employee?.office?.timezone || payslip.organization?.timezone || 'Africa/Lagos';
+    const officeOpenTime = payslip.employee?.office?.openTime || '08:00';
+    const officeCloseTime = payslip.employee?.office?.closeTime || '17:00';
+
     let displayPresentDays = 0;
     let displayLateDays = 0;
     let displayWorkHours = 0;
     let attendancePenalties = 0;
     let totalOvertimeEarnings = 0;
-    let itemizedDeductions = [];
+    let itemizedRecords = [];
 
     for (const a of atts) {
       const hasCheckedIn = Boolean(a.clockInTime) || ['PRESENT', 'LATE', 'COMPLETELY_LATE', 'HALF_DAY', 'REVIEW_REQUIRED'].includes(a.status);
@@ -782,14 +861,89 @@ class PayrollService {
       totalOvertimeEarnings += Number(a.overtimeEarnings || 0);
 
       const pen = Number(a.penalty || 0);
-      if (pen > 0) {
-        attendancePenalties += pen;
-        itemizedDeductions.push({
-          date: a.date.toISOString().split('T')[0],
+      const isLateStatus = a.status === 'LATE' || a.status === 'COMPLETELY_LATE';
+      if (pen > 0 || isLateStatus) {
+        if (pen > 0) attendancePenalties += pen;
+        const clockInStr = a.clockInTime ? this.formatTime(a.clockInTime, tz) : '';
+        const dateFormatted = this.formatDate(a.date, tz);
+        let category = 'LATE ARRIVAL';
+        let categoryColor = '#b91c1c';
+        let badgeBg = '#fef2f2';
+        let desc = '';
+        let subDetail = '';
+
+        if (a.status === 'COMPLETELY_LATE') {
+          category = 'COMPLETELY LATE';
+          categoryColor = '#991b1b';
+          badgeBg = '#fef2f2';
+          desc = clockInStr ? `Exceeded late threshold (Arrival: ${clockInStr})` : 'Exceeded late threshold';
+          subDetail = officeOpenTime ? `Expected opening: ${officeOpenTime}` : '';
+        } else if (a.status === 'LATE') {
+          category = 'LATE ARRIVAL';
+          categoryColor = '#b91c1c';
+          badgeBg = '#fef2f2';
+          desc = clockInStr ? `Late arrival at ${clockInStr}` : 'Late check-in';
+          subDetail = officeOpenTime ? `Shift begins: ${officeOpenTime}` : '';
+        } else if (a.status === 'ABSENT') {
+          category = 'ABSENCE';
+          categoryColor = '#c2410c';
+          badgeBg = '#fff7ed';
+          desc = 'Full-day absence recorded';
+          subDetail = 'Unexcused non-attendance';
+        } else {
+          category = 'ATTENDANCE';
+          categoryColor = '#475569';
+          badgeBg = '#f1f5f9';
+          desc = clockInStr ? `Attendance deduction (Arrival: ${clockInStr})` : 'Attendance deduction';
+          subDetail = `Status: ${a.status}`;
+        }
+
+        itemizedRecords.push({
+          id: `att-${a.id}`,
           type: 'ATTENDANCE_PENALTY',
+          categoryType: 'DEDUCTION',
+          category,
+          categoryColor,
+          badgeBg,
+          date: a.date.toISOString().split('T')[0],
+          dateStr: dateFormatted,
+          time: clockInStr,
+          timeStr: clockInStr || '—',
           status: a.status,
           amount: pen,
-          reason: a.status === 'COMPLETELY_LATE' ? 'Exceeded late threshold' : 'Late check-in',
+          description: desc,
+          subDetail,
+          rawTimestamp: a.clockInTime || a.date,
+        });
+      }
+
+      // Workday Overstay / Overtime additions
+      const otEarnings = Number(a.overtimeEarnings || 0);
+      const otMinutes = Number(a.overtimeMinutes || 0);
+      if (otEarnings > 0 || otMinutes > 0) {
+        const clockOutStr = a.clockOutTime ? this.formatTime(a.clockOutTime, tz) : '';
+        const dateFormatted = this.formatDate(a.date, tz);
+        const rate = a.overtimeDetails?.feePerOvertimeHour;
+
+        itemizedRecords.push({
+          id: `overstay-${a.id}`,
+          type: 'WORK_OVERSTAY',
+          categoryType: 'EARNING',
+          category: 'WORK OVERSTAY',
+          categoryColor: '#059669',
+          badgeBg: '#f0fdf4',
+          date: a.date.toISOString().split('T')[0],
+          dateStr: dateFormatted,
+          time: clockOutStr,
+          timeStr: clockOutStr ? `Departure: ${clockOutStr}` : `${otMinutes} min`,
+          amount: otEarnings,
+          description: clockOutStr
+            ? `Workday overstay until ${clockOutStr} (${otMinutes} min past close)`
+            : `Workday overstay: ${Math.round((otMinutes / 60) * 10) / 10}h (${otMinutes} min)`,
+          subDetail: rate
+            ? `Rate: ${this.formatMoney(rate, payslip.currency || 'NGN')}/hr · Closed ${officeCloseTime}`
+            : `Office closed at ${officeCloseTime}`,
+          rawTimestamp: a.clockOutTime || a.date,
         });
       }
     }
@@ -797,13 +951,29 @@ class PayrollService {
     let breakPenalties = 0;
     for (const b of breaks) {
       const pen = Number(b.penalty || 0);
-      if (pen > 0) {
-        breakPenalties += pen;
-        itemizedDeductions.push({
-          date: b.startTime.toISOString().split('T')[0],
+      if (pen > 0 || (b.durationMinutes && b.durationMinutes > 60)) {
+        if (pen > 0) breakPenalties += pen;
+        const startStr = b.startTime ? this.formatTime(b.startTime, tz) : '';
+        const endStr = b.endTime ? this.formatTime(b.endTime, tz) : (b.isAutoEnded ? 'Auto-ended' : '');
+        const timeRange = (startStr && endStr) ? `${startStr} – ${endStr}` : startStr;
+        const dateFormatted = this.formatDate(b.startTime, tz);
+        const durationStr = b.durationMinutes ? `${b.durationMinutes} mins` : '';
+
+        itemizedRecords.push({
+          id: `break-${b.id}`,
           type: 'BREAK_PENALTY',
+          categoryType: 'DEDUCTION',
+          category: 'BREAK OVERSTAY',
+          categoryColor: '#ea580c',
+          badgeBg: '#fff7ed',
+          date: b.startTime.toISOString().split('T')[0],
+          dateStr: dateFormatted,
+          time: timeRange,
+          timeStr: timeRange || '—',
           amount: pen,
-          reason: `Break overstay penalty (${b.breakType || 'Break'})`,
+          description: `Break overstay (${b.breakType || 'Break'}${durationStr ? ` · ${durationStr}` : ''})`,
+          subDetail: timeRange ? `Interval: ${timeRange}${b.notes ? ` · ${b.notes}` : ''}` : (b.notes || ''),
+          rawTimestamp: b.startTime,
         });
       }
     }
@@ -811,13 +981,28 @@ class PayrollService {
     let manualPenalties = 0;
     for (const m of manuals) {
       const amt = Number(m.amount || 0);
-      manualPenalties += amt;
-      itemizedDeductions.push({
-        date: m.createdAt.toISOString().split('T')[0],
-        type: 'MANUAL_PENALTY',
-        amount: amt,
-        reason: m.reason || 'HR Administrative penalty',
-      });
+      if (amt > 0) {
+        manualPenalties += amt;
+        const timeStr = m.createdAt ? this.formatTime(m.createdAt, tz) : '';
+        const dateFormatted = this.formatDate(m.createdAt, tz);
+
+        itemizedRecords.push({
+          id: `manual-${m.id}`,
+          type: 'MANUAL_PENALTY',
+          categoryType: 'DEDUCTION',
+          category: 'HR PENALTY',
+          categoryColor: '#7c3aed',
+          badgeBg: '#faf5ff',
+          date: m.createdAt.toISOString().split('T')[0],
+          dateStr: dateFormatted,
+          time: timeStr,
+          timeStr: timeStr || '—',
+          amount: amt,
+          description: m.reason || 'HR administrative disciplinary deduction',
+          subDetail: 'Administrative disciplinary penalty',
+          rawTimestamp: m.createdAt,
+        });
+      }
     }
 
     const now = new Date();
@@ -831,11 +1016,13 @@ class PayrollService {
       attendancePenalties = savedCalculation.summary.attendancePenalties ?? attendancePenalties;
       breakPenalties = savedCalculation.summary.breakPenalties ?? breakPenalties;
       manualPenalties = savedCalculation.summary.manualPenalties ?? manualPenalties;
-      itemizedDeductions = (savedCalculation.lineItems || []).filter((item) => item.category === 'DEDUCTION');
+      if (savedCalculation.lineItems && savedCalculation.lineItems.length > 0) {
+        itemizedRecords = savedCalculation.lineItems.filter((i) => i.type !== 'BASE_SALARY');
+      }
     }
 
-    // Sort all itemized penalties chronologically
-    itemizedDeductions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    // Sort all itemized audit records chronologically
+    itemizedRecords.sort((a, b) => new Date(a.rawTimestamp).getTime() - new Date(b.rawTimestamp).getTime());
 
     const baseSalary = Number(payslip.baseSalary || payslip.employee?.baseSalary || 0);
     const overtimeEarnings = Number(savedCalculation?.summary?.overtimeEarnings ?? totalOvertimeEarnings);
@@ -863,7 +1050,7 @@ class PayrollService {
             manualPenalties,
             totalDeductions,
             netSalary,
-            breakdownJson: itemizedDeductions,
+            breakdownJson: itemizedRecords,
           },
         });
       }
@@ -1145,14 +1332,15 @@ class PayrollService {
       currentY += evalH + 14;
 
       // ─────────────────────────────────────────────────────────────
-      // 6. ITEMIZED DEDUCTIONS AUDIT TRAIL
       // ─────────────────────────────────────────────────────────────
-      if (itemizedDeductions.length > 0) {
+      // 6. ITEMIZED ATTENDANCE, PENALTIES & OVERSTAY AUDIT TRAIL
+      // ─────────────────────────────────────────────────────────────
+      if (itemizedRecords.length > 0) {
         doc.fillColor('#0f172a').fontSize(8.5).font('Helvetica-Bold')
-          .text('ITEMIZED DEDUCTIONS & PENALTIES AUDIT TRAIL', 40, currentY);
+          .text('ITEMIZED ATTENDANCE, PENALTIES & OVERSTAY AUDIT TRAIL', 40, currentY);
         doc.fillColor('#64748b').fontSize(7.5).font('Helvetica')
-          .text('Official breakdown of individual attendance and disciplinary deductions applied for this cycle.', 40, currentY + 12);
-        currentY += 25;
+          .text('Official audit record of all late arrivals, break overstays, HR disciplinary deductions, and workday overstays for this pay cycle.', 40, currentY + 12);
+        currentY += 27;
 
         // Table Header
         const auditHeadH = 18;
@@ -1160,19 +1348,19 @@ class PayrollService {
         doc.rect(40, currentY, 515, auditHeadH).lineWidth(0.5).strokeColor('#cbd5e1').stroke();
 
         doc.fillColor('#475569').fontSize(7.5).font('Helvetica-Bold')
-          .text('DATE', 48, currentY + 5)
-          .text('CATEGORY', 125, currentY + 5)
-          .text('DESCRIPTION / REASON', 230, currentY + 5)
+          .text('DATE & TIME', 48, currentY + 5)
+          .text('CATEGORY', 160, currentY + 5)
+          .text('RECORD DETAILS & REASON', 255, currentY + 5)
           .text('AMOUNT', 465, currentY + 5, { width: 80, align: 'right' });
 
         currentY += auditHeadH;
 
-        for (let i = 0; i < itemizedDeductions.length; i++) {
-          const item = itemizedDeductions[i];
-          const rowHeight = 18;
+        for (let i = 0; i < itemizedRecords.length; i++) {
+          const item = itemizedRecords[i];
+          const rowHeight = 24;
 
           // Check if row exceeds page bounds
-          if (currentY + rowHeight > 675) {
+          if (currentY + rowHeight > 730) {
             doc.addPage();
             doc.fillColor('#0f172a').fontSize(11).font('Helvetica-Bold')
               .text(`${orgName}  •  PAYSLIP CONTINUATION`, 40, 42);
@@ -1184,9 +1372,9 @@ class PayrollService {
             doc.rect(40, currentY, 515, auditHeadH).fill('#f1f5f9');
             doc.rect(40, currentY, 515, auditHeadH).lineWidth(0.5).strokeColor('#cbd5e1').stroke();
             doc.fillColor('#475569').fontSize(7.5).font('Helvetica-Bold')
-              .text('DATE', 48, currentY + 5)
-              .text('CATEGORY', 125, currentY + 5)
-              .text('DESCRIPTION / REASON', 230, currentY + 5)
+              .text('DATE & TIME', 48, currentY + 5)
+              .text('CATEGORY', 160, currentY + 5)
+              .text('RECORD DETAILS & REASON', 255, currentY + 5)
               .text('AMOUNT', 465, currentY + 5, { width: 80, align: 'right' });
             currentY += auditHeadH;
           }
@@ -1195,51 +1383,51 @@ class PayrollService {
           doc.rect(40, currentY, 515, rowHeight).fill(isAlt ? '#fcfdfe' : '#ffffff');
           doc.rect(40, currentY, 515, rowHeight).lineWidth(0.5).strokeColor('#f1f5f9').stroke();
 
-          doc.fillColor('#64748b').fontSize(7.5).font('Helvetica')
-            .text(item.date, 48, currentY + 5);
+          // Date & Time (stacked vertically)
+          doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica-Bold')
+            .text(item.dateStr || item.date, 48, currentY + 4);
+          doc.fillColor('#64748b').fontSize(6.5).font('Helvetica')
+            .text(item.timeStr || item.time || '—', 48, currentY + 14);
 
-          const catName = item.type === 'ATTENDANCE_PENALTY' || item.type === 'ATTENDANCE_LATE' ? 'ATTENDANCE'
+          // Category Badge Text
+          const catLabel = item.categoryLabel || item.category || (
+            item.type === 'ATTENDANCE_PENALTY' || item.type === 'ATTENDANCE_LATE' ? 'LATE ARRIVAL'
             : item.type === 'BREAK_PENALTY' ? 'BREAK OVERSTAY'
-            : 'DISCIPLINARY';
+            : item.type === 'WORK_OVERSTAY' || item.type === 'OVERTIME' ? 'WORK OVERSTAY'
+            : 'HR PENALTY'
+          );
+          doc.fillColor(item.categoryColor || '#334155').fontSize(7.5).font('Helvetica-Bold')
+            .text(catLabel, 160, currentY + 4);
 
-          doc.fillColor('#334155').fontSize(7.5).font('Helvetica-Bold')
-            .text(catName, 125, currentY + 5);
-
+          // Details & Reason (stacked vertically)
           doc.fillColor('#334155').fontSize(7.5).font('Helvetica')
-            .text(`${item.description || item.reason || item.type}${item.sourceType ? ` · ${item.sourceType} ${String(item.sourceId || '').slice(0, 8)}` : ''}`, 230, currentY + 5, { width: 220, ellipsis: true });
+            .text(item.description || item.reason || item.type, 255, currentY + 4, { width: 205, ellipsis: true });
+          if (item.subDetail) {
+            doc.fillColor('#64748b').fontSize(6.5).font('Helvetica')
+              .text(item.subDetail, 255, currentY + 14, { width: 205, ellipsis: true });
+          }
 
-          doc.fillColor('#b91c1c').fontSize(7.5).font('Helvetica-Bold')
-            .text(`-${this.formatMoneyPdf(item.amount, currency)}`, 465, currentY + 5, { width: 80, align: 'right' });
+          // Amount
+          const isEarning = item.categoryType === 'EARNING' || item.category === 'EARNING' || item.type === 'WORK_OVERSTAY' || item.type === 'OVERTIME';
+          const amtColor = isEarning ? '#047857' : (item.amount > 0 ? '#b91c1c' : '#64748b');
+          const amtSign = isEarning ? '+' : (item.amount > 0 ? '-' : '');
+          const amtText = item.amount > 0 ? `${amtSign}${this.formatMoneyPdf(item.amount, currency)}` : '—';
+
+          doc.fillColor(amtColor).fontSize(7.5).font('Helvetica-Bold')
+            .text(amtText, 465, currentY + 8, { width: 80, align: 'right' });
 
           currentY += rowHeight;
         }
-        currentY += 12;
+        currentY += 14;
       } else {
         doc.fillColor('#0f172a').fontSize(8.5).font('Helvetica-Bold')
-          .text('ITEMIZED DEDUCTIONS & PENALTIES AUDIT TRAIL', 40, currentY);
+          .text('ITEMIZED ATTENDANCE, PENALTIES & OVERSTAY AUDIT TRAIL', 40, currentY);
         currentY += 14;
         doc.rect(40, currentY, 515, 24).fill('#f8fafc');
         doc.rect(40, currentY, 515, 24).lineWidth(0.5).strokeColor('#e2e8f0').stroke();
         doc.fillColor('#047857').fontSize(8).font('Helvetica-Bold')
-          .text('✓ No statutory deductions or disciplinary penalties incurred for this pay period.', 52, currentY + 7);
+          .text('✓ No attendance penalties or overstay records incurred for this pay period.', 52, currentY + 7);
         currentY += 34;
-      }
-
-      const overtimeItems = (savedCalculation?.lineItems || []).filter((item) => item.type === 'OVERTIME');
-      if (overtimeItems.length > 0 && currentY < 690) {
-        doc.fillColor('#0f172a').fontSize(8.5).font('Helvetica-Bold')
-          .text('OVERTIME CALCULATION SOURCES', 40, currentY);
-        currentY += 16;
-        for (const item of overtimeItems) {
-          const overtimeRule = item.calculation || {};
-          const source = `Attendance ${String(item.sourceId || '').slice(0, 8)} · ${item.ruleVersion || 'office-overtime-v1'}`;
-          const detail = `${item.date || ''} · ${item.minutes || 0} min after ${overtimeRule.startAfterCloseMinutes ?? 0} min delay · ${this.formatMoneyPdf(item.ratePerHour || 0, currency)}/hour`;
-          doc.fillColor('#334155').fontSize(7.5).font('Helvetica')
-            .text(detail, 48, currentY, { width: 350, ellipsis: true });
-          doc.fillColor('#64748b').fontSize(7).font('Helvetica')
-            .text(source, 405, currentY, { width: 140, align: 'right', ellipsis: true });
-          currentY += 14;
-        }
       }
 
       // ─────────────────────────────────────────────────────────────
@@ -1359,6 +1547,57 @@ class PayrollService {
 
     const subject = `Official Payslip: ${empName} - ${monthStr} (${periodLabel})`;
 
+    const rawBreakdown = Array.isArray(freshPayslip.breakdownJson) ? freshPayslip.breakdownJson : [];
+    const auditItems = rawBreakdown.filter((i) => i.type !== 'BASE_SALARY');
+    let auditTrailRowsHtml = '';
+
+    if (auditItems.length > 0) {
+      auditTrailRowsHtml = auditItems.map((item, idx) => {
+        const isAlt = idx % 2 === 1;
+        const isEarning = item.categoryType === 'EARNING' || item.category === 'EARNING' || item.type === 'WORK_OVERSTAY' || item.type === 'OVERTIME';
+        const amtColor = isEarning ? '#047857' : (item.amount > 0 ? '#b91c1c' : '#64748b');
+        const amtSign = isEarning ? '+' : (item.amount > 0 ? '-' : '');
+        const amtText = item.amount > 0 ? `${amtSign}${this.formatMoney(item.amount, currency)}` : '—';
+        const badgeBg = item.badgeBg || (isEarning ? '#f0fdf4' : '#fef2f2');
+        const badgeColor = item.categoryColor || (isEarning ? '#059669' : '#b91c1c');
+        const catLabel = item.categoryLabel || item.category || (
+          item.type === 'ATTENDANCE_PENALTY' || item.type === 'ATTENDANCE_LATE' ? 'LATE ARRIVAL'
+          : item.type === 'BREAK_PENALTY' ? 'BREAK OVERSTAY'
+          : isEarning ? 'WORK OVERSTAY'
+          : 'HR PENALTY'
+        );
+
+        return `
+          <tr style="border-bottom: 1px solid #f1f5f9; background-color: ${isAlt ? '#f8fafc' : '#ffffff'};">
+            <td style="padding: 10px 12px; vertical-align: top; white-space: nowrap;">
+              <div style="font-weight: 600; color: #0f172a; font-size: 12px;">${item.dateStr || item.date}</div>
+              <div style="font-size: 11px; color: #64748b; margin-top: 2px;">${item.timeStr || item.time || '—'}</div>
+            </td>
+            <td style="padding: 10px 12px; vertical-align: top;">
+              <span style="display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 10.5px; font-weight: 600; background-color: ${badgeBg}; color: ${badgeColor};">
+                ${catLabel}
+              </span>
+            </td>
+            <td style="padding: 10px 12px; vertical-align: top; color: #334155; font-size: 12px;">
+              <div style="font-weight: 500;">${item.description || item.reason || item.type}</div>
+              ${item.subDetail ? `<div style="font-size: 11px; color: #64748b; margin-top: 2px;">${item.subDetail}</div>` : ''}
+            </td>
+            <td style="padding: 10px 12px; vertical-align: top; text-align: right; font-weight: 700; white-space: nowrap; font-size: 12px; color: ${amtColor};">
+              ${amtText}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    } else {
+      auditTrailRowsHtml = `
+        <tr>
+          <td colspan="4" style="padding: 18px 12px; text-align: center; color: #047857; font-weight: 600; background-color: #f0fdf4; font-size: 12px;">
+            ✓ No attendance penalties or overstay records incurred for this pay period.
+          </td>
+        </tr>
+      `;
+    }
+
     const htmlBody = `
 <!DOCTYPE html>
 <html>
@@ -1437,6 +1676,26 @@ class PayrollService {
           <span class="row-label">Attendance & Conduct Grade:</span>
           <span class="row-val" style="color: #0f172a; font-weight: bold;">${employeeGrade}</span>
         </div>
+      </div>
+
+      <!-- ITEMIZED AUDIT TRAIL TABLE IN EMAIL -->
+      <div style="margin-top: 22px; margin-bottom: 22px;">
+        <div style="font-size: 12px; font-weight: bold; color: #0f172a; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 8px;">
+          📋 Itemized Attendance, Penalties & Overstay Records
+        </div>
+        <table style="width: 100%; border-collapse: collapse; background: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0; font-size: 12px;">
+          <thead>
+            <tr style="background-color: #f1f5f9; text-align: left; color: #475569; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+              <th style="padding: 9px 12px; border-bottom: 1px solid #cbd5e1;">Date & Time</th>
+              <th style="padding: 9px 12px; border-bottom: 1px solid #cbd5e1;">Category</th>
+              <th style="padding: 9px 12px; border-bottom: 1px solid #cbd5e1;">Details / Reason</th>
+              <th style="padding: 9px 12px; border-bottom: 1px solid #cbd5e1; text-align: right;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${auditTrailRowsHtml}
+          </tbody>
+        </table>
       </div>
 
       <div style="background-color: #f1f5f9; border-radius: 8px; padding: 14px 16px; margin: 18px 0; border: 1px solid #e2e8f0;">

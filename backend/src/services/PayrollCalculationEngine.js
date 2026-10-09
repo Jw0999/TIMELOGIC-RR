@@ -16,6 +16,38 @@ function workDate(value) {
   return value instanceof Date ? value.toISOString().slice(0, 10) : String(value).slice(0, 10);
 }
 
+function formatTime(date, timeZone = 'Africa/Lagos') {
+  if (!date) return '';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return '';
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: timeZone || 'Africa/Lagos',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }).format(d);
+  } catch {
+    return '';
+  }
+}
+
+function formatDate(date, timeZone = 'Africa/Lagos') {
+  if (!date) return '';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return '';
+  try {
+    return new Intl.DateTimeFormat('en-GB', {
+      timeZone: timeZone || 'Africa/Lagos',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }).format(d);
+  } catch {
+    return d.toISOString().split('T')[0];
+  }
+}
+
 function stableStringify(value) {
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
   if (value && typeof value === 'object') {
@@ -35,6 +67,9 @@ function calculatePayroll({
   attendanceRecords = [],
   breakRecords = [],
   manualPenalties = [],
+  timezone = 'Africa/Lagos',
+  officeOpenTime = '08:00',
+  officeCloseTime = '17:00',
 }) {
   const attendance = [...attendanceRecords].sort((left, right) => String(left.id).localeCompare(String(right.id)));
   const breaks = [...breakRecords].sort((left, right) => String(left.id).localeCompare(String(right.id)));
@@ -63,19 +98,36 @@ function calculatePayroll({
   for (const record of attendance) {
     const overtimeEarnings = money(record.overtimeEarnings);
     const overtimeMinutes = Math.max(0, Math.trunc(amount(record.overtimeMinutes)));
+    const clockOutStr = record.clockOutTime ? formatTime(record.clockOutTime, timezone) : '';
+    const dateFormatted = formatDate(record.date, timezone);
+    const dateKey = workDate(record.date);
+
     if (overtimeEarnings > 0 || overtimeMinutes > 0) {
+      const overstayDesc = clockOutStr
+        ? `Overstay until ${clockOutStr} (${overtimeMinutes} min after closing)`
+        : `${Math.round((overtimeMinutes / 60) * 10) / 10}h (${overtimeMinutes} min) overstay after closing`;
+
       earnings.push({
         id: `overtime:${record.id}`,
         type: 'OVERTIME',
         category: 'EARNING',
+        categoryLabel: 'WORK OVERSTAY',
         amount: overtimeEarnings,
         currency,
-        date: workDate(record.date),
+        date: dateKey,
+        dateFormatted,
+        time: clockOutStr,
+        timeStr: clockOutStr ? `Departure: ${clockOutStr}` : `${overtimeMinutes} min`,
         minutes: overtimeMinutes,
         ratePerHour: amount(record.overtimeDetails?.feePerOvertimeHour),
         ruleVersion: record.overtimeRuleVersion || 'office-overtime-v1',
         calculation: record.overtimeDetails || null,
-        description: `${Math.round((overtimeMinutes / 60) * 10) / 10}h (${overtimeMinutes} min) overstay after closing`,
+        description: overstayDesc,
+        subDetail: record.overtimeDetails?.feePerOvertimeHour
+          ? `Rate: ${currency} ${record.overtimeDetails.feePerOvertimeHour}/hr · Closed ${officeCloseTime}`
+          : `Office closed at ${officeCloseTime}`,
+        badgeBg: '#f0fdf4',
+        categoryColor: '#059669',
         sourceType: 'AttendanceRecord',
         sourceId: record.id,
       });
@@ -83,14 +135,49 @@ function calculatePayroll({
 
     const attendancePenalty = money(record.penalty);
     if (attendancePenalty > 0) {
+      const clockInStr = record.clockInTime ? formatTime(record.clockInTime, timezone) : '';
+      let catLabel = 'ATTENDANCE';
+      let catColor = '#b91c1c';
+      let badgeBg = '#fef2f2';
+      let desc = '';
+      let subDetail = '';
+
+      if (record.status === 'COMPLETELY_LATE') {
+        catLabel = 'COMPLETELY LATE';
+        catColor = '#991b1b';
+        desc = clockInStr ? `Exceeded late threshold (Arrival: ${clockInStr})` : 'Completely late attendance penalty';
+        subDetail = officeOpenTime ? `Expected opening: ${officeOpenTime}` : '';
+      } else if (record.status === 'LATE') {
+        catLabel = 'LATE ARRIVAL';
+        catColor = '#b91c1c';
+        desc = clockInStr ? `Late arrival at ${clockInStr}` : 'Attendance penalty';
+        subDetail = officeOpenTime ? `Shift begins: ${officeOpenTime}` : '';
+      } else if (record.status === 'ABSENT') {
+        catLabel = 'ABSENCE';
+        catColor = '#c2410c';
+        badgeBg = '#fff7ed';
+        desc = 'Full-day absence penalty';
+        subDetail = 'Unexcused absence';
+      } else {
+        desc = clockInStr ? `Attendance penalty (Arrival: ${clockInStr})` : 'Attendance penalty';
+      }
+
       deductions.push({
         id: `attendance-penalty:${record.id}`,
         type: 'ATTENDANCE_PENALTY',
         category: 'DEDUCTION',
+        categoryLabel: catLabel,
+        categoryColor: catColor,
+        badgeBg,
         amount: attendancePenalty,
         currency,
-        date: workDate(record.date),
-        description: record.status === 'COMPLETELY_LATE' ? 'Completely late attendance penalty' : 'Attendance penalty',
+        date: dateKey,
+        dateFormatted,
+        time: clockInStr,
+        timeStr: clockInStr || '—',
+        status: record.status,
+        description: desc,
+        subDetail,
         sourceType: 'AttendanceRecord',
         sourceId: record.id,
       });
@@ -100,14 +187,28 @@ function calculatePayroll({
   for (const record of breaks) {
     const penalty = money(record.penalty);
     if (penalty <= 0) continue;
+    const startStr = record.startTime ? formatTime(record.startTime, timezone) : '';
+    const endStr = record.endTime ? formatTime(record.endTime, timezone) : (record.isAutoEnded ? 'Auto-ended' : '');
+    const timeRange = (startStr && endStr) ? `${startStr} – ${endStr}` : startStr;
+    const dateFormatted = formatDate(record.startTime, timezone);
+    const dateKey = workDate(record.startTime);
+    const durationStr = record.durationMinutes ? `${record.durationMinutes} mins` : '';
+
     deductions.push({
       id: `break-penalty:${record.id}`,
       type: 'BREAK_PENALTY',
       category: 'DEDUCTION',
+      categoryLabel: 'BREAK OVERSTAY',
+      categoryColor: '#ea580c',
+      badgeBg: '#fff7ed',
       amount: penalty,
       currency,
-      date: workDate(record.startTime),
-      description: `Break overstay penalty (${record.breakType || 'Break'})`,
+      date: dateKey,
+      dateFormatted,
+      time: timeRange,
+      timeStr: timeRange || '—',
+      description: `Break overstay (${record.breakType || 'Break'}${durationStr ? ` · ${durationStr}` : ''})`,
+      subDetail: timeRange ? `Interval: ${timeRange}${record.notes ? ` · ${record.notes}` : ''}` : (record.notes || ''),
       sourceType: 'BreakRecord',
       sourceId: record.id,
     });
@@ -116,14 +217,25 @@ function calculatePayroll({
   for (const record of penalties) {
     const penalty = money(record.amount);
     if (penalty <= 0) continue;
+    const timeStr = record.createdAt ? formatTime(record.createdAt, timezone) : '';
+    const dateFormatted = formatDate(record.createdAt, timezone);
+    const dateKey = workDate(record.createdAt);
+
     deductions.push({
       id: `manual-penalty:${record.id}`,
       type: 'MANUAL_PENALTY',
       category: 'DEDUCTION',
+      categoryLabel: 'HR PENALTY',
+      categoryColor: '#7c3aed',
+      badgeBg: '#faf5ff',
       amount: penalty,
       currency,
-      date: workDate(record.createdAt),
+      date: dateKey,
+      dateFormatted,
+      time: timeStr,
+      timeStr: timeStr || '—',
       description: record.reason || 'HR administrative penalty',
+      subDetail: 'Administrative disciplinary deduction',
       sourceType: 'ManualPenalty',
       sourceId: record.id,
     });
