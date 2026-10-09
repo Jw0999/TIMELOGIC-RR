@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle, CalendarClock, CheckCircle2, Clock3, LogIn, LogOut,
-  LockKeyhole, RefreshCw, Search, UserCheck, X,
+  LockKeyhole, RefreshCw, Search, UserCheck, X, Camera,
 } from 'lucide-react';
 import Header from '../components/Header';
 import { useAuth } from '../context/AuthContext';
@@ -27,7 +27,15 @@ type ResultNotice = {
   ruleVersion?: string | null;
 };
 
-function FaceCapture({ onCapture, canStart }: { onCapture: (image: string, livenessFrames: string[]) => void; canStart: boolean }) {
+function FaceCapture({
+  onCapture,
+  canStart,
+  onRetry,
+}: {
+  onCapture: (image: string, livenessFrames: string[]) => void;
+  canStart: boolean;
+  onRetry?: () => void;
+}) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [ready, setReady] = useState(false);
@@ -35,20 +43,104 @@ function FaceCapture({ onCapture, canStart }: { onCapture: (image: string, liven
   const [capturing, setCapturing] = useState(false);
   const [attempted, setAttempted] = useState(false);
   const [started, setStarted] = useState(false);
+  const [completed, setCompleted] = useState(false);
+
   useEffect(() => {
     let stream: MediaStream | null = null;
     if (!started) return undefined;
     navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false }).then((next) => {
       stream = next;
-      if (videoRef.current) { videoRef.current.srcObject = next; videoRef.current.onloadedmetadata = () => setReady(true); }
+      if (videoRef.current) {
+        videoRef.current.srcObject = next;
+        videoRef.current.onloadedmetadata = () => setReady(true);
+      }
     }).catch(() => {});
     return () => stream?.getTracks().forEach((track) => track.stop());
   }, [started]);
-  const captureFrame = () => { const video = videoRef.current; const canvas = canvasRef.current; if (!video || !canvas) return null; canvas.width = video.videoWidth; canvas.height = video.videoHeight; canvas.getContext('2d')?.drawImage(video, 0, 0); return canvas.toDataURL('image/jpeg', 0.75); };
-  const capture = async () => { if (capturing || attempted) return; setAttempted(true); setCapturing(true); setInstruction('Turn your head slightly left'); await new Promise((resolve) => window.setTimeout(resolve, 1400)); const first = captureFrame(); if (!first) { setCapturing(false); return; } setInstruction('Now turn your head slightly right'); await new Promise((resolve) => window.setTimeout(resolve, 1400)); const second = captureFrame(); if (!second) { setCapturing(false); return; } setInstruction('Face the camera normally'); await new Promise((resolve) => window.setTimeout(resolve, 700)); const third = captureFrame(); if (third) { setInstruction('Live verification complete'); onCapture(third, [first, second, third]); } setCapturing(false); };
-  useEffect(() => { if (started && ready && !capturing && !attempted) void capture(); }, [started, ready, capturing, attempted]);
-  if (!started) return <div className="space-y-2"><p className="text-xs font-semibold text-slate-600">Enter the employee password first, then start face verification.</p><button type="button" onClick={() => setStarted(true)} disabled={!canStart} className="w-full px-3 py-2 rounded-xl bg-slate-800 text-white text-sm font-bold disabled:opacity-40">Start Face Verification</button></div>;
-  return <div className="space-y-2"><video ref={videoRef} autoPlay playsInline muted className="w-full rounded-xl bg-black max-h-48 object-cover" /><p className="text-xs font-semibold text-slate-600" aria-live="polite">{instruction}</p><canvas ref={canvasRef} hidden /></div>;
+
+  const captureFrame = () => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return null;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d')?.drawImage(video, 0, 0);
+    return canvas.toDataURL('image/jpeg', 0.75);
+  };
+
+  const capture = async () => {
+    if (capturing || attempted) return;
+    setAttempted(true);
+    setCapturing(true);
+    setInstruction('Turn your head slightly left');
+    await new Promise((resolve) => window.setTimeout(resolve, 1400));
+    const first = captureFrame();
+    if (!first) { setCapturing(false); return; }
+    setInstruction('Now turn your head slightly right');
+    await new Promise((resolve) => window.setTimeout(resolve, 1400));
+    const second = captureFrame();
+    if (!second) { setCapturing(false); return; }
+    setInstruction('Face the camera normally');
+    await new Promise((resolve) => window.setTimeout(resolve, 700));
+    const third = captureFrame();
+    if (third) {
+      setInstruction('Live verification complete');
+      setCompleted(true);
+      onCapture(third, [first, second, third]);
+    }
+    setCapturing(false);
+  };
+
+  useEffect(() => {
+    if (started && ready && !capturing && !attempted) void capture();
+  }, [started, ready, capturing, attempted]);
+
+  const handleRetake = () => {
+    setCompleted(false);
+    setAttempted(false);
+    setCapturing(false);
+    setInstruction('Position your face in the frame');
+    onRetry?.();
+  };
+
+  if (!started) {
+    return (
+      <div className="space-y-2">
+        <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+          Enter the employee password first, then start face verification.
+        </p>
+        <button
+          type="button"
+          onClick={() => setStarted(true)}
+          disabled={!canStart}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-sm font-bold disabled:opacity-40 transition shadow-sm"
+        >
+          <Camera size={16} />
+          <span>Start Face Verification</span>
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <video ref={videoRef} autoPlay playsInline muted className="w-full rounded-xl bg-black max-h-48 object-cover shadow-sm" />
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-slate-600 dark:text-slate-300" aria-live="polite">{instruction}</p>
+        {completed && (
+          <button
+            type="button"
+            onClick={handleRetake}
+            className="inline-flex items-center gap-1 text-xs font-semibold text-primary-600 hover:text-primary-700 dark:text-primary-400"
+          >
+            <RefreshCw size={12} />
+            <span>Retake</span>
+          </button>
+        )}
+      </div>
+      <canvas ref={canvasRef} hidden />
+    </div>
+  );
 }
 
 function formatTime(value?: string | null, timezone?: string | null) {
@@ -96,6 +188,7 @@ export default function ManualCheckIn() {
   const [faceImage, setFaceImage] = useState('');
   const [livenessFrames, setLivenessFrames] = useState<string[]>([]);
   const [confirmError, setConfirmError] = useState('');
+  const [captureKey, setCaptureKey] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<ResultNotice | null>(null);
 
@@ -144,6 +237,14 @@ export default function ManualCheckIn() {
     setFaceImage('');
     setLivenessFrames([]);
     setConfirmError('');
+    setCaptureKey(0);
+  };
+
+  const handleRetryCapture = () => {
+    setConfirmError('');
+    setFaceImage('');
+    setLivenessFrames([]);
+    setCaptureKey((k) => k + 1);
   };
 
   const confirmAction = async (faceOverride?: string, framesOverride?: string[]) => {
@@ -351,14 +452,42 @@ export default function ManualCheckIn() {
               <p className="text-sm text-[var(--text-muted)]">
                 <b className="text-[var(--text-main)]">{pending.employee.firstName} {pending.employee.lastName}</b> must enter their own account password to check {pending.kind === 'check-in' ? 'in' : 'out'}. The backend uses server time and records the signed-in administrator as the operator.
               </p>
-              {confirmError && <div className="rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 text-sm text-red-700 dark:text-red-400">{confirmError}</div>}
+              {confirmError && (
+                <div className="rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3.5 space-y-2.5 text-sm text-red-700 dark:text-red-400">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle size={17} className="mt-0.5 flex-shrink-0 text-red-600 dark:text-red-400" />
+                    <p className="flex-1 font-medium">{confirmError}</p>
+                  </div>
+                  {pending.kind === 'check-in' && (
+                    <button
+                      type="button"
+                      onClick={handleRetryCapture}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-red-600 hover:bg-red-700 active:scale-[0.99] text-white text-xs font-bold transition shadow-sm"
+                    >
+                      <RefreshCw size={14} />
+                      <span>Retry Face Verification (Re-open Camera)</span>
+                    </button>
+                  )}
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">Employee password</label>
                 <input autoFocus type="password" autoComplete="current-password" value={password}
                   onChange={(event) => setPassword(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void confirmAction(); }}
                   className="w-full border border-[var(--input-border)] bg-[var(--input-bg)] text-[var(--text-main)] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
               </div>
-              {pending.kind === 'check-in' && <FaceCapture canStart={Boolean(password)} onCapture={(image, frames) => { setFaceImage(image); setLivenessFrames(frames); if (password) window.setTimeout(() => void confirmAction(image, frames), 0); }} />}
+              {pending.kind === 'check-in' && (
+                <FaceCapture
+                  key={captureKey}
+                  canStart={Boolean(password)}
+                  onRetry={handleRetryCapture}
+                  onCapture={(image, frames) => {
+                    setFaceImage(image);
+                    setLivenessFrames(frames);
+                    if (password) window.setTimeout(() => void confirmAction(image, frames), 0);
+                  }}
+                />
+              )}
             </div>
             <div className="px-6 pb-6 flex justify-end gap-3">
               <button onClick={closeConfirmation} disabled={submitting} className="px-4 py-2 border border-[var(--border)] rounded-xl text-sm font-semibold text-[var(--text-main)]">Cancel</button>

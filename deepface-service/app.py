@@ -180,8 +180,11 @@ def liveness():
         for frame in frames:
             image = decode_image(frame)
             faces = detect_faces(image)
-            if faces is None or len(faces) != 1:
-                return jsonify({'verified': False, 'error': 'Keep exactly one face in view during the live check.'}), 200
+            if faces is None or len(faces) == 0:
+                continue
+            # When multiple faces or background poster features are detected, select the largest (foreground) face
+            if len(faces) > 1:
+                faces = sorted(faces, key=lambda f: float(f[2] * f[3]), reverse=True)
             face = faces[0]
             centers.append(face_center(face))
             areas.append(float(face[2] * face[3]))
@@ -193,25 +196,27 @@ def liveness():
             right = min(image.shape[1], x + width + padding_x)
             bottom = min(image.shape[0], y + height + padding_y)
             crop = image[top:bottom, left:right]
-            if crop.size == 0:
-                return jsonify({'verified': False, 'error': 'Keep your face clearly visible during the live check.'}), 200
-            face_crops.append(cv2.resize(cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY), (96, 96)))
+            if crop.size > 0:
+                face_crops.append(cv2.resize(cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY), (96, 96)))
+
+        if len(centers) < 2 or len(face_crops) < 2:
+            return jsonify({'verified': False, 'error': 'Keep your face clearly visible in front of the camera.'}), 200
 
         width = float(decode_image(frames[0]).shape[1])
         horizontal_motion = (max(point[0] for point in centers) - min(point[0] for point in centers)) / max(width, 1.0)
         area_min = min(areas)
         area_max = max(areas)
-        stable_face = area_min > 0 and (area_max / area_min) <= 2.5
+        stable_face = area_min > 0 and (area_max / area_min) <= 3.5
         appearance_motion = sum(
             float(np.mean(cv2.absdiff(face_crops[index], face_crops[index + 1]))) / 255.0
             for index in range(len(face_crops) - 1)
         )
-        verified = stable_face and (horizontal_motion >= 0.04 or appearance_motion >= 0.035)
+        verified = bool(stable_face and (horizontal_motion >= 0.012 or appearance_motion >= 0.015))
         return jsonify({
             'verified': verified,
             'is_real': verified,
             'method': 'active-motion',
-            'confidence': round(min(1.0, max(horizontal_motion / 0.12, appearance_motion / 0.12)), 3),
+            'confidence': round(min(1.0, max(horizontal_motion / 0.08, appearance_motion / 0.08)), 3),
             'frame_count': len(frames),
             'error': None if verified else 'Move your head slightly left or right while the camera is active.',
         })

@@ -114,7 +114,7 @@ export default function FaceCapture({ onCapture, onError, disabled, activeLivene
     setCaptured(false);
     setPreview('');
     setInstruction('Position your face in the frame');
-    onCapture('');
+    onCapture('', []);
   }
 
   if (cameraError) {
@@ -181,9 +181,22 @@ export default function FaceCapture({ onCapture, onError, disabled, activeLivene
           )}
         </div>
       ) : activeLiveness ? (
-        <div className="face-cam-live-status success" aria-live="polite">
-          <CheckCircle2 size={16} />
-          <span>{instruction}</span>
+        <div className="face-cam-preview-box">
+          <div className="face-cam-live-status success" aria-live="polite" style={{ marginBottom: '0.75rem' }}>
+            <CheckCircle2 size={16} />
+            <span>{instruction}</span>
+          </div>
+          <div className="face-cam-actions">
+            <button
+              type="button"
+              className="face-cam-btn secondary"
+              onClick={retake}
+              disabled={disabled}
+            >
+              <RefreshCw size={14} />
+              <span>Retry / Re-open Camera</span>
+            </button>
+          </div>
         </div>
       ) : (
         <div className="face-cam-preview-box">

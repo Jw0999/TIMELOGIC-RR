@@ -407,6 +407,7 @@ function App() {
   const [password, setPassword] = useState('');
   const [faceImage, setFaceImage] = useState('');
   const [livenessFrames, setLivenessFrames] = useState<string[]>([]);
+  const [faceCaptureKey, setFaceCaptureKey] = useState(0);
   const [actionBusy, setActionBusy] = useState(false);
 
   // Breaks state
@@ -711,7 +712,15 @@ function App() {
     setPassword('');
     setFaceImage('');
     setLivenessFrames([]);
+    setFaceCaptureKey(0);
     setActionBusy(false);
+  }
+
+  function handleRetryFace() {
+    setError('');
+    setFaceImage('');
+    setLivenessFrames([]);
+    setFaceCaptureKey((k) => k + 1);
   }
 
   // Handle Face Enrollment for an employee
@@ -2125,6 +2134,49 @@ function App() {
               </div>
 
               <div className="modal-body">
+                {/* Modal Error Alert with Retry Button */}
+                {error && (
+                  <div
+                    className="alert error"
+                    style={{
+                      marginBottom: '1rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.5rem',
+                      alignItems: 'flex-start',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%' }}>
+                      <AlertTriangle size={18} style={{ flexShrink: 0 }} />
+                      <span style={{ flex: 1, fontSize: '0.88rem' }}>{error}</span>
+                    </div>
+                    {pendingAction.type === 'check_in' && hasEnrolledFace(pendingAction.employee) && (
+                      <button
+                        type="button"
+                        className="btn"
+                        style={{
+                          background: '#dc2626',
+                          color: '#fff',
+                          fontSize: '0.8rem',
+                          padding: '0.45rem 0.85rem',
+                          borderRadius: '8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          alignSelf: 'stretch',
+                          justifyContent: 'center',
+                          fontWeight: 600,
+                          marginTop: '0.25rem',
+                        }}
+                        onClick={handleRetryFace}
+                      >
+                        <RefreshCw size={14} />
+                        <span>Retry Face Verification (Re-open Camera)</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 {/* Notice if employee has no face enrolled — ONLY on check_in */}
                 {pendingAction.type === 'check_in' && !hasEnrolledFace(pendingAction.employee) && (
                   <div
@@ -2185,6 +2237,7 @@ function App() {
                       Face Verification
                     </label>
                     <FaceCapture
+                      key={faceCaptureKey}
                       onCapture={(image, frames) => {
                         setFaceImage(image);
                         setLivenessFrames(frames || []);
