@@ -105,6 +105,17 @@ async function clearFailedMigrations() {
         // Ignore if table doesn't exist yet
       }
 
+      try {
+        await prisma.$executeRawUnsafe(`ALTER TABLE "attendance_records" ADD COLUMN IF NOT EXISTS "lifecycleState" TEXT NOT NULL DEFAULT 'FINALIZED';`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "attendance_records" ADD COLUMN IF NOT EXISTS "recordHash" TEXT;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "attendance_records" ADD COLUMN IF NOT EXISTS "rulesSnapshot" JSONB;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "attendance_records" ADD COLUMN IF NOT EXISTS "evidencePackage" JSONB;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "attendance_records" ADD COLUMN IF NOT EXISTS "calculatedSummary" JSONB;`);
+        console.log('[Migration Cleanup] ✓ Ensured attendance_records lifecycleState and trust columns exist');
+      } catch (colErr) {
+        // Ignore if table doesn't exist yet
+      }
+
       console.log('[Migration Cleanup] ✓ Migration database is clean\n');
       return true;
 
