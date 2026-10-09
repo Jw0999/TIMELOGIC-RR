@@ -15,7 +15,8 @@ const weeklySchedule = (openTime = '08:00', closeTime = '17:00'): WeeklySchedule
 ) as WeeklySchedule;
 
 interface ShiftScheduleItem {
-  label: string;
+  label?: string;
+  name?: string;
   openTime: string;
   closeTime: string;
   isOvernight?: boolean;
@@ -31,13 +32,57 @@ interface ShiftSchedules {
 }
 
 const defaultShiftSchedules = (): ShiftSchedules => ({
-  FULL_TIME: { label: 'Full Time', openTime: '08:00', closeTime: '17:00' },
-  MORNING:   { label: 'Morning Shift', openTime: '07:00', closeTime: '14:00' },
-  AFTERNOON: { label: 'Afternoon Shift', openTime: '12:00', closeTime: '19:00' },
-  EVENING:   { label: 'Evening Shift', openTime: '14:00', closeTime: '22:00' },
-  NIGHT:     { label: 'Night Shift', openTime: '21:00', closeTime: '05:00', isOvernight: true },
-  FLEXIBLE:  { label: 'Flexible Shift', openTime: '08:00', closeTime: '17:00' },
+  FULL_TIME: { label: 'Full Time', name: 'Full Time', openTime: '08:00', closeTime: '17:00' },
+  MORNING:   { label: 'Morning Shift', name: 'Morning Shift', openTime: '07:00', closeTime: '14:00' },
+  AFTERNOON: { label: 'Afternoon Shift', name: 'Afternoon Shift', openTime: '12:00', closeTime: '19:00' },
+  EVENING:   { label: 'Evening Shift', name: 'Evening Shift', openTime: '14:00', closeTime: '22:00' },
+  NIGHT:     { label: 'Night Shift', name: 'Night Shift', openTime: '21:00', closeTime: '05:00', isOvernight: true },
+  FLEXIBLE:  { label: 'Flexible Shift', name: 'Flexible Shift', openTime: '08:00', closeTime: '17:00' },
 });
+
+interface AutoCheckoutPolicy {
+  midnightAutoCheckout: boolean;
+  dayShiftCutoffTime: string;
+  nightShiftMaxHours: number;
+}
+
+const defaultAutoCheckoutPolicy = (): AutoCheckoutPolicy => ({
+  midnightAutoCheckout: true,
+  dayShiftCutoffTime: '00:00',
+  nightShiftMaxHours: 14,
+});
+
+const sanitizeShiftSchedules = (shifts: any): ShiftSchedules => {
+  const def = defaultShiftSchedules();
+  if (!shifts || typeof shifts !== 'object') return def;
+  return {
+    FULL_TIME: { ...def.FULL_TIME, ...shifts.FULL_TIME, openTime: shifts.FULL_TIME?.openTime || '08:00', closeTime: shifts.FULL_TIME?.closeTime || '17:00' },
+    MORNING:   { ...def.MORNING,   ...shifts.MORNING,   openTime: shifts.MORNING?.openTime   || '07:00', closeTime: shifts.MORNING?.closeTime   || '14:00' },
+    AFTERNOON: { ...def.AFTERNOON, ...shifts.AFTERNOON, openTime: shifts.AFTERNOON?.openTime || '12:00', closeTime: shifts.AFTERNOON?.closeTime || '19:00' },
+    EVENING:   { ...def.EVENING,   ...shifts.EVENING,   openTime: shifts.EVENING?.openTime   || '14:00', closeTime: shifts.EVENING?.closeTime   || '22:00' },
+    NIGHT:     { ...def.NIGHT,     ...shifts.NIGHT,     openTime: shifts.NIGHT?.openTime     || '21:00', closeTime: shifts.NIGHT?.closeTime     || '05:00', isOvernight: true },
+    FLEXIBLE:  { ...def.FLEXIBLE,  ...shifts.FLEXIBLE,  openTime: shifts.FLEXIBLE?.openTime  || '08:00', closeTime: shifts.FLEXIBLE?.closeTime  || '17:00' },
+  };
+};
+
+const sanitizeAutoCheckoutPolicy = (policy: any): AutoCheckoutPolicy => {
+  const def = defaultAutoCheckoutPolicy();
+  if (!policy || typeof policy !== 'object') return def;
+  return {
+    midnightAutoCheckout: policy.midnightAutoCheckout !== undefined ? Boolean(policy.midnightAutoCheckout) : true,
+    dayShiftCutoffTime: policy.dayShiftCutoffTime || '00:00',
+    nightShiftMaxHours: Number.isFinite(+policy.nightShiftMaxHours) ? parseInt(policy.nightShiftMaxHours, 10) : 14,
+  };
+};
+
+const SHIFT_DEFS: Array<{ key: keyof ShiftSchedules; title: string; isOvernight?: boolean }> = [
+  { key: 'FULL_TIME', title: 'Full Time' },
+  { key: 'MORNING',   title: 'Morning Shift' },
+  { key: 'AFTERNOON', title: 'Afternoon Shift' },
+  { key: 'EVENING',   title: 'Evening Shift' },
+  { key: 'NIGHT',     title: 'Night Shift', isOvernight: true },
+  { key: 'FLEXIBLE',  title: 'Flexible Shift' },
+];
 
 interface OrgFormData {
   name: string; industry: string;
@@ -48,6 +93,7 @@ interface OrgFormData {
   allowDeviceCheckIn: boolean; allowManualCheckIn: boolean; hasStudents: boolean;
   timezone: string;
   shiftSchedules: ShiftSchedules;
+  autoCheckoutPolicy: AutoCheckoutPolicy;
   offices: {
     name: string; address: string; timezone: string; wifiSSID: string; publicIp: string;
     breakMinutes: number;
@@ -56,6 +102,9 @@ interface OrgFormData {
     graceMinutes: number; lateAfterMinutes: number; gracePenalty: number; latePenalty: number; completelyLatePenalty: number; absentPenalty: number;
     overstayPenalty: number;
     breakStart: string; breakEnd: string;
+    midnightAutoCheckout: boolean;
+    dayShiftCutoffTime: string;
+    nightShiftMaxHours: number;
   }[];
   departments: { name: string; breakStart: string; breakEnd: string; overstayPenalty: number }[];
   admin: { firstName: string; lastName: string; email: string; password: string; confirmPassword: string };
@@ -68,6 +117,9 @@ const newOffice = () => ({
   graceMinutes: 30, lateAfterMinutes: 90, gracePenalty: 0, latePenalty: 0, completelyLatePenalty: 0, absentPenalty: 0,
   overstayPenalty: 0,
   breakStart: '13:00', breakEnd: '14:00',
+  midnightAutoCheckout: true,
+  dayShiftCutoffTime: '00:00',
+  nightShiftMaxHours: 14,
 });
 const defaultForm = (): OrgFormData => ({
   name: '', industry: 'Technology',
@@ -78,6 +130,7 @@ const defaultForm = (): OrgFormData => ({
   allowDeviceCheckIn: true, allowManualCheckIn: false, hasStudents: false,
   timezone: 'Africa/Lagos',
   shiftSchedules: defaultShiftSchedules(),
+  autoCheckoutPolicy: defaultAutoCheckoutPolicy(),
   offices: [{ ...newOffice(), name: 'Main Office' }],
   departments: [{ name: 'Engineering', breakStart: '13:00', breakEnd: '14:00', overstayPenalty: 0 }],
   admin: { firstName: '', lastName: '', email: '', password: '', confirmPassword: '' },
@@ -140,7 +193,14 @@ function OrgModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
         hasStudents: form.hasStudents,
         timezone: form.timezone,
         shiftSchedules: form.shiftSchedules,
-        offices: form.offices,
+        autoCheckoutPolicy: form.autoCheckoutPolicy,
+        offices: form.offices.map((off) => ({
+          ...off,
+          shiftSchedules: form.shiftSchedules,
+          midnightAutoCheckout: form.autoCheckoutPolicy.midnightAutoCheckout,
+          dayShiftCutoffTime: form.autoCheckoutPolicy.dayShiftCutoffTime,
+          nightShiftMaxHours: form.autoCheckoutPolicy.nightShiftMaxHours,
+        })),
         departments: form.departments,
         admin: {
           firstName,
@@ -183,15 +243,21 @@ function OrgModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
             <div className="p-4 bg-[var(--hover-bg)] rounded-xl border border-[var(--border)] space-y-3">
               <div>
                 <p className="text-sm font-bold text-[var(--text-main)]">Shift schedules</p>
-                <p className="text-[11px] text-[var(--text-muted)] mt-0.5">Configure working hours for Full Time, Morning, and Evening shifts. Lateness and absence calculations respect these shift windows.</p>
+                <p className="text-[11px] text-[var(--text-muted)] mt-0.5">Configure working hours for Full Time, Morning, Afternoon, Evening, and Night shifts. Lateness and absence calculations respect these shift windows.</p>
               </div>
               <div className="space-y-2">
-                {(['FULL_TIME', 'MORNING', 'EVENING'] as const).map((key) => {
+                {SHIFT_DEFS.map(({ key, title, isOvernight }) => {
                   const item = form.shiftSchedules[key] || defaultShiftSchedules()[key];
-                  const title = key === 'FULL_TIME' ? 'Full Time' : key === 'MORNING' ? 'Morning Shift' : 'Evening Shift';
                   return (
                     <div key={key} className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-center bg-[var(--card-bg)] p-2.5 rounded-xl border border-[var(--border)]">
-                      <span className="text-xs font-semibold text-[var(--text-main)]">{title}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-semibold text-[var(--text-main)]">{title}</span>
+                        {isOvernight && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300">
+                            Overnight
+                          </span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-1.5">
                         <label className="text-[11px] text-[var(--text-muted)] font-medium">Start:</label>
                         <input
@@ -225,6 +291,61 @@ function OrgModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
                     </div>
                   );
                 })}
+              </div>
+            </div>
+
+            <div className="p-4 bg-[var(--hover-bg)] rounded-xl border border-[var(--border)] space-y-3">
+              <div>
+                <p className="text-sm font-bold text-[var(--text-main)]">Intelligent Auto Check-Out & Cutoff Rules</p>
+                <p className="text-[11px] text-[var(--text-muted)] mt-0.5">Control midnight checkout sweep and shift safety cutoff limits.</p>
+              </div>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 rounded border-[var(--input-border)] accent-primary-700"
+                  checked={form.autoCheckoutPolicy.midnightAutoCheckout}
+                  onChange={(e) => setForm((p) => ({
+                    ...p,
+                    autoCheckoutPolicy: { ...p.autoCheckoutPolicy, midnightAutoCheckout: e.target.checked }
+                  }))}
+                />
+                <span>
+                  <span className="block text-xs font-semibold text-[var(--text-main)]">Midnight Auto Check-Out (00:00)</span>
+                  <span className="block text-[11px] leading-4 text-[var(--text-muted)] mt-0.5">
+                    Automatically check out unclocked day workers at 00:00 midnight with 0 overtime additions and 0 deductions (add nothing nor remove nothing).
+                  </span>
+                </span>
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className={lbl}>Day Shift Auto Check-Out Cutoff</label>
+                  <input
+                    type="text"
+                    className={inp}
+                    value={form.autoCheckoutPolicy.dayShiftCutoffTime}
+                    onChange={(e) => setForm((p) => ({
+                      ...p,
+                      autoCheckoutPolicy: { ...p.autoCheckoutPolicy, dayShiftCutoffTime: e.target.value }
+                    }))}
+                    placeholder="00:00"
+                  />
+                  <p className="text-[10px] text-[var(--text-muted)] mt-1">Default 00:00. Day workers who forget to clock out are auto-closed at this time.</p>
+                </div>
+                <div>
+                  <label className={lbl}>Night Shift Max Working Limit (Hours)</label>
+                  <input
+                    type="number"
+                    min={8}
+                    max={24}
+                    className={inp}
+                    value={form.autoCheckoutPolicy.nightShiftMaxHours}
+                    onChange={(e) => setForm((p) => ({
+                      ...p,
+                      autoCheckoutPolicy: { ...p.autoCheckoutPolicy, nightShiftMaxHours: parseInt(e.target.value, 10) || 14 }
+                    }))}
+                  />
+                  <p className="text-[10px] text-[var(--text-muted)] mt-1">Night workers crossing midnight remain clocked in up to this limit.</p>
+                </div>
               </div>
             </div>
             <div className="p-4 bg-[var(--hover-bg)] rounded-xl border border-[var(--border)] space-y-3">
@@ -655,7 +776,8 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
   const [allowManualCheckIn, setAllowManualCheckIn] = useState(org.allowManualCheckIn ?? false);
   const [hasStudents, setHasStudents] = useState(org.hasStudents ?? false);
   const [timezone, setTimezone] = useState(org.timezone ?? 'Africa/Lagos');
-  const [shiftSchedules, setShiftSchedules] = useState<ShiftSchedules>(() => org.shiftSchedules ?? defaultShiftSchedules());
+  const [shiftSchedules, setShiftSchedules] = useState<ShiftSchedules>(() => sanitizeShiftSchedules(org.shiftSchedules));
+  const [autoCheckoutPolicy, setAutoCheckoutPolicy] = useState<AutoCheckoutPolicy>(() => sanitizeAutoCheckoutPolicy(org.autoCheckoutPolicy));
   const [offices, setOffices] = useState<any[]>(() => (org.offices ?? []).map((o: any) => ({
     id: o.id, name: o.name ?? '', address: o.address ?? '', timezone: o.timezone ?? 'Africa/Lagos',
     wifiSSID: o.wifiSSID ?? '', publicIp: o.publicIp ?? '',
@@ -667,6 +789,10 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
     overstayPenalty: o.overstayPenalty ?? 0,
     breakStart: o.breakStart ?? '13:00', breakEnd: o.breakEnd ?? '14:00',
     weeklySchedule: o.weeklySchedule ?? weeklySchedule('08:00', '17:00'),
+    shiftSchedules: sanitizeShiftSchedules(o.shiftSchedules || org.shiftSchedules),
+    midnightAutoCheckout: o.midnightAutoCheckout !== undefined ? Boolean(o.midnightAutoCheckout) : (org.autoCheckoutPolicy?.midnightAutoCheckout ?? true),
+    dayShiftCutoffTime: o.dayShiftCutoffTime || org.autoCheckoutPolicy?.dayShiftCutoffTime || '00:00',
+    nightShiftMaxHours: Number.isFinite(+o.nightShiftMaxHours) ? parseInt(o.nightShiftMaxHours, 10) : (org.autoCheckoutPolicy?.nightShiftMaxHours ?? 14),
   })));
   const [departments, setDepartments] = useState<any[]>(() => (org.departments ?? []).map((d: any) => ({
     id: d.id,
@@ -700,7 +826,14 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
         hasStudents,
         timezone,
         shiftSchedules,
-        offices,
+        autoCheckoutPolicy,
+        offices: offices.map((off) => ({
+          ...off,
+          shiftSchedules,
+          midnightAutoCheckout: autoCheckoutPolicy.midnightAutoCheckout,
+          dayShiftCutoffTime: autoCheckoutPolicy.dayShiftCutoffTime,
+          nightShiftMaxHours: autoCheckoutPolicy.nightShiftMaxHours,
+        })),
         departments,
       });
       onSaved(); onClose();
@@ -823,15 +956,21 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
           <div className="p-4 bg-[var(--hover-bg)] rounded-xl border border-[var(--border)] space-y-3">
             <div>
               <p className="text-sm font-bold text-[var(--text-main)]">Shift schedules</p>
-              <p className="text-[11px] text-[var(--text-muted)] mt-0.5">Configure working hours for Full Time, Morning, and Evening shifts. Lateness and absence calculations respect these shift windows.</p>
+              <p className="text-[11px] text-[var(--text-muted)] mt-0.5">Configure working hours for Full Time, Morning, Afternoon, Evening, and Night shifts. Lateness and absence calculations respect these shift windows.</p>
             </div>
             <div className="space-y-2">
-              {(['FULL_TIME', 'MORNING', 'EVENING'] as const).map((key) => {
+              {SHIFT_DEFS.map(({ key, title, isOvernight }) => {
                 const item = shiftSchedules[key] || defaultShiftSchedules()[key];
-                const title = key === 'FULL_TIME' ? 'Full Time' : key === 'MORNING' ? 'Morning Shift' : 'Evening Shift';
                 return (
                   <div key={key} className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-center bg-[var(--card-bg)] p-2.5 rounded-xl border border-[var(--border)]">
-                    <span className="text-xs font-semibold text-[var(--text-main)]">{title}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-semibold text-[var(--text-main)]">{title}</span>
+                      {isOvernight && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300">
+                          Overnight
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-1.5">
                       <label className="text-[11px] text-[var(--text-muted)] font-medium">Start:</label>
                       <input
@@ -859,6 +998,52 @@ function EditOrgModal({ org, onClose, onSaved }: { org: any; onClose: () => void
                   </div>
                 );
               })}
+            </div>
+          </div>
+
+          <div className="p-4 bg-[var(--hover-bg)] rounded-xl border border-[var(--border)] space-y-3">
+            <div>
+              <p className="text-sm font-bold text-[var(--text-main)]">Intelligent Auto Check-Out & Cutoff Rules</p>
+              <p className="text-[11px] text-[var(--text-muted)] mt-0.5">Control midnight checkout sweep and shift safety cutoff limits.</p>
+            </div>
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 rounded border-[var(--input-border)] accent-primary-700"
+                checked={autoCheckoutPolicy.midnightAutoCheckout}
+                onChange={(e) => setAutoCheckoutPolicy((p) => ({ ...p, midnightAutoCheckout: e.target.checked }))}
+              />
+              <span>
+                <span className="block text-xs font-semibold text-[var(--text-main)]">Midnight Auto Check-Out (00:00)</span>
+                <span className="block text-[11px] leading-4 text-[var(--text-muted)] mt-0.5">
+                  Automatically check out unclocked day workers at 00:00 midnight with 0 overtime additions and 0 deductions (add nothing nor remove nothing).
+                </span>
+              </span>
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div>
+                <label className={lbl}>Day Shift Auto Check-Out Cutoff</label>
+                <input
+                  type="text"
+                  className={inp}
+                  value={autoCheckoutPolicy.dayShiftCutoffTime}
+                  onChange={(e) => setAutoCheckoutPolicy((p) => ({ ...p, dayShiftCutoffTime: e.target.value }))}
+                  placeholder="00:00"
+                />
+                <p className="text-[10px] text-[var(--text-muted)] mt-1">Default 00:00. Day workers who forget to clock out are auto-closed at this time.</p>
+              </div>
+              <div>
+                <label className={lbl}>Night Shift Max Working Limit (Hours)</label>
+                <input
+                  type="number"
+                  min={8}
+                  max={24}
+                  className={inp}
+                  value={autoCheckoutPolicy.nightShiftMaxHours}
+                  onChange={(e) => setAutoCheckoutPolicy((p) => ({ ...p, nightShiftMaxHours: parseInt(e.target.value, 10) || 14 }))}
+                />
+                <p className="text-[10px] text-[var(--text-muted)] mt-1">Night workers crossing midnight remain clocked in up to this limit.</p>
+              </div>
             </div>
           </div>
 
