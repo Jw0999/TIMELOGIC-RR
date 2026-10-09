@@ -24,7 +24,7 @@ const localServiceUrl = (key, fallback) => {
   if (!value) throw new Error(`Missing required env var: ${key}`);
   let parsed;
   try { parsed = new URL(value); } catch { throw new Error(`${key} must be a valid URL`); }
-  if (!isProduction && !isPrivateHost(parsed.hostname)) {
+  if (!isProduction && process.env.ALLOW_REMOTE_SERVICES !== 'true' && !isPrivateHost(parsed.hostname)) {
     throw new Error(`${key} must point to localhost or a private LAN address while TimeLogic is local-only`);
   }
   return value;
@@ -40,7 +40,7 @@ const localCorsOrigins = `${defaultCorsOrigins},${process.env.CORS_ORIGINS || ''
   .map((origin) => {
     let parsed;
     try { parsed = new URL(origin); } catch { throw new Error(`Invalid CORS origin: ${origin}`); }
-    if (!isProduction && !isPrivateHost(parsed.hostname)) {
+    if (!isProduction && process.env.ALLOW_REMOTE_SERVICES !== 'true' && !isPrivateHost(parsed.hostname)) {
       throw new Error(`CORS origin must be local while TimeLogic is local-only: ${origin}`);
     }
     if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error(`CORS origin must use http or https: ${origin}`);
