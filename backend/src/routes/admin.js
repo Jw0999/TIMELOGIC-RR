@@ -212,6 +212,10 @@ router.put('/station-password', authenticate, isAdmin, [
   body('stationPassword').isLength({ min: 4 }).withMessage('Station password must be at least 4 characters or digits'),
 ], validate, ctrl.setStationPassword);
 
+// Shift Schedules & Auto-Checkout Configuration (configured by Admin)
+router.get('/shifts', authenticate, isAdmin, ctrl.getShiftConfiguration);
+router.put('/shifts', authenticate, isAdmin, ctrl.updateShiftConfiguration);
+
 // Kiosk Devices & Hardware Binding
 router.get('/kiosk-devices', authenticate, isAdmin, ctrl.getKioskDevices);
 router.put('/kiosk-devices/:id/release', authenticate, isAdmin, ctrl.releaseKioskDevice);

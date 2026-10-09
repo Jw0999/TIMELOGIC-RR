@@ -589,6 +589,10 @@ const updateOfficeSecurity = async (req, res, next) => {
     if (b.autoSessionMinutes !== undefined) officeData.autoSessionMinutes = parseInt(b.autoSessionMinutes, 10) || 60;
     if (b.breakStart !== undefined) officeData.breakStart = b.breakStart || null;
     if (b.breakEnd   !== undefined) officeData.breakEnd   = b.breakEnd   || null;
+    if (b.midnightAutoCheckout !== undefined) officeData.midnightAutoCheckout = Boolean(b.midnightAutoCheckout);
+    if (b.dayShiftCutoffTime !== undefined)   officeData.dayShiftCutoffTime   = b.dayShiftCutoffTime || '00:00';
+    if (b.nightShiftMaxHours !== undefined)   officeData.nightShiftMaxHours   = Number.isFinite(+b.nightShiftMaxHours) ? parseInt(b.nightShiftMaxHours, 10) : 14;
+    if (b.shiftSchedules !== undefined)       officeData.shiftSchedules       = b.shiftSchedules;
     if (Object.keys(officeData).length) {
       await prisma.office.update({ where: { id: officeId }, data: officeData });
     }
@@ -600,6 +604,7 @@ const updateOfficeSecurity = async (req, res, next) => {
       overtimeStartAfterCloseMinutes: _overtimeDelay, overtimeFeePerHour: _overtimeRate,
       graceMinutes: _g, lateAfterMinutes: _la, gracePenalty: _gp, latePenalty: _lp, completelyLatePenalty: _clp,
       autoSessionMinutes: _as, breakStart: _bs, breakEnd: _be,
+      midnightAutoCheckout: _mac, dayShiftCutoffTime: _dsc, nightShiftMaxHours: _nsm, shiftSchedules: _ss,
       ...settingsData
     } = req.body;
     const settings = await prisma.securitySettings.upsert({

@@ -18,18 +18,25 @@ interface ShiftScheduleItem {
   label: string;
   openTime: string;
   closeTime: string;
+  isOvernight?: boolean;
 }
 
 interface ShiftSchedules {
   FULL_TIME: ShiftScheduleItem;
   MORNING: ShiftScheduleItem;
+  AFTERNOON: ShiftScheduleItem;
   EVENING: ShiftScheduleItem;
+  NIGHT: ShiftScheduleItem;
+  FLEXIBLE: ShiftScheduleItem;
 }
 
 const defaultShiftSchedules = (): ShiftSchedules => ({
   FULL_TIME: { label: 'Full Time', openTime: '08:00', closeTime: '17:00' },
-  MORNING:   { label: 'Morning Shift', openTime: '08:00', closeTime: '13:00' },
-  EVENING:   { label: 'Evening Shift', openTime: '13:00', closeTime: '18:00' },
+  MORNING:   { label: 'Morning Shift', openTime: '07:00', closeTime: '14:00' },
+  AFTERNOON: { label: 'Afternoon Shift', openTime: '12:00', closeTime: '19:00' },
+  EVENING:   { label: 'Evening Shift', openTime: '14:00', closeTime: '22:00' },
+  NIGHT:     { label: 'Night Shift', openTime: '21:00', closeTime: '05:00', isOvernight: true },
+  FLEXIBLE:  { label: 'Flexible Shift', openTime: '08:00', closeTime: '17:00' },
 });
 
 interface OrgFormData {

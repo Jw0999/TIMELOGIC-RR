@@ -21,6 +21,7 @@ const AttendanceService = require('../services/AttendanceService');
 const logger = require('../config/logger');
 const { atZonedTime, openingOccurrence, zonedParts, isSunday, officeHoursFor } = require('../utils/attendanceClock');
 const { getCurrentServerTime } = require('../utils/networkTime');
+const { evaluateAutoCheckout } = require('../utils/shiftHelper');
 
 let _timer = null;
 let _lastMinute = -1;
@@ -39,6 +40,9 @@ async function tick() {
     const minuteKey = Math.floor(now.getTime() / 60000);
     if (minuteKey === _lastMinute) return; // once per absolute minute
     _lastMinute = minuteKey;
+
+    // 1. Run midnight and cutoff auto-checkout sweep
+    await runAutoCheckoutSweep(now);
 
     // Reconcile missed work after a restart, laptop sleep, or delayed timer.
     await endExpiredSessions(now);
@@ -143,12 +147,89 @@ async function autoCreate(org, office, now, openAt, closeAt) {
   }
 }
 
+async function runAutoCheckoutSweep(now) {
+  try {
+    const openRecords = await prisma.attendanceRecord.findMany({
+      where: {
+        clockInTime: { not: null },
+        clockOutTime: null,
+      },
+      include: {
+        employee: {
+          select: {
+            id: true,
+            orgId: true,
+            shiftType: true,
+            organization: {
+              select: {
+                id: true,
+                timezone: true,
+                shiftSchedules: true,
+                autoCheckoutPolicy: true,
+              },
+            },
+          },
+        },
+        session: {
+          select: {
+            id: true,
+            startTime: true,
+            office: {
+              select: {
+                id: true,
+                name: true,
+                timezone: true,
+                shiftSchedules: true,
+                midnightAutoCheckout: true,
+                dayShiftCutoffTime: true,
+                nightShiftMaxHours: true,
+                organization: {
+                  select: {
+                    id: true,
+                    timezone: true,
+                    shiftSchedules: true,
+                    autoCheckoutPolicy: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    for (const record of openRecords) {
+      const tz = record.session?.office?.timezone ||
+        record.employee?.organization?.timezone ||
+        'Africa/Lagos';
+
+      const evaluation = evaluateAutoCheckout(record, now, tz);
+      if (evaluation.shouldAutoCheckout) {
+        await AttendanceService.autoCheckOutRecord(record.id, {
+          reason: evaluation.reason,
+          effectiveCheckoutTime: evaluation.effectiveCheckoutTime,
+        }).catch((err) => {
+          logger.error(`Error auto checking out record ${record.id}: ${err.message}`);
+        });
+      }
+    }
+  } catch (err) {
+    logger.error(`Error in runAutoCheckoutSweep: ${err.message}`);
+  }
+}
+
 async function endExpiredSessions(now) {
   const sessions = await prisma.attendanceSession.findMany({
     where: { endTime: { lte: now }, status: { in: ['ACTIVE', 'PAUSED'] } },
     select: { id: true, sessionName: true },
   });
   for (const sn of sessions) {
+    // If employees are still clocked in, do not end session prematurely
+    const openCount = await prisma.attendanceRecord.count({
+      where: { sessionId: sn.id, clockInTime: { not: null }, clockOutTime: null },
+    });
+    if (openCount > 0) continue;
+
     await AttendanceService.syncEmployeeAbsencesForSession(sn.id).catch((e) => logger.warn('absence sweep:', e.message));
     await prisma.attendanceSession.updateMany({
       where: { id: sn.id, status: { in: ['ACTIVE', 'PAUSED'] } },
@@ -205,6 +286,12 @@ async function endSessionsOutsideOfficeHours(now) {
 
     const autoCreateAt = new Date(openAt.getTime() - sessionLeadMinutes() * 60_000);
     if (now < autoCreateAt || now >= closeAt) {
+      // If employees are still clocked in on this session, keep it open!
+      const openCount = await prisma.attendanceRecord.count({
+        where: { sessionId: session.id, clockInTime: { not: null }, clockOutTime: null },
+      });
+      if (openCount > 0) continue;
+
       await AttendanceService.syncEmployeeAbsencesForSession(session.id).catch((e) => logger.warn('absence sweep:', e.message));
       await prisma.attendanceSession.updateMany({
         where: { id: session.id, status: { in: ['ACTIVE', 'PAUSED'] } },

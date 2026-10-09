@@ -11,6 +11,7 @@ const { performFaceVerification, hasValidEnrolledFace } = require('../utils/face
 const AuditService = require('./AuditService');
 const WorkEventService = require('./WorkEventService');
 const BreakService = require('./BreakService');
+const { resolveShiftSchedule, getShiftClosingInstant, isShiftOvernight, DEFAULT_SHIFT_SCHEDULES } = require('../utils/shiftHelper');
 
 const CHALLENGE_TTL_SECONDS = 120; // code valid for 2 minutes
 
@@ -125,14 +126,24 @@ class AttendanceService {
     });
     const challengeTime = await getCurrentServerTime();
     if (session?.office && !officeHoursFor(challengeTime, session.office)) return { success: false, reason: 'SUNDAY_CLOSED', message: 'This office is closed today.' };
-    if (
-      !session || session.status !== 'ACTIVE' || !session.office?.isActive ||
-      challengeTime < session.startTime || (session.endTime && challengeTime > session.endTime)
-    ) {
+    if (!session || !session.office?.isActive) {
       return { success: false, reason: 'SESSION_CLOSED', message: 'No active attendance session. Ask your admin to start a session.' };
     }
     if (session.office.orgId !== employee.orgId) {
       return { success: false, reason: 'SESSION_CLOSED', message: 'This attendance session does not belong to your organization.' };
+    }
+    // A closed or expired session must NOT stop a shift worker from scanning QR / checking in
+    if (session.status !== 'ACTIVE' || (session.endTime && challengeTime > session.endTime)) {
+      const extendedEndTime = new Date(Math.max(
+        session.endTime ? session.endTime.getTime() : challengeTime.getTime(),
+        challengeTime.getTime() + 8 * 3600 * 1000
+      ));
+      await prisma.attendanceSession.update({
+        where: { id: session.id },
+        data: { status: 'ACTIVE', endTime: extendedEndTime },
+      }).catch(() => {});
+      session.status = 'ACTIVE';
+      session.endTime = extendedEndTime;
     }
     if (employee.officeId && session.office?.id && employee.officeId !== session.office.id) {
       return { success: false, reason: 'OFFICE_MISMATCH', message: `This employee belongs to ${employee.office?.name || 'another office'} and cannot check in at this office session.` };
@@ -451,15 +462,24 @@ class AttendanceService {
       },
     });
 
-    if (
-      !session || session.status !== 'ACTIVE' || !session.office?.isActive ||
-      clockInTime < session.startTime || (session.endTime && clockInTime > session.endTime)
-    ) {
+    if (!session || !session.office?.isActive) {
       return { success: false, reason: 'SESSION_CLOSED' };
     }
-    if (!officeHoursFor(clockInTime, session.office)) return { success: false, reason: 'SUNDAY_CLOSED', message: 'This office is closed today.' };
     if (session.office.orgId !== employee.orgId) {
       return { success: false, reason: 'SESSION_CLOSED', message: 'This attendance session does not belong to your organization.' };
+    }
+    // A closed or expired session must NOT stop a shift worker from checking in
+    if (session.status !== 'ACTIVE' || (session.endTime && clockInTime > session.endTime)) {
+      const extendedEndTime = new Date(Math.max(
+        session.endTime ? session.endTime.getTime() : clockInTime.getTime(),
+        clockInTime.getTime() + 8 * 3600 * 1000
+      ));
+      await prisma.attendanceSession.update({
+        where: { id: session.id },
+        data: { status: 'ACTIVE', endTime: extendedEndTime },
+      }).catch(() => {});
+      session.status = 'ACTIVE';
+      session.endTime = extendedEndTime;
     }
     if (employee.officeId && session.office?.id && employee.officeId !== session.office.id) {
       return { success: false, reason: 'OFFICE_MISMATCH', message: `This employee belongs to ${employee.office?.name || 'another office'} and cannot check in at ${session.office?.name || 'this office'}.` };
@@ -517,6 +537,7 @@ class AttendanceService {
         checkInSource: 'PHONE', scanResult: 'VALID',
         wifiVerified: check.wifiVerified, deviceVerified: check.deviceVerified,
         deviceId: deviceId ?? null, wifiSSID: wifiSSID ?? null,
+        shiftTypeSnapshot: employee.shiftType || 'FULL_TIME',
       }, tx).then((record) => ({ record, status, penalty, clockInTime, timezone: session.office.timezone || 'Africa/Lagos' })),
     });
 
@@ -529,7 +550,7 @@ class AttendanceService {
     const employee = await this._loadEmployeeForChannel(employeeId, 'PHONE');
 
     // Resolve the record (sessionId optional)
-    const record = await prisma.attendanceRecord.findFirst({
+    let record = await prisma.attendanceRecord.findFirst({
       where: {
         employeeId,
         ...(sessionId ? { sessionId } : {}),
@@ -555,6 +576,34 @@ class AttendanceService {
         },
       },
     });
+
+    if (!record && sessionId) {
+      record = await prisma.attendanceRecord.findFirst({
+        where: {
+          employeeId,
+          clockInTime: { not: null },
+          clockOutTime: null,
+        },
+        orderBy: { clockInTime: 'desc' },
+        include: {
+          session: {
+            select: {
+              id: true,
+              startTime: true,
+              office: {
+                select: {
+                  id: true, orgId: true, name: true, wifiSSID: true, publicIp: true,
+                  openTime: true, closeTime: true, weeklySchedule: true, timezone: true,
+                  overtimeStartAfterCloseMinutes: true, overtimeFeePerHour: true,
+                  overstayPenalty: true, breakMinutes: true, breakStart: true, breakEnd: true,
+                  securitySettings: true,
+                },
+              },
+            },
+          },
+        },
+      });
+    }
 
     if (!record) throw Object.assign(new Error('No check-in record found for today'), { status: 404 });
     if (record.clockOutTime) throw Object.assign(new Error('Already clocked out'), { status: 409 });
@@ -699,38 +748,69 @@ class AttendanceService {
       const alreadyHas = activeSessions.some((s) => s.office?.id === office.id);
       if (!alreadyHas) {
         const hours = officeHoursFor(now, { ...office, organizationOpeningTime: organization?.openingTime });
-        if (hours) {
-          const openAt = atZonedTime(now, hours.openTime, office.timezone);
-          const closeAt = atZonedTime(now, hours.closeTime, office.timezone);
-          if (!closeAt || now < closeAt) {
-            try {
-              const autoSession = await prisma.attendanceSession.create({
-                data: {
-                  id: uuidv4(),
-                  sessionName: `${office.name} Standard Session`,
-                  officeId: office.id,
-                  officeName: office.name,
-                  orgName: organization?.name ?? null,
-                  startTime: openAt || now,
-                  endTime: closeAt || new Date(now.getTime() + 10 * 3600 * 1000),
-                  status: 'ACTIVE',
-                  qrRefreshInterval: 120,
-                },
-                select: {
-                  id: true, sessionName: true, startTime: true, endTime: true,
-                  office: {
-                    select: {
-                      id: true, name: true, timezone: true, openTime: true, closeTime: true,
-                      graceMinutes: true, lateAfterMinutes: true, gracePenalty: true, latePenalty: true, completelyLatePenalty: true,
-                      breakStart: true, breakEnd: true, breakMinutes: true,
-                    },
+        const openAt = hours ? atZonedTime(now, hours.openTime, office.timezone) : now;
+        const closeAt = hours ? atZonedTime(now, hours.closeTime, office.timezone) : null;
+        const sessionEnd = (closeAt && now < closeAt)
+          ? closeAt
+          : new Date(now.getTime() + 10 * 3600 * 1000);
+
+        // Check if there is an existing session for today that can be reactivated
+        const existingToday = await prisma.attendanceSession.findFirst({
+          where: {
+            officeId: office.id,
+            startTime: { gte: new Date(now.getTime() - 24 * 3600 * 1000) },
+          },
+          orderBy: { startTime: 'desc' },
+          select: {
+            id: true, sessionName: true, startTime: true, endTime: true, status: true,
+            office: {
+              select: {
+                id: true, name: true, timezone: true, openTime: true, closeTime: true,
+                graceMinutes: true, lateAfterMinutes: true, gracePenalty: true, latePenalty: true, completelyLatePenalty: true,
+                breakStart: true, breakEnd: true, breakMinutes: true,
+              },
+            },
+          },
+        });
+
+        if (existingToday) {
+          if (existingToday.status !== 'ACTIVE' || (existingToday.endTime && existingToday.endTime <= now)) {
+            await prisma.attendanceSession.update({
+              where: { id: existingToday.id },
+              data: { status: 'ACTIVE', endTime: sessionEnd },
+            }).catch(() => {});
+            existingToday.status = 'ACTIVE';
+            existingToday.endTime = sessionEnd;
+          }
+          activeSessions.push(existingToday);
+        } else {
+          try {
+            const autoSession = await prisma.attendanceSession.create({
+              data: {
+                id: uuidv4(),
+                sessionName: `${office.name} Standard Session`,
+                officeId: office.id,
+                officeName: office.name,
+                orgName: organization?.name ?? null,
+                startTime: openAt || now,
+                endTime: sessionEnd,
+                status: 'ACTIVE',
+                qrRefreshInterval: 120,
+              },
+              select: {
+                id: true, sessionName: true, startTime: true, endTime: true,
+                office: {
+                  select: {
+                    id: true, name: true, timezone: true, openTime: true, closeTime: true,
+                    graceMinutes: true, lateAfterMinutes: true, gracePenalty: true, latePenalty: true, completelyLatePenalty: true,
+                    breakStart: true, breakEnd: true, breakMinutes: true,
                   },
                 },
-              });
-              activeSessions.push(autoSession);
-            } catch {
-              // Ignore session creation clash if created concurrently
-            }
+              },
+            });
+            activeSessions.push(autoSession);
+          } catch {
+            // Ignore concurrent creation
           }
         }
       }
@@ -1008,6 +1088,7 @@ class AttendanceService {
         clockInTime, status, penalty,
         checkInSource: 'MANUAL', checkInRecordedById: adminId,
         wifiVerified: false, deviceVerified: false,
+        shiftTypeSnapshot: employee.shiftType || 'FULL_TIME',
       }, tx).then((record) => ({ record, status, penalty, clockInTime })),
     });
     if (!outcome.duplicate) this._emit('attendance:checkin', { record: outcome.record, sessionId, source: 'MANUAL' });
@@ -1025,7 +1106,7 @@ class AttendanceService {
 
     // Checkout is password-only. Face verification is required only at check-in.
 
-    const record = await prisma.attendanceRecord.findFirst({
+    let record = await prisma.attendanceRecord.findFirst({
       where: {
         employeeId,
         ...(sessionId ? { sessionId } : {}),
@@ -1043,6 +1124,27 @@ class AttendanceService {
         },
       },
     });
+
+    if (!record && sessionId) {
+      record = await prisma.attendanceRecord.findFirst({
+        where: {
+          employeeId,
+          clockInTime: { not: null },
+          clockOutTime: null,
+          session: { office: { orgId: adminOrgId } },
+        },
+        orderBy: { clockInTime: 'desc' },
+        include: {
+          session: {
+            select: {
+              startTime: true,
+              office: { select: { orgId: true, openTime: true, closeTime: true, weeklySchedule: true, timezone: true, overtimeStartAfterCloseMinutes: true, overtimeFeePerHour: true, overstayPenalty: true, breakMinutes: true, breakStart: true, breakEnd: true } },
+            },
+          },
+        },
+      });
+    }
+
     if (!record) throw Object.assign(new Error('No open attendance record found for this employee.'), { status: 404 });
     const clientTimestamp = timestamp ? new Date(timestamp) : null;
     const clockOutTime = await getCurrentServerTime();
@@ -1180,14 +1282,14 @@ class AttendanceService {
 
   _assertCheckoutAllowed(record, clockOutTime) {
     const office = record.session?.office;
-    if (!office?.closeTime) return;
-    const hours = officeHoursFor(clockOutTime, office);
-    if (!hours) throw Object.assign(new Error('This office is closed today.'), { status: 400, reason: 'SUNDAY_CLOSED' });
+    const shiftType = record.shiftTypeSnapshot || record.employee?.shiftType || 'FULL_TIME';
+    const shift = resolveShiftSchedule(office || {}, shiftType);
+    const timezone = office?.timezone || 'Africa/Lagos';
 
-    const closeAt = this._getScheduledOfficeClose(record, clockOutTime, hours);
+    const closeAt = this._getScheduledOfficeClose(record, clockOutTime);
     if (closeAt && clockOutTime < closeAt) {
       throw Object.assign(
-        new Error(`Check-out is available after the organisation closes at ${hours.closeTime} (${office.timezone || 'Africa/Lagos'}).`),
+        new Error(`Check-out is available after your scheduled shift ends at ${shift.closeTime} (${timezone}).`),
         { status: 400, reason: 'CHECKOUT_TOO_EARLY' }
       );
     }
@@ -1195,19 +1297,11 @@ class AttendanceService {
 
   _getScheduledOfficeClose(record, at, knownHours = null) {
     const office = record.session?.office;
-    if (!office?.closeTime) return null;
-    const hours = knownHours || officeHoursFor(at, office);
-    if (!hours?.closeTime) return null;
-    const opening = openingOccurrence(
-      record.session.startTime,
-      hours.openTime,
-      office.timezone,
-      hours.closeTime,
-      record.session.startTime,
-    );
-    let closeAt = atZonedTime(record.session.startTime, hours.closeTime, office.timezone);
-    if (opening && closeAt && closeAt <= opening) closeAt = atZonedTime(record.session.startTime, hours.closeTime, office.timezone, 1);
-    return closeAt;
+    const shiftType = record.shiftTypeSnapshot || record.employee?.shiftType || 'FULL_TIME';
+    const shift = resolveShiftSchedule(office || {}, shiftType);
+    const timezone = office?.timezone || 'Africa/Lagos';
+
+    return getShiftClosingInstant(record, shift, timezone);
   }
 
   async _evaluateOvertimeAtCheckout(orgId, record, clockOutTime) {
@@ -1385,11 +1479,11 @@ class AttendanceService {
         continue;
       }
 
-      // Shift check: an evening worker should not be marked absent during morning hours
-      if (employee.shiftType === 'EVENING') {
-        const eveningClose = session.office.organization?.shiftSchedules?.EVENING?.closeTime || '18:00';
-        const eveningCloseAt = atZonedTime(nowServer, eveningClose, tz);
-        if (eveningCloseAt && nowServer < eveningCloseAt) {
+      // Shift check: a shift worker should NOT be marked absent before their shift ends
+      if (employee.shiftType && employee.shiftType !== 'FULL_TIME') {
+        const shift = resolveShiftSchedule(session.office, employee.shiftType);
+        const shiftCloseAt = getShiftClosingInstant({ session, clockInTime: nowServer }, shift, tz);
+        if (shiftCloseAt && nowServer < shiftCloseAt) {
           continue;
         }
       }
@@ -1688,12 +1782,28 @@ class AttendanceService {
         },
       },
     });
-    if (
-      !session || session.status !== 'ACTIVE' || !session.office?.isActive ||
-      session.office.orgId !== orgId || now < session.startTime ||
-      (session.endTime && now > session.endTime)
-    ) {
+    if (!session || !session.office?.isActive || session.office.orgId !== orgId) {
       throw Object.assign(new Error('No active attendance session was found for this organization.'), { status: 400 });
+    }
+    // A closed session must NOT stop a shift worker from checking in
+    if (session.status !== 'ACTIVE' || (session.endTime && now > session.endTime)) {
+      const extendedEndTime = new Date(Math.max(
+        session.endTime ? session.endTime.getTime() : now.getTime(),
+        now.getTime() + 8 * 3600 * 1000
+      ));
+      session = await prisma.attendanceSession.update({
+        where: { id: session.id },
+        data: { status: 'ACTIVE', endTime: extendedEndTime },
+        select: {
+          id: true, status: true, startTime: true, endTime: true,
+          office: {
+            select: {
+              id: true, orgId: true, isActive: true, timezone: true, openTime: true, closeTime: true, weeklySchedule: true,
+              graceMinutes: true, lateAfterMinutes: true, gracePenalty: true, latePenalty: true, completelyLatePenalty: true,
+            },
+          },
+        },
+      });
     }
     return session;
   }
@@ -1721,6 +1831,7 @@ class AttendanceService {
       deviceVerified: data.deviceVerified ?? false,
       deviceId: data.deviceId ?? null,
       wifiSSID: data.wifiSSID ?? null,
+      shiftTypeSnapshot: data.shiftTypeSnapshot ?? null,
     };
     if (existing) {
       const changed = await db.attendanceRecord.updateMany({
@@ -1821,12 +1932,10 @@ class AttendanceService {
     const o = session.office ?? {};
     let hours = officeHoursFor(clockInTime, o);
 
-    // Shift awareness: if employee has a shiftType and organization has shift schedules,
-    // evaluate lateness against the employee's shift start time rather than office openTime.
-    const orgSchedules = employee?.organization?.shiftSchedules || o.organization?.shiftSchedules;
-    if (employee?.shiftType && orgSchedules && orgSchedules[employee.shiftType]) {
-      const shift = orgSchedules[employee.shiftType];
-      if (shift.openTime && shift.closeTime) {
+    // Shift awareness: evaluate lateness against the employee's shift start time rather than office openTime.
+    if (employee?.shiftType) {
+      const shift = resolveShiftSchedule(o, employee.shiftType);
+      if (shift?.openTime && shift?.closeTime) {
         hours = {
           openTime: shift.openTime,
           closeTime: shift.closeTime,
@@ -1983,6 +2092,81 @@ class AttendanceService {
       dedupeKey: `attendance-correction:approve:${record.id}:${updated.updatedAt.toISOString()}`,
       metadata: { action: 'APPROVED', before: record, after: updated, notes },
     });
+    return updated;
+  }
+
+  async autoCheckOutRecord(recordId, { reason = 'MIDNIGHT_SWEEP', effectiveCheckoutTime = null } = {}) {
+    const record = await prisma.attendanceRecord.findUnique({
+      where: { id: recordId },
+      include: {
+        employee: { select: { id: true, orgId: true, shiftType: true } },
+        session: { select: { id: true, office: { select: { id: true, timezone: true } } } },
+      },
+    });
+
+    if (!record || !record.clockInTime || record.clockOutTime) return null;
+
+    const clockOutTime = effectiveCheckoutTime || await getCurrentServerTime();
+    const workMs = Math.max(0, clockOutTime.getTime() - record.clockInTime.getTime());
+    const totalWorkHours = parseFloat((workMs / 3600000).toFixed(2));
+    const shiftType = record.shiftTypeSnapshot || record.employee?.shiftType || 'FULL_TIME';
+
+    // Auto-end any open breaks without adding penalty
+    const activeBreaks = await prisma.breakRecord.findMany({
+      where: { attendanceRecordId: record.id, endTime: null },
+    });
+    for (const b of activeBreaks) {
+      const dur = Math.max(1, Math.floor((clockOutTime.getTime() - b.startTime.getTime()) / 60000));
+      await prisma.breakRecord.update({
+        where: { id: b.id },
+        data: {
+          endTime: clockOutTime,
+          durationMinutes: dur,
+          penalty: 0,
+          isAutoEnded: true,
+          notes: 'Auto-ended on system auto-checkout',
+        },
+      });
+      await prisma.attendanceRecord.update({
+        where: { id: record.id },
+        data: { totalBreakMinutes: { increment: dur } },
+      }).catch(() => {});
+    }
+
+    const updated = await prisma.attendanceRecord.update({
+      where: { id: record.id },
+      data: {
+        clockOutTime,
+        totalWorkHours,
+        checkOutSource: 'SYSTEM',
+        isAutoCheckedOut: true,
+        autoCheckoutReason: reason,
+        shiftTypeSnapshot: shiftType,
+        overtimeMinutes: 0,
+        overtimeEarnings: 0,
+        overtimeRuleVersion: null,
+        overtimeDetails: null,
+      },
+    });
+
+    // Record attendance event for audit trail
+    await prisma.attendanceEvent.create({
+      data: {
+        id: uuidv4(),
+        orgId: record.employee.orgId,
+        employeeId: record.employee.id,
+        actorId: null,
+        sessionId: record.sessionId,
+        attendanceRecordId: record.id,
+        eventType: 'CHECK_OUT',
+        source: 'SYSTEM',
+        ruleVersion: 'AUTO_CHECKOUT_SWEEP',
+        metadata: { reason, shiftType, isAutoCheckedOut: true },
+      },
+    }).catch((e) => logger.warn(`Failed to log auto-checkout event for ${record.id}:`, e.message));
+
+    this._emit('attendance:checkout', { record: updated, sessionId: record.sessionId });
+    logger.info(`Auto-checked out employee ${record.employee.id} (record ${record.id}) - Reason: ${reason}`);
     return updated;
   }
 

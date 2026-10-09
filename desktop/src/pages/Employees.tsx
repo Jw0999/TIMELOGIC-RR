@@ -20,7 +20,10 @@ const STATUS_STYLE: Record<string, string> = {
 const SHIFTS = [
   { value: 'FULL_TIME', label: 'Full Time' },
   { value: 'MORNING', label: 'Morning Shift' },
+  { value: 'AFTERNOON', label: 'Afternoon Shift' },
   { value: 'EVENING', label: 'Evening Shift' },
+  { value: 'NIGHT', label: 'Night Shift' },
+  { value: 'FLEXIBLE', label: 'Flexible Shift' },
 ];
 
 const SHIFT_LABEL: Record<string, string> = {

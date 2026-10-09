@@ -162,6 +162,8 @@ export const getCsvUrl        = () => `${API_URL}/reports/export/csv`;
 export const fetchAdminOrg       = () => api.get<any>('/admin/org').then((r) => r.data);
 export const updateOfficeSettings = (officeId: string, body: any) =>
   api.put<any>(`/admin/offices/${officeId}/settings`, body).then((r) => r.data);
+export const fetchShiftConfiguration = () => api.get<any>('/admin/shifts').then((r) => r.data ?? r);
+export const updateShiftConfiguration = (body: any) => api.put<any>('/admin/shifts', body).then((r) => r.data ?? r);
 
 // ─── Emergency ───────────────────────────────────────────────────────────────
 export const stopAllAttendance = (officeId: string, reason: string) => api.post<any>('/admin/emergency/stop-all', { officeId, reason });

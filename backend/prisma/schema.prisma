@@ -27,6 +27,7 @@ model Organization {
   timezone                String            @default("Africa/Lagos")
   kioskPasswordHash       String?
   shiftSchedules          Json?
+  autoCheckoutPolicy      Json?
   maxEmployees            Int?              @default(20)
   maxKiosks               Int?              @default(1)
   maxDesktopAdmins        Int?              @default(1)
@@ -89,6 +90,10 @@ model Office {
   completelyLatePenalty          Int                 @default(0)
   absentPenalty                  Int                 @default(0)
   overstayPenalty                Int                 @default(0)
+  shiftSchedules                 Json?
+  midnightAutoCheckout           Boolean?            @default(true)
+  dayShiftCutoffTime             String?             @default("00:00")
+  nightShiftMaxHours             Int?                @default(14)
   sessions                       AttendanceSession[]
   organization                   Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
   employees                      User[]              @relation("OfficeEmployees")
@@ -393,6 +398,9 @@ model AttendanceRecord {
   checkOutSource       AttendanceSource?
   checkInRecordedById  String?
   checkOutRecordedById String?
+  isAutoCheckedOut     Boolean           @default(false)
+  autoCheckoutReason   String?
+  shiftTypeSnapshot    String?
   lifecycleState       String            @default("FINALIZED")
   recordHash           String?
   rulesSnapshot        Json?
