@@ -6,6 +6,7 @@ import {
   GraduationCap, UserCheck, ReceiptText, Banknote, TrendingUp, type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { IS_LOCAL_PART } from '../config';
 import logo from '../assets/logo.jpg';
 
 type Capability = 'allowManualCheckIn' | 'hasStudents';
@@ -32,12 +33,8 @@ export default function Sidebar() {
   const { user, organization, logout } = useAuth();
   const navigate = useNavigate();
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
-  const isLocalOrElectron = typeof window !== 'undefined' && (
-    Boolean((window as any).electronAPI) ||
-    ['localhost', '127.0.0.1'].includes(window.location.hostname)
-  );
   const visibleNav = NAV.filter((item) => {
-    if (item.to === '/sales-intelligence' && !isLocalOrElectron) return false;
+    if (item.to === '/sales-intelligence' && !IS_LOCAL_PART) return false;
     return isSuperAdmin || !item.capability || Boolean(organization?.[item.capability]);
   });
   return (

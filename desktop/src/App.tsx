@@ -20,6 +20,7 @@ import Penalties from './pages/Penalties';
 import Salary from './pages/Salary';
 import SalesIntelligence from './pages/SalesIntelligence';
 import SubscriptionLockModal from './components/SubscriptionLockModal';
+import { IS_LOCAL_PART } from './config';
 
 function Guard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -72,7 +73,7 @@ function AppRoutes() {
       <Route path="/employees"  element={<Guard><Layout><Employees /></Layout></Guard>} />
       <Route path="/salary"     element={<Guard><Layout><Salary /></Layout></Guard>} />
       <Route path="/sales-intelligence" element={
-        (typeof window !== 'undefined' && (Boolean((window as any).electronAPI) || ['localhost', '127.0.0.1'].includes(window.location.hostname)))
+        IS_LOCAL_PART
           ? <Guard><Layout><SalesIntelligence /></Layout></Guard>
           : <Navigate to="/dashboard" replace />
       } />
