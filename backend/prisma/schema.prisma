@@ -16,6 +16,8 @@ model Organization {
   subscriptionStart       DateTime          @default(now())
   subscriptionExpiresAt   DateTime?
   lastActivatedAt         DateTime?
+  subscriptionPausedAt    DateTime?
+  subscriptionPausedRemainingSeconds Int?
   createdAt               DateTime          @default(now())
   updatedAt               DateTime          @updatedAt
   leavePolicy             Json?

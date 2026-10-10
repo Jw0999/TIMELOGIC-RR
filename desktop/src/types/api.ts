@@ -3,9 +3,12 @@ export type EmployeeCheckInMethod = 'PHONE' | 'MANUAL' | 'BOTH';
 export interface SubscriptionStatus {
   status: string;
   isExpired: boolean;
+  isSuspended?: boolean;
   daysRemaining: number;
+  pausedDaysRemaining?: number;
   subscriptionExpiresAt: string | null;
   subscriptionStart?: string | null;
+  subscriptionPausedAt?: string | null;
   lastActivatedAt?: string | null;
 }
 

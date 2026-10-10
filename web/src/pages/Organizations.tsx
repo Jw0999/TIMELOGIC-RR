@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, X, ChevronRight, ChevronsUpDown, Pencil, CalendarDays, KeyRound, Copy, Check, MessageSquare, Sparkles } from 'lucide-react';
+import { Plus, Trash2, X, ChevronRight, ChevronsUpDown, Pencil, CalendarDays, KeyRound, Copy, Check, MessageSquare, Sparkles, PauseCircle, PlayCircle, Clock } from 'lucide-react';
 import PageShell from '../components/PageShell';
-import { fetchAllOrgs, createOrg, updateOrg, deleteOrg, fetchOrgUsers, fetchLeavePolicy, saveLeavePolicy, resetAdminPassword, reassignUserOffice, generateOrgActivationCode, fetchOrgActivationCodes, manualRenewOrgSubscription } from '../services';
+import { fetchAllOrgs, createOrg, updateOrg, deleteOrg, fetchOrgUsers, fetchLeavePolicy, saveLeavePolicy, resetAdminPassword, reassignUserOffice, generateOrgActivationCode, fetchOrgActivationCodes, manualRenewOrgSubscription, suspendOrg, unsuspendOrg } from '../services';
 import { downloadCSV } from '../utils/csv';
 
 const INDUSTRIES = ['Technology','Finance','Healthcare','Education','Logistics','Retail','Manufacturing','Non-profit','Government','Other'];
@@ -1170,6 +1170,26 @@ export default function Organizations() {
     finally { setDeleting(null); }
   };
 
+  const handleSuspend = async (id: string, name: string) => {
+    if (!window.confirm(`Suspend organization "${name}"?\n\nThis will put the subscription and active codes ON HOLD. Remaining days will be frozen and access will be locked until reactivated.`)) return;
+    try {
+      await suspendOrg(id);
+      load();
+    } catch (err: any) {
+      alert(err?.message ?? 'Failed to suspend organization');
+    }
+  };
+
+  const handleUnsuspend = async (id: string, name: string) => {
+    if (!window.confirm(`Reactivate organization "${name}"?\n\nThis will restore the frozen subscription days and unlock access.`)) return;
+    try {
+      await unsuspendOrg(id);
+      load();
+    } catch (err: any) {
+      alert(err?.message ?? 'Failed to reactivate organization');
+    }
+  };
+
   return (
     <>
       <PageShell
@@ -1219,8 +1239,10 @@ export default function Organizations() {
                 const manualEnabled = o.allowManualCheckIn ?? false;
                 const studentsEnabled = o.hasStudents ?? false;
                 const sub = o.subscription || {};
-                const isExpired = sub.isExpired ?? o.isExpired ?? (o.subscriptionStatus === 'EXPIRED');
+                const isSuspended = o.subscriptionStatus === 'SUSPENDED' || o.isSuspended || sub.isSuspended;
+                const isExpired = !isSuspended && (sub.isExpired ?? o.isExpired ?? (o.subscriptionStatus === 'EXPIRED'));
                 const days = sub.daysRemaining ?? o.daysRemaining ?? 0;
+                const pausedDays = o.pausedDaysRemaining ?? sub.pausedDaysRemaining ?? days;
                 const expiryDate = sub.subscriptionExpiresAt ?? o.subscriptionExpiresAt;
                 return (
                   <tr key={o.id} className="hover:bg-[var(--hover-bg)] transition-colors">
@@ -1267,7 +1289,11 @@ export default function Organizations() {
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-1.5">
-                          {isExpired ? (
+                          {isSuspended ? (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 flex items-center gap-1" title="Subscription is frozen on hold">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-600" /> Suspended ({pausedDays}d hold)
+                            </span>
+                          ) : isExpired ? (
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 flex items-center gap-1">
                               <span className="w-1.5 h-1.5 rounded-full bg-red-500" /> Expired
                             </span>
@@ -1282,7 +1308,9 @@ export default function Organizations() {
                           )}
                         </div>
                         <p className="text-[10px] text-[var(--text-muted)] whitespace-nowrap">
-                          {expiryDate && !isExpired
+                          {isSuspended
+                            ? `Subscription on hold (${pausedDays}d frozen)`
+                            : expiryDate && !isExpired
                             ? `Expires ${new Date(expiryDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
                             : isExpired
                             ? 'Locked out'
@@ -1301,6 +1329,25 @@ export default function Organizations() {
                         <button onClick={() => setViewOrg(o)} className="text-sm font-semibold text-primary-700 hover:text-primary-900 transition-colors">View</button>
                         <button onClick={() => setLeaveOrg(o)} title="Leave days" className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-[var(--hover-bg)] text-[var(--text-muted)] hover:text-primary-700 transition-colors"><CalendarDays size={13}/></button>
                         <button onClick={() => setEditOrg(o)} title="Edit" className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-[var(--hover-bg)] text-[var(--text-muted)] hover:text-primary-700 transition-colors"><Pencil size={13}/></button>
+                        {o.id !== 'platform-org' && (
+                          isSuspended ? (
+                            <button
+                              onClick={() => handleUnsuspend(o.id, o.name)}
+                              title="Unsuspend (Resume Subscription)"
+                              className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-emerald-50 text-[var(--text-muted)] hover:text-emerald-600 transition-colors"
+                            >
+                              <PlayCircle size={14}/>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleSuspend(o.id, o.name)}
+                              title="Suspend (Freeze Subscription On Hold)"
+                              className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-amber-50 text-[var(--text-muted)] hover:text-amber-600 transition-colors"
+                            >
+                              <PauseCircle size={14}/>
+                            </button>
+                          )
+                        )}
                         {o.id !== 'platform-org' && (
                           <button onClick={() => handleDelete(o.id, o.name)} disabled={deleting === o.id}
                             className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-red-50 text-[var(--text-muted)] hover:text-red-500 transition-colors disabled:opacity-50">
@@ -1391,12 +1438,25 @@ function LeavePolicyModal({ org, onClose }: { org: any; onClose: () => void }) {
   );
 }
 
+const DURATION_PRESETS = [
+  { label: '7 Days', days: 7 },
+  { label: '14 Days', days: 14 },
+  { label: '30 Days (Default)', days: 30 },
+  { label: '60 Days', days: 60 },
+  { label: '90 Days', days: 90 },
+  { label: '180 Days', days: 180 },
+  { label: '365 Days (1 Yr)', days: 365 },
+];
+
 function ActivationCodeModal({ org, onClose }: { org: any; onClose: () => void }) {
   const [codes, setCodes] = useState<any[]>([]);
   const [latestCode, setLatestCode] = useState<string | null>(null);
+  const [durationDays, setDurationDays] = useState<number>(30);
+  const [isCustomDuration, setIsCustomDuration] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [renewing, setRenewing] = useState(false);
+  const [unsuspending, setUnsuspending] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -1422,9 +1482,9 @@ function ActivationCodeModal({ org, onClose }: { org: any; onClose: () => void }
     setError('');
     setSuccess('');
     try {
-      const res = await generateOrgActivationCode(org.id, 30);
-      setLatestCode(res.activationCode?.code || null);
-      setSuccess('New 8-digit activation code generated successfully!');
+      const res = await generateOrgActivationCode(org.id, durationDays);
+      setLatestCode(res.activationCode?.code || res.data?.code || null);
+      setSuccess(`New ${durationDays}-day activation code generated successfully!`);
       loadCodes();
     } catch (err: any) {
       setError(err?.message ?? 'Failed to generate code');
@@ -1434,17 +1494,32 @@ function ActivationCodeModal({ org, onClose }: { org: any; onClose: () => void }
   };
 
   const handleManualRenew = async () => {
-    if (!window.confirm(`Manually extend subscription for "${org.name}" by 30 days?`)) return;
+    if (!window.confirm(`Manually extend subscription for "${org.name}" by ${durationDays} days?`)) return;
     setRenewing(true);
     setError('');
     setSuccess('');
     try {
-      const res = await manualRenewOrgSubscription(org.id, 30);
-      setSuccess(res.message || 'Subscription extended successfully!');
+      const res = await manualRenewOrgSubscription(org.id, durationDays);
+      setSuccess(res.message || `Subscription extended by ${durationDays} days!`);
     } catch (err: any) {
       setError(err?.message ?? 'Failed to renew');
     } finally {
       setRenewing(false);
+    }
+  };
+
+  const handleUnsuspendModal = async () => {
+    if (!window.confirm(`Reactivate organization "${org.name}"?\n\nThis will resume its frozen subscription and unlock operations.`)) return;
+    setUnsuspending(true);
+    setError('');
+    try {
+      await unsuspendOrg(org.id);
+      setSuccess('Organization reactivated! Subscription resumed.');
+      setTimeout(() => { onClose(); }, 1200);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to reactivate organization');
+    } finally {
+      setUnsuspending(false);
     }
   };
 
@@ -1455,13 +1530,15 @@ function ActivationCodeModal({ org, onClose }: { org: any; onClose: () => void }
   };
 
   const sub = org.subscription || {};
-  const isExpired = sub.isExpired ?? org.isExpired ?? (org.subscriptionStatus === 'EXPIRED');
+  const isSuspended = org.subscriptionStatus === 'SUSPENDED' || org.isSuspended || sub.isSuspended;
+  const isExpired = !isSuspended && (sub.isExpired ?? org.isExpired ?? (org.subscriptionStatus === 'EXPIRED'));
   const days = sub.daysRemaining ?? org.daysRemaining ?? 0;
+  const pausedDays = org.pausedDaysRemaining ?? sub.pausedDaysRemaining ?? days;
   const expiryRaw = sub.subscriptionExpiresAt ?? org.subscriptionExpiresAt;
   const expiresAt = expiryRaw ? new Date(expiryRaw).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Not set';
 
   const waMessage = latestCode 
-    ? encodeURIComponent(`Hello ${org.name},\nHere is your TimeLogic 30-day activation code: *${latestCode}*.\n\nPlease enter this code in your TimeLogic Desktop Application to activate/renew your subscription.\nThank you!`)
+    ? encodeURIComponent(`Hello ${org.name},\nHere is your TimeLogic ${durationDays}-day activation code: *${latestCode}*.\n\nPlease enter this code in your TimeLogic Desktop Application to activate/renew your subscription.\nThank you!`)
     : '';
 
   return (
@@ -1473,7 +1550,7 @@ function ActivationCodeModal({ org, onClose }: { org: any; onClose: () => void }
               <KeyRound size={20} className="text-primary-600" />
               Subscription & License · {org.name}
             </h2>
-            <p className="text-xs text-[var(--text-muted)] mt-0.5">Manage 30-day activation codes and lockout status</p>
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">Manage custom duration activation codes and lockout status</p>
           </div>
           <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-main)] flex-shrink-0"><X size={20}/></button>
         </div>
@@ -1482,54 +1559,142 @@ function ActivationCodeModal({ org, onClose }: { org: any; onClose: () => void }
           {error && <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-sm text-red-700">{error}</div>}
           {success && <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-sm text-emerald-700">{success}</div>}
 
+          {/* Suspended alert banner */}
+          {isSuspended && (
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between text-amber-900">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0 text-amber-700">
+                  <PauseCircle size={20} />
+                </div>
+                <div>
+                  <p className="font-bold text-sm">Organization Suspended (Subscription On Hold)</p>
+                  <p className="text-xs text-amber-700 mt-0.5">
+                    Operations are locked. {pausedDays} days of subscription are frozen safely on hold.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleUnsuspendModal}
+                disabled={unsuspending}
+                className="px-3.5 py-2 bg-amber-700 hover:bg-amber-800 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+              >
+                <PlayCircle size={14} /> {unsuspending ? 'Resuming…' : 'Reactivate Org'}
+              </button>
+            </div>
+          )}
+
           {/* Status summary banner */}
           <div className={`p-4 rounded-2xl border flex items-center justify-between ${
+            isSuspended ? 'bg-amber-50/70 border-amber-200 text-amber-800' :
             isExpired ? 'bg-red-50/70 border-red-200 text-red-800' :
             days <= 5 ? 'bg-amber-50/70 border-amber-200 text-amber-800' :
             'bg-emerald-50/70 border-emerald-200 text-emerald-800'
           }`}>
             <div>
               <div className="flex items-center gap-2">
-                <span className={`w-2.5 h-2.5 rounded-full ${isExpired ? 'bg-red-500' : days <= 5 ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
+                <span className={`w-2.5 h-2.5 rounded-full ${
+                  isSuspended ? 'bg-amber-500' :
+                  isExpired ? 'bg-red-500' :
+                  days <= 5 ? 'bg-amber-500 animate-pulse' :
+                  'bg-emerald-500'
+                }`} />
                 <span className="font-bold text-sm tracking-wide uppercase">
-                  {isExpired ? 'Locked Out / Expired' : days <= 5 ? 'Renewal Due Soon' : 'Subscription Active'}
+                  {isSuspended ? 'Suspended (Subscription Frozen)' : isExpired ? 'Locked Out / Expired' : days <= 5 ? 'Renewal Due Soon' : 'Subscription Active'}
                 </span>
               </div>
               <p className="text-xs mt-1 text-[var(--text-muted)]">
-                Expires on: <span className="font-semibold text-[var(--text-main)]">{expiresAt}</span> · {isExpired ? <span className="text-red-600 font-semibold">Locked</span> : <span>{days} days remaining</span>}
+                Expires on: <span className="font-semibold text-[var(--text-main)]">{expiresAt}</span> · {
+                  isSuspended ? <span className="text-amber-700 font-semibold">{pausedDays} days frozen on hold</span> :
+                  isExpired ? <span className="text-red-600 font-semibold">Locked</span> :
+                  <span>{days} days remaining</span>
+                }
               </p>
             </div>
             <button
               onClick={handleManualRenew}
               disabled={renewing}
               className="text-xs font-bold px-3 py-1.5 rounded-xl border bg-white hover:bg-gray-50 text-gray-700 shadow-sm transition disabled:opacity-50"
-              title="Directly extend subscription by 30 days without code"
+              title={`Directly extend subscription by ${durationDays} days without code`}
             >
-              {renewing ? 'Extending…' : '+ 30 Days Override'}
+              {renewing ? 'Extending…' : `+ ${durationDays} Days Override`}
             </button>
           </div>
 
           {/* Generator card */}
           <div className="p-5 bg-gradient-to-br from-[var(--hover-bg)] to-[var(--card-bg)] rounded-2xl border border-[var(--border)] space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <div>
                 <h3 className="font-bold text-sm text-[var(--text-main)] flex items-center gap-1.5">
-                  <Sparkles size={16} className="text-amber-500" /> Generate Monthly Code
+                  <Sparkles size={16} className="text-amber-500" /> Generate Activation Code
                 </h3>
                 <p className="text-xs text-[var(--text-muted)] mt-0.5">Generate a single-use 8-digit PIN for client to unlock Desktop app.</p>
               </div>
               <button
                 onClick={handleGenerate}
-                disabled={generating}
-                className="px-4 py-2 bg-primary-700 hover:bg-primary-800 text-white text-xs font-bold rounded-xl transition shadow-sm disabled:opacity-60"
+                disabled={generating || isSuspended}
+                className="px-4 py-2 bg-primary-700 hover:bg-primary-800 text-white text-xs font-bold rounded-xl transition shadow-sm disabled:opacity-50"
+                title={isSuspended ? 'Cannot generate code while organization is suspended' : undefined}
               >
-                {generating ? 'Generating…' : 'Generate Code'}
+                {generating ? 'Generating…' : `Generate ${durationDays}-Day Code`}
               </button>
+            </div>
+
+            {/* Duration Selector & Custom Days Form */}
+            <div className="pt-2 border-t border-[var(--border)] space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-[var(--text-main)] flex items-center gap-1">
+                  <Clock size={13} className="text-primary-600" /> Subscription Duration:
+                </span>
+                <span className="text-xs font-bold text-primary-700 bg-primary-50 px-2 py-0.5 rounded-md border border-primary-100">
+                  {durationDays} Days
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {DURATION_PRESETS.map((p) => (
+                  <button
+                    key={p.days}
+                    type="button"
+                    onClick={() => { setDurationDays(p.days); setIsCustomDuration(false); }}
+                    className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg border transition ${
+                      !isCustomDuration && durationDays === p.days
+                        ? 'bg-primary-700 text-white border-primary-700 shadow-sm'
+                        : 'bg-[var(--card-bg)] text-[var(--text-main)] border-[var(--border)] hover:bg-[var(--hover-bg)]'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setIsCustomDuration(true)}
+                  className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg border transition ${
+                    isCustomDuration
+                      ? 'bg-primary-700 text-white border-primary-700 shadow-sm'
+                      : 'bg-[var(--card-bg)] text-[var(--text-main)] border-[var(--border)] hover:bg-[var(--hover-bg)]'
+                  }`}
+                >
+                  Custom Days…
+                </button>
+              </div>
+              {isCustomDuration && (
+                <div className="flex items-center gap-2 mt-2 pt-1">
+                  <span className="text-xs text-[var(--text-muted)] font-medium">Specify exact days:</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="3650"
+                    value={durationDays}
+                    onChange={(e) => setDurationDays(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                    className="w-24 px-2.5 py-1 text-xs font-bold bg-[var(--card-bg)] border border-primary-300 rounded-lg text-primary-800 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                  />
+                  <span className="text-xs text-[var(--text-muted)] font-medium">days</span>
+                </div>
+              )}
             </div>
 
             {latestCode && (
               <div className="mt-3 p-4 bg-primary-50/70 border border-primary-200 rounded-2xl">
-                <p className="text-xs font-semibold text-primary-800 uppercase tracking-wider mb-1">Generated 8-Digit Activation Code:</p>
+                <p className="text-xs font-semibold text-primary-800 uppercase tracking-wider mb-1">Generated 8-Digit Activation Code ({durationDays} Days):</p>
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <span className="font-mono text-2xl font-black text-primary-900 tracking-[0.25em]">
                     {latestCode.slice(0, 4)} {latestCode.slice(4)}
@@ -1553,7 +1718,7 @@ function ActivationCodeModal({ org, onClose }: { org: any; onClose: () => void }
                   </div>
                 </div>
                 <p className="text-[11px] text-primary-700 mt-2">
-                  Client inputs this code in their TimeLogic Desktop app. Once redeemed, it unlocks the app and extends the organization's subscription by 30 days.
+                  Client inputs this code in their TimeLogic Desktop app. Once redeemed, it unlocks the app and extends the organization's subscription by {durationDays} days.
                 </p>
               </div>
             )}
@@ -1593,7 +1758,7 @@ function ActivationCodeModal({ org, onClose }: { org: any; onClose: () => void }
                             </span>
                           )}
                         </td>
-                        <td className="px-3 py-2 text-[var(--text-muted)]">{c.durationDays || 30} days</td>
+                        <td className="px-3 py-2 text-[var(--text-muted)] font-semibold">{c.durationDays || 30} days</td>
                         <td className="px-3 py-2 text-[var(--text-muted)]">{new Date(c.createdAt).toLocaleDateString('en-GB')}</td>
                         <td className="px-3 py-2 text-right">
                           {!c.isUsed && (

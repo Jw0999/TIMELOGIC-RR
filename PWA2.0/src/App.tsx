@@ -319,7 +319,7 @@ function KioskSuspendedScreen({
                 lineHeight: 1.6,
               }}
             >
-              This kiosk is temporarily unavailable because the organization's monthly subscription has ended. Once the administrator enters the monthly activation code in the TimeLogic Desktop application, this terminal will automatically resume operations.
+              This kiosk is temporarily unavailable because the organization's subscription has ended or is on hold. Once the administrator activates the subscription in the TimeLogic Desktop application, this terminal will automatically resume operations.
             </p>
           </div>
 
@@ -505,7 +505,7 @@ function App() {
       setSubscriptionExpired(false);
       await load(false, true);
     } catch (e: any) {
-      if (e?.code === 'SUBSCRIPTION_EXPIRED' || e?.message?.includes('subscription has expired')) {
+      if (e?.code === 'SUBSCRIPTION_EXPIRED' || e?.code === 'ORGANIZATION_SUSPENDED' || e?.message?.includes('subscription has expired') || e?.message?.includes('suspended')) {
         setSubscriptionExpired(true);
       }
     } finally {

@@ -216,9 +216,9 @@ async function request<T>(method: Method, path: string, body?: unknown, allowRef
       throw new Error('Session expired. Please log in again.');
     }
 
-    if (res.status === 403 && res.data?.code === 'SUBSCRIPTION_EXPIRED') {
+    if (res.status === 403 && (res.data?.code === 'SUBSCRIPTION_EXPIRED' || res.data?.code === 'ORGANIZATION_SUSPENDED')) {
       window.dispatchEvent(new CustomEvent('subscription:expired', { detail: res.data }));
-      throw new Error(res.data?.message || 'Organization subscription has expired. Please enter activation code to continue.');
+      throw new Error(res.data?.message || 'Organization access locked. Please contact administrator.');
     }
 
     if (!res.ok) {
@@ -267,9 +267,9 @@ async function request<T>(method: Method, path: string, body?: unknown, allowRef
     throw new Error('Session expired. Please log in again.');
   }
 
-  if (res.status === 403 && data?.code === 'SUBSCRIPTION_EXPIRED') {
+  if (res.status === 403 && (data?.code === 'SUBSCRIPTION_EXPIRED' || data?.code === 'ORGANIZATION_SUSPENDED')) {
     window.dispatchEvent(new CustomEvent('subscription:expired', { detail: data }));
-    throw new Error(data?.message || 'Organization subscription has expired. Please enter activation code to continue.');
+    throw new Error(data?.message || 'Organization access locked. Please contact administrator.');
   }
 
   if (!res.ok) {

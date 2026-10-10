@@ -22,10 +22,29 @@ function getOrgSubscriptionStatus(org) {
   const now = new Date();
   const expiresAt = org.subscriptionExpiresAt ? new Date(org.subscriptionExpiresAt) : null;
 
+  // If organization is SUSPENDED by Super Admin, subscription is on hold
+  if (org.subscriptionStatus === 'SUSPENDED') {
+    const pausedSeconds = org.subscriptionPausedRemainingSeconds || 0;
+    const pausedDays = Math.ceil(pausedSeconds / 86400);
+    return {
+      isExpired: true,
+      isSuspended: true,
+      status: 'SUSPENDED',
+      subscriptionStart: org.subscriptionStart || null,
+      subscriptionExpiresAt: expiresAt ? expiresAt.toISOString() : null,
+      subscriptionPausedAt: org.subscriptionPausedAt ? (org.subscriptionPausedAt instanceof Date ? org.subscriptionPausedAt.toISOString() : new Date(org.subscriptionPausedAt).toISOString()) : null,
+      lastActivatedAt: org.lastActivatedAt ? (org.lastActivatedAt instanceof Date ? org.lastActivatedAt.toISOString() : new Date(org.lastActivatedAt).toISOString()) : null,
+      daysRemaining: pausedDays,
+      pausedDaysRemaining: pausedDays,
+      pausedRemainingSeconds: pausedSeconds,
+    };
+  }
+
   // If no expiration date is set, or org was never activated, or status is explicitly EXPIRED
   if (!expiresAt || org.subscriptionStatus === 'EXPIRED') {
     return {
       isExpired: true,
+      isSuspended: false,
       status: 'EXPIRED',
       subscriptionStart: org.subscriptionStart || null,
       subscriptionExpiresAt: expiresAt ? expiresAt.toISOString() : null,
@@ -47,6 +66,7 @@ function getOrgSubscriptionStatus(org) {
 
   return {
     isExpired,
+    isSuspended: false,
     status,
     subscriptionStart: org.subscriptionStart || org.createdAt,
     subscriptionExpiresAt: expiresAt.toISOString(),
@@ -99,6 +119,13 @@ async function redeemActivationCode({ orgId, code, adminId, adminIp }) {
     return { success: false, error: 'Organization not found.' };
   }
 
+  if (org.subscriptionStatus === 'SUSPENDED') {
+    return {
+      success: false,
+      error: 'This organization is currently suspended by Super Admin. The subscription is on hold and activation codes cannot be redeemed until the organization is unsuspended.',
+    };
+  }
+
   const durationDays = activationRecord.durationDays || 30;
   const currentExpiry = org.subscriptionExpiresAt ? new Date(org.subscriptionExpiresAt) : null;
 
@@ -123,6 +150,8 @@ async function redeemActivationCode({ orgId, code, adminId, adminIp }) {
         subscriptionStatus: 'ACTIVE',
         subscriptionStart: org.subscriptionStart || now,
         subscriptionExpiresAt: newExpiry,
+        subscriptionPausedAt: null,
+        subscriptionPausedRemainingSeconds: null,
         lastActivatedAt: now,
       },
     }),

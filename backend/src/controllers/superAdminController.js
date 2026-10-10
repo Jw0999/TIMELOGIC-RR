@@ -93,6 +93,8 @@ const listOrgs = async (req, res, next) => {
         subscriptionExpiresAt: sub.subscriptionExpiresAt,
         daysRemaining: sub.daysRemaining,
         isExpired: sub.isExpired,
+        isSuspended: Boolean(sub.isSuspended),
+        pausedDaysRemaining: sub.pausedDaysRemaining ?? 0,
         activeKiosksCount: org.kioskDevices ? org.kioskDevices.length : 0,
       };
     });
@@ -1159,10 +1161,14 @@ const reassignUserOffice = async (req, res, next) => {
 const generateOrgActivationCode = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { durationDays = 30 } = req.body;
+    const durationDays = Math.max(1, parseInt(req.body.durationDays, 10) || 30);
     const org = await prisma.organization.findUnique({ where: { id } });
     if (!org) {
       return res.status(404).json({ success: false, error: 'Organization not found.' });
+    }
+
+    if (org.subscriptionStatus === 'SUSPENDED') {
+      return res.status(400).json({ success: false, error: 'Cannot generate activation codes while organization is suspended. Unsuspend the organization first.' });
     }
 
     // Generate unique 8-digit numeric code
@@ -1183,7 +1189,7 @@ const generateOrgActivationCode = async (req, res, next) => {
       data: {
         orgId: id,
         code,
-        durationDays: Number(durationDays) || 30,
+        durationDays,
         isUsed: false,
         createdById: req.user?.id || null,
         expiresAt,
@@ -1200,7 +1206,7 @@ const generateOrgActivationCode = async (req, res, next) => {
 
     res.json({
       success: true,
-      message: '8-digit activation code generated successfully.',
+      message: `${durationDays}-day activation code generated successfully.`,
       data: {
         id: record.id,
         code: record.code,
@@ -1230,7 +1236,7 @@ const getOrgActivationCodes = async (req, res, next) => {
 const manualRenewOrgSubscription = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { durationDays = 30 } = req.body;
+    const durationDays = Math.max(1, parseInt(req.body.durationDays, 10) || 30);
     const org = await prisma.organization.findUnique({ where: { id } });
     if (!org) {
       return res.status(404).json({ success: false, error: 'Organization not found.' });
@@ -1238,14 +1244,16 @@ const manualRenewOrgSubscription = async (req, res, next) => {
 
     const now = new Date();
     const currentExpiry = org.subscriptionExpiresAt ? new Date(org.subscriptionExpiresAt) : null;
-    const baseDate = currentExpiry && currentExpiry.getTime() > now.getTime() ? currentExpiry : now;
-    const newExpiry = new Date(baseDate.getTime() + (Number(durationDays) || 30) * 24 * 60 * 60 * 1000);
+    const baseDate = currentExpiry && currentExpiry.getTime() > now.getTime() && org.subscriptionStatus !== 'SUSPENDED' ? currentExpiry : now;
+    const newExpiry = new Date(baseDate.getTime() + durationDays * 24 * 60 * 60 * 1000);
 
     const updated = await prisma.organization.update({
       where: { id },
       data: {
         subscriptionStatus: 'ACTIVE',
         subscriptionExpiresAt: newExpiry,
+        subscriptionPausedAt: null,
+        subscriptionPausedRemainingSeconds: null,
         lastActivatedAt: now,
       },
     });
@@ -1262,8 +1270,97 @@ const manualRenewOrgSubscription = async (req, res, next) => {
 
     res.json({
       success: true,
-      message: `Organization subscription extended to ${newExpiry.toISOString()}`,
+      message: `Organization subscription extended by ${durationDays} days to ${newExpiry.toISOString()}`,
       data: status,
+    });
+  } catch (err) { next(err); }
+};
+
+// PUT /api/super/organizations/:id/suspend — Super Admin suspends org and puts subscription on hold
+const suspendOrganization = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (id === 'platform-org') {
+      return res.status(400).json({ success: false, message: 'Platform organization cannot be suspended.' });
+    }
+    const org = await prisma.organization.findUnique({ where: { id } });
+    if (!org) return res.status(404).json({ success: false, message: 'Organization not found.' });
+
+    if (org.subscriptionStatus === 'SUSPENDED') {
+      return res.status(400).json({ success: false, message: 'Organization is already suspended.' });
+    }
+
+    const now = new Date();
+    // Calculate remaining seconds if expiresAt is in future
+    const remainingSeconds = (org.subscriptionExpiresAt && new Date(org.subscriptionExpiresAt).getTime() > now.getTime())
+      ? Math.floor((new Date(org.subscriptionExpiresAt).getTime() - now.getTime()) / 1000)
+      : 0;
+
+    const updated = await prisma.organization.update({
+      where: { id },
+      data: {
+        subscriptionStatus: 'SUSPENDED',
+        subscriptionPausedAt: now,
+        subscriptionPausedRemainingSeconds: remainingSeconds,
+      },
+    });
+
+    await AuditService.log({
+      req,
+      action: 'ORGANIZATION_SUSPENDED',
+      targetId: id,
+      targetType: 'Organization',
+      details: { orgName: org.name, remainingSeconds, pausedDays: Math.ceil(remainingSeconds / 86400) },
+    });
+
+    res.json({
+      success: true,
+      message: `Organization "${org.name}" suspended. Subscription is on hold with ${Math.ceil(remainingSeconds / 86400)} days preserved.`,
+      data: getOrgSubscriptionStatus(updated),
+    });
+  } catch (err) { next(err); }
+};
+
+// PUT /api/super/organizations/:id/unsuspend — Super Admin unsuspends org and restores on-hold subscription
+const unsuspendOrganization = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const org = await prisma.organization.findUnique({ where: { id } });
+    if (!org) return res.status(404).json({ success: false, message: 'Organization not found.' });
+
+    if (org.subscriptionStatus !== 'SUSPENDED') {
+      return res.status(400).json({ success: false, message: 'Organization is not currently suspended.' });
+    }
+
+    const now = new Date();
+    const remainingSeconds = org.subscriptionPausedRemainingSeconds || 0;
+    const newExpiry = remainingSeconds > 0
+      ? new Date(now.getTime() + remainingSeconds * 1000)
+      : org.subscriptionExpiresAt;
+    const newStatus = remainingSeconds > 0 ? 'ACTIVE' : 'EXPIRED';
+
+    const updated = await prisma.organization.update({
+      where: { id },
+      data: {
+        subscriptionStatus: newStatus,
+        subscriptionExpiresAt: newExpiry,
+        subscriptionPausedAt: null,
+        subscriptionPausedRemainingSeconds: null,
+      },
+    });
+
+    await AuditService.log({
+      req,
+      action: 'ORGANIZATION_UNSUSPENDED',
+      targetId: id,
+      targetType: 'Organization',
+      details: { orgName: org.name, newExpiry, restoredDays: Math.ceil(remainingSeconds / 86400) },
+    });
+
+    res.json({
+      success: true,
+      message: `Organization "${org.name}" reactivated. Restored ${Math.ceil(remainingSeconds / 86400)} days of subscription.`,
+      data: getOrgSubscriptionStatus(updated),
     });
   } catch (err) { next(err); }
 };
@@ -1446,5 +1543,6 @@ module.exports = {
   employeeFullRecord, reemployEmployee, suspendAdmin, activateAdmin, reassignEmployee,
   updateProfile, resetSystem, getLeavePolicy, setLeavePolicy, getAuditLogs,
   generateOrgActivationCode, getOrgActivationCodes, manualRenewOrgSubscription,
+  suspendOrganization, unsuspendOrganization,
   listDevices, unlockDevice, deleteDevice,
 };

@@ -43,6 +43,8 @@ async function checkSubscription(req, res, next) {
         subscriptionStatus: true,
         subscriptionStart: true,
         subscriptionExpiresAt: true,
+        subscriptionPausedAt: true,
+        subscriptionPausedRemainingSeconds: true,
         lastActivatedAt: true,
         createdAt: true,
       },
@@ -70,6 +72,17 @@ async function checkSubscription(req, res, next) {
 
       if (isExempt) {
         return next();
+      }
+
+      if (subscription.isSuspended) {
+        return res.status(403).json({
+          success: false,
+          code: 'ORGANIZATION_SUSPENDED',
+          error: 'Organization suspended. Contact Super Admin.',
+          message: 'Your organization has been suspended by Super Admin. Operations and subscriptions are on hold.',
+          status: 'SUSPENDED',
+          pausedDaysRemaining: subscription.pausedDaysRemaining,
+        });
       }
 
       return res.status(403).json({

@@ -24,7 +24,9 @@ export default function SubscriptionLockModal() {
     return null;
   }
 
-  const isInitialActivation = !subscription?.lastActivatedAt;
+  const isSuspended = subscription?.isSuspended || subscription?.status === 'SUSPENDED';
+  const pausedDays = subscription?.pausedDaysRemaining ?? subscription?.daysRemaining ?? 0;
+  const isInitialActivation = !isSuspended && !subscription?.lastActivatedAt;
 
   const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Only allow digits, max 8 characters
@@ -61,9 +63,11 @@ export default function SubscriptionLockModal() {
 
   const orgName = organization?.name || 'Your Organization';
   const whatsappUrl = `https://wa.me/${SUPPORT_WHATSAPP}?text=${encodeURIComponent(
-    isInitialActivation
-      ? `Hello TimeLogic Support, our organization "${orgName}" is newly registered and requires an 8-digit activation code to start our 30-day subscription.`
-      : `Hello TimeLogic Support, our organization "${orgName}" subscription has expired. Please send our 8-digit monthly activation code.`
+    isSuspended
+      ? `Hello TimeLogic Support, our organization "${orgName}" has been suspended. Please assist in reactivating our account.`
+      : isInitialActivation
+      ? `Hello TimeLogic Support, our organization "${orgName}" is newly registered and requires an 8-digit activation code to start our subscription.`
+      : `Hello TimeLogic Support, our organization "${orgName}" subscription has expired. Please send our 8-digit activation code.`
   )}`;
 
   return (
@@ -71,7 +75,9 @@ export default function SubscriptionLockModal() {
       <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-3xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
         {/* Top warning stripe */}
         <div className={`p-6 text-white flex items-center gap-4 ${
-          isInitialActivation
+          isSuspended
+            ? 'bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700'
+            : isInitialActivation
             ? 'bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800'
             : 'bg-gradient-to-r from-red-600 via-rose-600 to-amber-600'
         }`}>
@@ -80,10 +86,10 @@ export default function SubscriptionLockModal() {
           </div>
           <div>
             <span className="text-[11px] font-bold uppercase tracking-wider bg-white/25 px-2.5 py-0.5 rounded-full inline-block mb-1">
-              {isInitialActivation ? 'Activation Required' : 'Service Locked'}
+              {isSuspended ? 'Organization Suspended' : isInitialActivation ? 'Activation Required' : 'Service Locked'}
             </span>
             <h2 className="text-xl font-black tracking-tight leading-snug">
-              {isInitialActivation ? 'Activate Your Organization' : 'Subscription Expired'}
+              {isSuspended ? 'Subscription On Hold' : isInitialActivation ? 'Activate Your Organization' : 'Subscription Expired'}
             </h2>
             <p className="text-xs text-white/90 font-medium truncate max-w-xs">{orgName}</p>
           </div>
@@ -106,71 +112,86 @@ export default function SubscriptionLockModal() {
           )}
 
           <div className="text-xs text-[var(--text-muted)] space-y-1.5 leading-relaxed">
-            {isInitialActivation ? (
+            {isSuspended ? (
+              <>
+                <p>
+                  Organization <strong className="text-[var(--text-main)]">{orgName}</strong> has been suspended by the Super Administrator.
+                </p>
+                <p>
+                  All desktop admin operations and attendance punch-ins are temporarily on hold. Your remaining subscription time (<strong className="text-amber-700">{pausedDays} days</strong>) is frozen safely and will resume when reactivated.
+                </p>
+              </>
+            ) : isInitialActivation ? (
               <>
                 <p>
                   Welcome to TimeLogic! Your organization account <strong className="text-[var(--text-main)]">{orgName}</strong> requires an activation code to begin.
                 </p>
                 <p>
-                  Please enter your <strong>8-digit activation code</strong> below to activate and unlock desktop admin and kiosk access for the next 30 days.
+                  Please enter your <strong>8-digit activation code</strong> below to activate and unlock desktop admin and kiosk access.
                 </p>
               </>
             ) : (
               <>
                 <p>
-                  Your monthly subscription for <strong className="text-[var(--text-main)]">{orgName}</strong> has ended.
+                  Your subscription for <strong className="text-[var(--text-main)]">{orgName}</strong> has ended.
                 </p>
                 <p>
-                  Desktop operations and attendance kiosk punch-ins are temporarily suspended. Please enter your <strong>8-digit activation code</strong> below to immediately unlock the system for the next 30 days.
+                  Desktop operations and attendance kiosk punch-ins are temporarily suspended. Please enter your <strong>8-digit activation code</strong> below to immediately unlock the system.
                 </p>
               </>
             )}
           </div>
 
-          <form onSubmit={handleRedeem} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text-main)] mb-1.5">
-                8-Digit Activation Code
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  autoFocus
-                  maxLength={8}
-                  placeholder="0000 0000"
-                  value={code}
-                  onChange={handleCodeChange}
-                  disabled={loading || !!success}
-                  className="w-full text-center text-2xl font-mono font-black tracking-[0.35em] py-3.5 px-4 rounded-2xl border-2 border-[var(--border)] bg-[var(--hover-bg)] text-[var(--text-main)] focus:outline-none focus:border-primary-600 focus:ring-4 focus:ring-primary-500/20 transition-all placeholder:text-[var(--text-muted)]/40"
-                />
-                <KeyRound className="w-5 h-5 text-[var(--text-muted)] absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-40" />
+          {!isSuspended ? (
+            <form onSubmit={handleRedeem} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text-main)] mb-1.5">
+                  8-Digit Activation Code
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoFocus
+                    maxLength={8}
+                    placeholder="0000 0000"
+                    value={code}
+                    onChange={handleCodeChange}
+                    disabled={loading || !!success}
+                    className="w-full text-center text-2xl font-mono font-black tracking-[0.35em] py-3.5 px-4 rounded-2xl border-2 border-[var(--border)] bg-[var(--hover-bg)] text-[var(--text-main)] focus:outline-none focus:border-primary-600 focus:ring-4 focus:ring-primary-500/20 transition-all placeholder:text-[var(--text-muted)]/40"
+                  />
+                  <KeyRound className="w-5 h-5 text-[var(--text-muted)] absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-40" />
+                </div>
+                <p className="text-[11px] text-[var(--text-muted)] mt-1.5 text-center">
+                  {code.length}/8 digits entered
+                </p>
               </div>
-              <p className="text-[11px] text-[var(--text-muted)] mt-1.5 text-center">
-                {code.length}/8 digits entered
-              </p>
-            </div>
 
-            <button
-              type="submit"
-              disabled={code.length !== 8 || loading || !!success}
-              className="w-full py-3.5 px-4 bg-primary-700 hover:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-2xl transition shadow-lg shadow-primary-700/25 flex items-center justify-center gap-2 text-sm"
-            >
-              {loading ? (
-                <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
-              ) : (
-                <>
-                  <span>{isInitialActivation ? 'Activate 30-Day Access' : 'Activate & Unlock System'}</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
-          </form>
+              <button
+                type="submit"
+                disabled={code.length !== 8 || loading || !!success}
+                className="w-full py-3.5 px-4 bg-primary-700 hover:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-2xl transition shadow-lg shadow-primary-700/25 flex items-center justify-center gap-2 text-sm"
+              >
+                {loading ? (
+                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
+                ) : (
+                  <>
+                    <span>{isInitialActivation ? 'Activate Access' : 'Activate & Unlock System'}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </form>
+          ) : (
+            <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-center text-xs font-semibold text-amber-800">
+              Activation codes cannot be redeemed while your organization is on hold. Please contact support to lift the suspension.
+            </div>
+          )}
 
           {/* WhatsApp Support Callout */}
           <div className="pt-2 border-t border-[var(--border)] flex flex-col gap-2">
             <p className="text-[11px] text-[var(--text-muted)] text-center">
-              Don't have an activation code? Contact TimeLogic Support to renew:
+              {isSuspended ? 'Need to reactivate your organization? Contact TimeLogic Support:' : "Don't have an activation code? Contact TimeLogic Support to renew:"}
             </p>
             <a
               href={whatsappUrl}

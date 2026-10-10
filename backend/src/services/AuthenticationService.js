@@ -84,7 +84,8 @@ class AuthenticationService {
       select: {
         id: true, name: true, allowDeviceCheckIn: true, allowManualCheckIn: true,
         hasStudents: true, openingTime: true, timezone: true,
-        subscriptionStatus: true, subscriptionStart: true, subscriptionExpiresAt: true, lastActivatedAt: true,
+        subscriptionStatus: true, subscriptionStart: true, subscriptionExpiresAt: true,
+        subscriptionPausedAt: true, subscriptionPausedRemainingSeconds: true, lastActivatedAt: true,
       },
     });
     if (!org) {
@@ -186,7 +187,8 @@ class AuthenticationService {
             id: true, name: true, allowDeviceCheckIn: true, allowManualCheckIn: true,
             hasStudents: true, openingTime: true, timezone: true,
             kioskPasswordHash: true, requireFaceVerification: true,
-            subscriptionStatus: true, subscriptionStart: true, subscriptionExpiresAt: true, lastActivatedAt: true,
+            subscriptionStatus: true, subscriptionStart: true, subscriptionExpiresAt: true,
+            subscriptionPausedAt: true, subscriptionPausedRemainingSeconds: true, lastActivatedAt: true,
           },
         },
       },
@@ -203,6 +205,12 @@ class AuthenticationService {
     // Check organization subscription status for kiosk station
     if (user.role !== 'SUPER_ADMIN' && user.organization) {
       const sub = getOrgSubscriptionStatus(user.organization);
+      if (sub.isSuspended) {
+        throw Object.assign(
+          new Error('Organization suspended by Super Admin. Operations and subscriptions are on hold.'),
+          { status: 403, code: 'ORGANIZATION_SUSPENDED' }
+        );
+      }
       if (sub.isExpired) {
         throw Object.assign(
           new Error('Subscription expired. Contact your administrator.'),

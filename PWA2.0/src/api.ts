@@ -89,7 +89,7 @@ async function request<T>(path: string, options: RequestInit = {}, retry = true)
     // Throw auth error so caller can gracefully use offline fallback.
     throw new Error('Your session expired. Please sign in again.');
   }
-  if (response.status === 403 && body?.code === 'SUBSCRIPTION_EXPIRED') {
+  if (response.status === 403 && (body?.code === 'SUBSCRIPTION_EXPIRED' || body?.code === 'ORGANIZATION_SUSPENDED')) {
     window.dispatchEvent(new CustomEvent('kiosk:subscription_expired', { detail: body }));
   }
   if (!response.ok) {

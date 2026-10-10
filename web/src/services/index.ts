@@ -17,6 +17,8 @@ export const reemployEmployee       = (userId: string) => api.put<any>(`/super/e
 export const generateOrgActivationCode = (orgId: string, durationDays = 30) => api.post<any>(`/super/organizations/${orgId}/generate-code`, { durationDays }).then((r) => r.data);
 export const fetchOrgActivationCodes   = (orgId: string) => api.get<any>(`/super/organizations/${orgId}/activation-codes`).then((r) => r.data ?? []);
 export const manualRenewOrgSubscription = (orgId: string, durationDays = 30) => api.post<any>(`/super/organizations/${orgId}/manual-renew`, { durationDays }).then((r) => r.data);
+export const suspendOrg       = (id: string) => api.put<any>(`/super/organizations/${id}/suspend`, {}).then((r) => r.data);
+export const unsuspendOrg     = (id: string) => api.put<any>(`/super/organizations/${id}/unsuspend`, {}).then((r) => r.data);
 // ─── Super Admin Device Management ──────────────────────────────────────────
 export const fetchSuperDevices = (params: { orgId?: string; deviceType?: string; isBound?: boolean | string; search?: string } = {}) => {
   const query = new URLSearchParams();

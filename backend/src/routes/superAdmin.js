@@ -76,6 +76,8 @@ router.get('/organizations/:id/users',           ctrl.orgUsers);
 router.post('/organizations/:id/generate-code',   ctrl.generateOrgActivationCode);
 router.get('/organizations/:id/activation-codes', ctrl.getOrgActivationCodes);
 router.post('/organizations/:id/manual-renew',    ctrl.manualRenewOrgSubscription);
+router.put('/organizations/:id/suspend',          ctrl.suspendOrganization);
+router.put('/organizations/:id/unsuspend',        ctrl.unsuspendOrganization);
 router.get('/organizations/:id/leave-policy',    ctrl.getLeavePolicy);
 router.put('/organizations/:id/leave-policy',    ctrl.setLeavePolicy);
 router.post('/organizations/:orgId/departments', [
