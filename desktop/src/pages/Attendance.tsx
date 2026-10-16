@@ -55,7 +55,7 @@ export default function Attendance() {
   useEffect(() => {
     if (!pastDate && serverNow) setPastDate(serverNow.toLocaleDateString('en-CA', { timeZone: organizationTimezone }));
   }, [pastDate, serverNow, organizationTimezone]);
-  useEffect(() => { if (view === 'today' || view === 'all' || pastDate) void load(); if (view !== 'today') return; const t = setInterval(() => void load(), 5000); return () => clearInterval(t); }, [view, pastDate]);
+  useEffect(() => { if (view === 'today' || view === 'all' || pastDate) void load(); if (view !== 'today') return; const t = setInterval(() => void load(), 20000); return () => clearInterval(t); }, [view, pastDate]);
 
   const filtered = records.filter((r) => {
     const matchSearch = `${r.employee?.firstName} ${r.employee?.lastName} ${r.employee?.employeeCode}`.toLowerCase().includes(search.toLowerCase());

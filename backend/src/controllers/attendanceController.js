@@ -1,5 +1,6 @@
 const AttendanceService = require('../services/AttendanceService');
 const { prisma } = require('../config/database');
+const { redis } = require('../config/redis');
 const EmployeePolicy = require('../services/EmployeePolicyService');
 const { dateKey } = require('../utils/attendanceClock');
 const { getCurrentServerTime } = require('../utils/networkTime');
@@ -360,11 +361,16 @@ const getLiveAttendance = async (req, res, next) => {
   try {
     const now = await getCurrentServerTime();
     const targetOrgId = await resolveAdminOrgId(req);
-    if (targetOrgId && targetOrgId !== 'platform-org') {
-      await AttendanceService.reconcilePastAbsencesForOrg(targetOrgId).catch((err) => {
-        logger.warn(`reconcilePastAbsencesForOrg in getLiveAttendance error: ${err.message}`);
-      });
+    const cacheKey = `tl:live_att:${targetOrgId}`;
+    const cached = await redis.get(cacheKey).catch(() => null);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        res.set('Cache-Control', 'no-store');
+        return res.json({ ...parsed, serverTime: now });
+      } catch (_) {}
     }
+
     const organization = await prisma.organization.findUnique({ where: { id: targetOrgId }, select: { timezone: true } });
     const today = new Date(`${dateKey(now, organization?.timezone || 'Africa/Lagos')}T00:00:00.000Z`);
     const records = await prisma.attendanceRecord.findMany({
@@ -384,8 +390,10 @@ const getLiveAttendance = async (req, res, next) => {
       orderBy: [{ clockInTime: 'desc' }, { date: 'desc' }],
       take: 500,
     });
+    const payload = { success: true, data: records, total: records.length };
+    await redis.set(cacheKey, JSON.stringify(payload), 'EX', 3).catch(() => null);
     res.set('Cache-Control', 'no-store');
-    res.json({ success: true, data: records, total: records.length, serverTime: now });
+    res.json({ ...payload, serverTime: now });
   } catch (err) { next(err); }
 };
 

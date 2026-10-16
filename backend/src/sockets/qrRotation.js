@@ -50,7 +50,7 @@ async function tick() {
   }
 }
 
-function startQRRotationWorker(intervalMs = 2000) {
+function startQRRotationWorker(intervalMs = 5000) {
   if (_timer) return;
   _timer = setInterval(tick, intervalMs);
   logger.info('QR rotation worker started');
