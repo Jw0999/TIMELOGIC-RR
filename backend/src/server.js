@@ -7,6 +7,7 @@ const { initIO } = require('./sockets/io');
 const { startQRRotationWorker, stopQRRotationWorker } = require('./sockets/qrRotation');
 const { startSessionScheduler, stopSessionScheduler } = require('./sockets/sessionScheduler');
 const { startPayrollScheduler, stopPayrollScheduler } = require('./sockets/payrollScheduler');
+const { startDeepfaceKeepAlive, stopDeepfaceKeepAlive } = require('./sockets/deepfaceKeepAlive');
 const logger = require('./config/logger');
 
 async function main() {
@@ -19,6 +20,7 @@ async function main() {
   startQRRotationWorker();
   startSessionScheduler();
   startPayrollScheduler();
+  startDeepfaceKeepAlive();
 
   // Bind IPv4 explicitly so Android devices can reach the Windows LAN address.
   // Recent Windows/Node combinations may treat the IPv6 wildcard as v6-only.
@@ -31,6 +33,7 @@ async function main() {
     stopQRRotationWorker();
     stopSessionScheduler();
     stopPayrollScheduler();
+    stopDeepfaceKeepAlive();
     server.close(async () => {
       await disconnectDatabase();
       await redis.quit();
