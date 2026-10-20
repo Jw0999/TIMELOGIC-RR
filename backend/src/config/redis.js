@@ -6,33 +6,52 @@ let redisClient = null;
 let isConnected = false;
 const memoryStore = new Map();
 
-try {
-  const redisUrl = env.REDIS_URL || 'redis://localhost:6379';
-  const isTls = redisUrl.startsWith('rediss://');
-  redisClient = new Redis(redisUrl, {
-    retryStrategy: (times) => Math.min(times * 100, 3000),
-    maxRetriesPerRequest: 1,
-    connectTimeout: 5000,
-    enableOfflineQueue: false,
-    lazyConnect: false,
-    ...(isTls ? { tls: { rejectUnauthorized: false } } : {}),
-  });
+let hasLoggedRedisWarning = false;
 
-  redisClient.on('connect', () => {
-    isConnected = true;
-    logger.info('Redis connected successfully');
-  });
+if (env.REDIS_URL) {
+  try {
+    const redisUrl = env.REDIS_URL;
+    const isTls = redisUrl.startsWith('rediss://');
+    redisClient = new Redis(redisUrl, {
+      retryStrategy: (times) => {
+        if (times > 10) {
+          if (!hasLoggedRedisWarning) {
+            logger.warn('Redis connection failed after 10 attempts. Operating in resilient in-memory mode.');
+            hasLoggedRedisWarning = true;
+          }
+          return null; // Stop retrying aggressively
+        }
+        return Math.min(times * 500, 5000);
+      },
+      maxRetriesPerRequest: 1,
+      connectTimeout: 5000,
+      enableOfflineQueue: false,
+      lazyConnect: false,
+      ...(isTls ? { tls: { rejectUnauthorized: false } } : {}),
+    });
 
-  redisClient.on('error', (err) => {
-    isConnected = false;
-    logger.warn('Redis unavailable, using resilient fallback cache:', err.message);
-  });
+    redisClient.on('connect', () => {
+      isConnected = true;
+      hasLoggedRedisWarning = false;
+      logger.info('Redis connected successfully');
+    });
 
-  redisClient.on('close', () => {
-    isConnected = false;
-  });
-} catch (err) {
-  logger.warn('Failed to initialize Redis client, using resilient fallback cache:', err.message);
+    redisClient.on('error', (err) => {
+      isConnected = false;
+      if (!hasLoggedRedisWarning) {
+        logger.warn('Redis unavailable, using resilient fallback cache:', err.message);
+        hasLoggedRedisWarning = true;
+      }
+    });
+
+    redisClient.on('close', () => {
+      isConnected = false;
+    });
+  } catch (err) {
+    logger.warn('Failed to initialize Redis client, using resilient fallback cache:', err.message);
+  }
+} else {
+  logger.info('No REDIS_URL configured; using resilient in-memory cache.');
 }
 
 // Resilient wrapper: uses real Redis when connected, otherwise uses memoryStore
