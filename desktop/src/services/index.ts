@@ -78,6 +78,8 @@ export const createManualPenalty = (body: { employeeId: string; amount: number; 
   api.post<any>('/admin/penalties', body).then((r) => r.data);
 export const deleteManualPenalty = (id: string) =>
   api.delete<any>(`/admin/penalties/${id}`).then((r) => r.data);
+export const fetchEmployeeAutoPenalties = (employeeId: string, month?: string) =>
+  api.get<any>(`/admin/penalties/auto/${employeeId}${month ? `?month=${encodeURIComponent(month)}` : ''}`).then((r) => r.data?.data || r.data);
 export const waiveEmployeeAutoPenalties = (employeeId: string, month?: string) =>
   api.delete<any>(`/admin/penalties/auto/${employeeId}${month ? `?month=${encodeURIComponent(month)}` : ''}`).then((r) => r.data);
 

@@ -35,6 +35,7 @@ export default function Attendance() {
   const [pastDate, setPastDate] = useState('');
   const [monthlyPenalties, setMonthlyPenalties] = useState<any>(null);
   const [selectedTimelineRecord, setSelectedTimelineRecord] = useState<any | null>(null);
+  const [waivingId, setWaivingId] = useState<string | null>(null);
 
   const load = async () => {
     try {
@@ -198,16 +199,26 @@ export default function Attendance() {
                         </button>
                         {Boolean(r.penalty && r.penalty > 0) && (
                           <button
+                            disabled={waivingId === r.id}
                             onClick={async () => {
-                              if (window.confirm(`Waive penalty of ₦${Number(r.penalty).toLocaleString()} for ${r.employee?.firstName}?`)) {
+                              if (!window.confirm(`Waive penalty of ₦${Number(r.penalty).toLocaleString()} for ${r.employee?.firstName}?`)) return;
+                              setWaivingId(r.id);
+                              try {
                                 await waiveRecordPenalty(r.id);
-                                load();
+                                setRecords((prev) =>
+                                  prev.map((rec) => (rec.id === r.id ? { ...rec, penalty: 0, reviewNotes: 'WAIVED_BY_ADMIN' } : rec))
+                                );
+                                await load();
+                              } catch (err) {
+                                setError(err instanceof Error ? err.message : 'Could not waive penalty.');
+                              } finally {
+                                setWaivingId(null);
                               }
                             }}
-                            className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 transition"
+                            className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 transition disabled:opacity-50"
                             title="Waive penalty on this record"
                           >
-                            Waive
+                            {waivingId === r.id ? 'Waiving...' : 'Waive'}
                           </button>
                         )}
                       </div>

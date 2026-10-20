@@ -317,28 +317,30 @@ const getMonthlyPenalties = async (req, res, next) => {
 const waiveRecordPenalty = async (req, res, next) => {
   try {
     const { recordId } = req.params;
-    const targetOrgId = req.user.role === 'SUPER_ADMIN'
-      ? (req.headers['x-organization-id'] || req.query.orgId || (req.user.orgId !== 'platform-org' ? req.user.orgId : null))
-      : req.user.orgId;
-    const orgFilter = targetOrgId ? { employee: { orgId: targetOrgId } } : (req.user.orgId !== 'platform-org' ? { employee: { orgId: req.user.orgId } } : {});
+    const targetOrgId = await resolveAdminOrgId(req);
+    const orgFilter = targetOrgId && targetOrgId !== 'platform-org' ? { employee: { orgId: targetOrgId } } : {};
     const record = await prisma.attendanceRecord.findFirst({
       where: { id: recordId, ...orgFilter },
     });
     if (!record) return res.status(404).json({ success: false, message: 'Attendance record not found.' });
     const updated = await prisma.attendanceRecord.update({
       where: { id: recordId },
-      data: { penalty: 0 },
+      data: {
+        penalty: 0,
+        reviewNotes: 'WAIVED_BY_ADMIN',
+        reviewedBy: req.user?.id,
+      },
     });
     await AuditService.log({
-      actorId: req.user.id,
-      actorRole: req.user.role,
+      actorId: req.user?.id,
+      actorRole: req.user?.role,
       action: 'ATTENDANCE_PENALTY_WAIVED',
       targetId: recordId,
       targetType: 'AttendanceRecord',
       details: { orgId: targetOrgId, before: { penalty: record.penalty }, after: { penalty: updated.penalty } },
     });
     await WorkEventService.record({
-      orgId: targetOrgId, employeeId: record.employeeId, actorId: req.user.id,
+      orgId: targetOrgId || record.employee?.orgId, employeeId: record.employeeId, actorId: req.user?.id,
       type: 'PENALTY_WAIVED', occurredAt: updated.updatedAt, source: 'ADMIN', status: 'CORRECTED',
       sourceType: 'AttendanceRecord', sourceId: recordId,
       dedupeKey: `attendance-penalty-waive:${recordId}:${updated.updatedAt.toISOString()}`,

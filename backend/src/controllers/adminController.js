@@ -953,6 +953,73 @@ const deletePenalty = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+const getEmployeeAutoPenalties = async (req, res, next) => {
+  try {
+    const targetOrgId = await resolveAdminOrgId(req);
+    const { employeeId } = req.params;
+    const month = String(req.query.month || '');
+    const employee = await prisma.user.findFirst({
+      where: { id: employeeId, orgId: targetOrgId, role: 'EMPLOYEE' },
+      select: { id: true, firstName: true, lastName: true, employeeCode: true },
+    });
+    if (!employee) return res.status(404).json({ success: false, message: 'Employee not found.' });
+
+    let dateFilter = {};
+    const monthMatch = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(month);
+    if (monthMatch) {
+      const start = new Date(Date.UTC(Number(monthMatch[1]), Number(monthMatch[2]) - 1, 1));
+      const end = new Date(Date.UTC(Number(monthMatch[1]), Number(monthMatch[2]), 1));
+      dateFilter = { gte: start, lt: end };
+    }
+
+    const [attendanceRecords, breakRecords] = await Promise.all([
+      prisma.attendanceRecord.findMany({
+        where: {
+          employeeId,
+          ...(monthMatch ? { date: dateFilter } : {}),
+          OR: [{ penalty: { gt: 0 } }, { reviewNotes: 'WAIVED_BY_ADMIN' }],
+        },
+        select: {
+          id: true,
+          date: true,
+          status: true,
+          penalty: true,
+          reviewNotes: true,
+          clockInTime: true,
+          clockOutTime: true,
+        },
+        orderBy: { date: 'desc' },
+      }),
+      prisma.breakRecord.findMany({
+        where: {
+          employeeId,
+          ...(monthMatch ? { startTime: dateFilter } : {}),
+          OR: [{ penalty: { gt: 0 } }, { notes: 'WAIVED_BY_ADMIN' }],
+        },
+        select: {
+          id: true,
+          startTime: true,
+          endTime: true,
+          durationMinutes: true,
+          penalty: true,
+          notes: true,
+        },
+        orderBy: { startTime: 'desc' },
+      }),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        employee,
+        month,
+        attendance: attendanceRecords,
+        breaks: breakRecords,
+      },
+    });
+  } catch (err) { next(err); }
+};
+
 const waiveEmployeeAutoPenalties = async (req, res, next) => {
   try {
     const targetOrgId = await resolveAdminOrgId(req);
@@ -987,7 +1054,7 @@ const waiveEmployeeAutoPenalties = async (req, res, next) => {
           ...(monthMatch ? { startTime: dateFilter } : {}),
           penalty: { gt: 0 },
         },
-        data: { penalty: 0 },
+        data: { penalty: 0, notes: 'WAIVED_BY_ADMIN' },
       }),
     ]);
 
@@ -1176,7 +1243,7 @@ module.exports = {
   emergencyStopAll, emergencyLockSystem, emergencyInvalidateQR, emergencyRevert,
   getNotifications, createEmployee,
   getManualAttendance, findManualEmployee, manualCheckIn, manualCheckOut, batchSyncAttendance,
-  listPenalties, createPenalty, deletePenalty, waiveEmployeeAutoPenalties,
+  listPenalties, createPenalty, deletePenalty, getEmployeeAutoPenalties, waiveEmployeeAutoPenalties,
   setStationPassword, getStationPasswordStatus,
   getShiftConfiguration, updateShiftConfiguration,
   getKioskDevices, releaseKioskDevice,

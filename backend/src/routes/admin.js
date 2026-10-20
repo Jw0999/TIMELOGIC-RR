@@ -47,6 +47,7 @@ router.post('/penalties', authenticate, isAdmin, [
   body('reason').trim().isLength({ min: 2, max: 500 }),
 ], validate, ctrl.createPenalty);
 router.delete('/penalties/:id', authenticate, isAdmin, ctrl.deletePenalty);
+router.get('/penalties/auto/:employeeId', authenticate, isAdmin, ctrl.getEmployeeAutoPenalties);
 router.delete('/penalties/auto/:employeeId', authenticate, isAdmin, ctrl.waiveEmployeeAutoPenalties);
 
 

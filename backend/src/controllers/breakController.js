@@ -110,15 +110,19 @@ const getDailyBreaks = async (req, res, next) => {
 const waiveBreakPenalty = async (req, res, next) => {
   try {
     const { breakId } = req.params;
-    const targetOrgId = req.headers['x-organization-id'] || req.query.orgId || (req.user.orgId !== 'platform-org' ? req.user.orgId : null);
-    const orgFilter = targetOrgId ? { employee: { orgId: targetOrgId } } : (req.user.orgId !== 'platform-org' ? { employee: { orgId: req.user.orgId } } : {});
+    let targetOrgId = req.headers['x-organization-id'] || req.query.orgId || (req.user?.orgId !== 'platform-org' ? req.user?.orgId : null);
+    if (!targetOrgId && req.user?.role === 'SUPER_ADMIN') {
+      const br = await prisma.breakRecord.findUnique({ where: { id: breakId }, select: { employee: { select: { orgId: true } } } });
+      targetOrgId = br?.employee?.orgId || null;
+    }
+    const orgFilter = targetOrgId ? { employee: { orgId: targetOrgId } } : (req.user?.orgId !== 'platform-org' ? { employee: { orgId: req.user?.orgId } } : {});
     const brk = await prisma.breakRecord.findFirst({
       where: { id: breakId, ...orgFilter },
     });
     if (!brk) return res.status(404).json({ success: false, message: 'Break record not found.' });
     const updated = await prisma.breakRecord.update({
       where: { id: breakId },
-      data: { penalty: 0 },
+      data: { penalty: 0, notes: 'WAIVED_BY_ADMIN' },
     });
     res.json({ success: true, data: updated, message: 'Break penalty waived successfully.' });
   } catch (err) { next(err); }

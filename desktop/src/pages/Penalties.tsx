@@ -20,6 +20,9 @@ import {
   createManualPenalty,
   deleteManualPenalty,
   waiveEmployeeAutoPenalties,
+  fetchEmployeeAutoPenalties,
+  waiveRecordPenalty,
+  waiveBreakPenalty,
   fetchEmployees,
   fetchMonthlyPenalties,
   fetchManualPenalties,
@@ -74,6 +77,7 @@ export default function Penalties() {
   const [search, setSearch] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [waivingEmployeeId, setWaivingEmployeeId] = useState<string | null>(null);
+  const [inspectEmployee, setInspectEmployee] = useState<Employee | null>(null);
 
   const monthLabel = useMemo(() => {
     try {
@@ -501,14 +505,23 @@ export default function Penalties() {
                               Add penalty
                             </button>
                             {autoTotal > 0 && (
-                              <button
-                                onClick={() => void handleWaiveAutoPenalties(employee, autoTotal)}
-                                disabled={waivingEmployeeId === employee.id}
-                                className="px-2.5 py-1 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-xs font-semibold transition disabled:opacity-50"
-                                title="Remove / waive auto penalties for this employee this month"
-                              >
-                                {waivingEmployeeId === employee.id ? 'Removing...' : 'Remove Auto'}
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => setInspectEmployee(employee)}
+                                  className="px-2.5 py-1 rounded-lg text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 text-xs font-semibold transition"
+                                  title="View breakdown and waive individual penalties"
+                                >
+                                  Breakdown
+                                </button>
+                                <button
+                                  onClick={() => void handleWaiveAutoPenalties(employee, autoTotal)}
+                                  disabled={waivingEmployeeId === employee.id}
+                                  className="px-2.5 py-1 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-xs font-semibold transition disabled:opacity-50"
+                                  title="Remove / waive all auto penalties for this employee this month"
+                                >
+                                  {waivingEmployeeId === employee.id ? 'Removing...' : 'Remove Auto'}
+                                </button>
+                              </>
                             )}
                           </div>
                         </td>
@@ -594,6 +607,20 @@ export default function Penalties() {
           onSaved={async () => {
             setShowAdd(false);
             setSuccessMsg('Penalty added successfully.');
+            setTimeout(() => setSuccessMsg(''), 4000);
+            await load();
+          }}
+        />
+      )}
+
+      {inspectEmployee && (
+        <AutoPenaltyDetailModal
+          employee={inspectEmployee}
+          month={month}
+          monthLabel={monthLabel}
+          onClose={() => setInspectEmployee(null)}
+          onWaived={async () => {
+            setSuccessMsg('Penalty waived successfully.');
             setTimeout(() => setSuccessMsg(''), 4000);
             await load();
           }}
@@ -709,6 +736,249 @@ function AddPenaltyModal({
             className="px-5 py-2 rounded-xl bg-primary-700 text-white text-sm font-bold hover:bg-primary-800 disabled:opacity-50 transition"
           >
             {saving ? 'Adding...' : 'Add penalty'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AutoPenaltyDetailModal({
+  employee,
+  month,
+  monthLabel,
+  onClose,
+  onWaived,
+}: {
+  employee: Employee;
+  month: string;
+  monthLabel: string;
+  onClose: () => void;
+  onWaived: () => Promise<void> | void;
+}) {
+  const [data, setData] = useState<{ attendance: any[]; breaks: any[] } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [waivingId, setWaivingId] = useState<string | null>(null);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetchEmployeeAutoPenalties(employee.id, month);
+      setData(res);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load auto penalty details.');
+    } finally {
+      setLoading(false);
+    }
+  }, [employee.id, month]);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
+
+  const handleWaiveAttendance = async (recId: string, amount: number) => {
+    if (!window.confirm(`Waive penalty of ${money(amount)} for this record?`)) return;
+    setWaivingId(recId);
+    try {
+      await waiveRecordPenalty(recId);
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              attendance: prev.attendance.map((a) =>
+                a.id === recId ? { ...a, penalty: 0, reviewNotes: 'WAIVED_BY_ADMIN' } : a
+              ),
+            }
+          : prev
+      );
+      await onWaived();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not waive attendance penalty.');
+    } finally {
+      setWaivingId(null);
+    }
+  };
+
+  const handleWaiveBreak = async (breakId: string, amount: number) => {
+    if (!window.confirm(`Waive break penalty of ${money(amount)}?`)) return;
+    setWaivingId(breakId);
+    try {
+      await waiveBreakPenalty(breakId);
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              breaks: prev.breaks.map((b) =>
+                b.id === breakId ? { ...b, penalty: 0, notes: 'WAIVED_BY_ADMIN' } : b
+              ),
+            }
+          : prev
+      );
+      await onWaived();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not waive break penalty.');
+    } finally {
+      setWaivingId(null);
+    }
+  };
+
+  const fmtDate = (d: string) => {
+    try {
+      return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    } catch {
+      return d;
+    }
+  };
+
+  const attList = data?.attendance || [];
+  const brkList = data?.breaks || [];
+  const totalCount = attList.length + brkList.length;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 p-4 flex items-center justify-center">
+      <div className="w-full max-w-2xl bg-[var(--card-bg)] rounded-3xl shadow-2xl overflow-hidden border border-[var(--border)] max-h-[85vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border)] shrink-0">
+          <div>
+            <h2 className="font-bold text-[var(--text-main)] text-base">
+              Auto Penalties Breakdown — {employee.firstName} {employee.lastName}
+            </h2>
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">
+              Showing all automated fines for {monthLabel}
+            </p>
+          </div>
+          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-main)]">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-6 overflow-y-auto space-y-6 flex-1">
+          {error && (
+            <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-xs flex items-center gap-2">
+              <AlertCircle size={14} className="shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {loading ? (
+            <div className="h-40 flex items-center justify-center">
+              <RefreshCw className="animate-spin text-primary-600" />
+            </div>
+          ) : totalCount === 0 ? (
+            <p className="py-8 text-center text-sm text-[var(--text-muted)]">
+              No automatic penalties recorded for {employee.firstName} in {monthLabel}.
+            </p>
+          ) : (
+            <>
+              {attList.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-3">
+                    Attendance Penalties (Lateness, Completely Late, Absence)
+                  </h3>
+                  <div className="rounded-xl border border-[var(--border)] overflow-hidden divide-y divide-[var(--border)]">
+                    {attList.map((rec) => {
+                      const isWaived = rec.penalty === 0 || rec.reviewNotes === 'WAIVED_BY_ADMIN';
+                      return (
+                        <div key={rec.id} className="p-3.5 flex items-center justify-between gap-3 text-xs bg-[var(--card-bg)]">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-[var(--text-main)]">{fmtDate(rec.date)}</span>
+                              <span
+                                className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                                  rec.status === 'ABSENT'
+                                    ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300'
+                                    : rec.status === 'COMPLETELY_LATE'
+                                    ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300'
+                                    : 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300'
+                                }`}
+                              >
+                                {rec.status}
+                              </span>
+                            </div>
+                            {rec.reviewNotes && (
+                              <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                                Note: {rec.reviewNotes}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className={`font-bold ${isWaived ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                              {money(rec.penalty)}
+                            </span>
+                            {isWaived ? (
+                              <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300 text-xs font-semibold">
+                                Waived
+                              </span>
+                            ) : (
+                              <button
+                                disabled={waivingId === rec.id}
+                                onClick={() => void handleWaiveAttendance(rec.id, rec.penalty)}
+                                className="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 dark:bg-rose-950/30 dark:text-rose-300 text-xs font-semibold transition disabled:opacity-50"
+                              >
+                                {waivingId === rec.id ? 'Waiving...' : 'Waive'}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {brkList.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-3">
+                    Break Penalties (Over Break)
+                  </h3>
+                  <div className="rounded-xl border border-[var(--border)] overflow-hidden divide-y divide-[var(--border)]">
+                    {brkList.map((rec) => {
+                      const isWaived = rec.penalty === 0 || rec.notes === 'WAIVED_BY_ADMIN';
+                      return (
+                        <div key={rec.id} className="p-3.5 flex items-center justify-between gap-3 text-xs bg-[var(--card-bg)]">
+                          <div className="flex-1 min-w-0">
+                            <span className="font-bold text-[var(--text-main)]">{fmtDate(rec.startTime)}</span>
+                            {rec.durationMinutes != null && (
+                              <span className="ml-2 text-[var(--text-muted)]">
+                                Duration: {rec.durationMinutes} mins
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className={`font-bold ${isWaived ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                              {money(rec.penalty)}
+                            </span>
+                            {isWaived ? (
+                              <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300 text-xs font-semibold">
+                                Waived
+                              </span>
+                            ) : (
+                              <button
+                                disabled={waivingId === rec.id}
+                                onClick={() => void handleWaiveBreak(rec.id, rec.penalty)}
+                                className="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 dark:bg-rose-950/30 dark:text-rose-300 text-xs font-semibold transition disabled:opacity-50"
+                              >
+                                {waivingId === rec.id ? 'Waiving...' : 'Waive'}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="px-6 py-4 border-t border-[var(--border)] flex justify-end shrink-0">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl border border-[var(--border)] text-sm font-semibold hover:bg-[var(--hover-bg)] transition"
+          >
+            Close
           </button>
         </div>
       </div>

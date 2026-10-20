@@ -1505,16 +1505,21 @@ class AttendanceService {
         where: { employeeId_sessionId_date: { employeeId: employee.id, sessionId, date } },
         select: { id: true, reviewNotes: true, penalty: true },
       });
-      if (existing?.reviewNotes === 'WAIVED_BY_ADMIN') continue;
+      if (existing?.reviewNotes === 'WAIVED_BY_ADMIN' || existing?.penalty === 0 || (existing?.reviewNotes && existing.reviewNotes.includes('WAIVED'))) continue;
 
       const evaluation = {
         status: leave ? 'ON_LEAVE' : 'ABSENT',
-        penalty: leave ? 0 : (session.office.absentPenalty || 0),
+        penalty: (leave || existing?.penalty === 0 || existing?.reviewNotes === 'WAIVED_BY_ADMIN' || (existing?.reviewNotes && existing.reviewNotes.includes('WAIVED')))
+          ? 0
+          : (session.office.absentPenalty || 0),
       };
       const savedRecord = await prisma.attendanceRecord.upsert({
         where: { employeeId_sessionId_date: { employeeId: employee.id, sessionId, date } },
         create: { id: uuidv4(), employeeId: employee.id, sessionId, date, status: evaluation.status, penalty: evaluation.penalty, checkInSource: 'PHONE' },
-        update: { status: evaluation.status, penalty: evaluation.penalty },
+        update: {
+          status: evaluation.status,
+          ...(existing?.penalty === 0 || existing?.reviewNotes === 'WAIVED_BY_ADMIN' || (existing?.reviewNotes && existing.reviewNotes.includes('WAIVED')) ? {} : { penalty: evaluation.penalty }),
+        },
       });
       await WorkEventService.record({
         orgId: session.office.orgId, employeeId: employee.id, type: evaluation.status,
@@ -1713,13 +1718,15 @@ class AttendanceService {
                 select: { id: true, reviewNotes: true, penalty: true },
               });
 
-              if (existingRecord?.reviewNotes === 'WAIVED_BY_ADMIN') {
+              if (existingRecord?.reviewNotes === 'WAIVED_BY_ADMIN' || existingRecord?.penalty === 0 || (existingRecord?.reviewNotes && existingRecord.reviewNotes.includes('WAIVED'))) {
                 continue;
               }
 
               const evaluation = {
                 status: leave ? 'ON_LEAVE' : 'ABSENT',
-                penalty: leave ? 0 : (office.absentPenalty || 0),
+                penalty: (leave || existingRecord?.penalty === 0 || existingRecord?.reviewNotes === 'WAIVED_BY_ADMIN' || (existingRecord?.reviewNotes && existingRecord.reviewNotes.includes('WAIVED')))
+                  ? 0
+                  : (office.absentPenalty || 0),
               };
               const savedRecord = await prisma.attendanceRecord.upsert({
                 where: {
@@ -1740,7 +1747,7 @@ class AttendanceService {
                 },
                 update: {
                   status: evaluation.status,
-                  penalty: evaluation.penalty,
+                  ...(existingRecord?.penalty === 0 || existingRecord?.reviewNotes === 'WAIVED_BY_ADMIN' || (existingRecord?.reviewNotes && existingRecord.reviewNotes.includes('WAIVED')) ? {} : { penalty: evaluation.penalty }),
                 },
               });
               await WorkEventService.record({
