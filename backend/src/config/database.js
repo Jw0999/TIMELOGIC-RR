@@ -8,8 +8,8 @@ const prisma = new PrismaClient({
   ],
 });
 
-prisma.$on('warn', (e) => logger.warn('Prisma warning:', e.message));
-prisma.$on('error', (e) => logger.error('Prisma error:', e.message));
+prisma.$on('warn', (e) => logger.warn(`Prisma warning: ${e.message || JSON.stringify(e)}`));
+prisma.$on('error', (e) => logger.error(`Prisma error: ${e.message || JSON.stringify(e)}`));
 
 async function connectDatabase() {
   await prisma.$connect();
