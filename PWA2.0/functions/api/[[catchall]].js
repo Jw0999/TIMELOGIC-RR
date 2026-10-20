@@ -5,11 +5,11 @@ export async function onRequest(context) {
   const { request } = context;
   const url = new URL(request.url);
 
-  const BACKEND_BASE = 'https://timelogic-api-fbd3128caa55.herokuapp.com';
+  const BACKEND_BASE = 'https://timelogic-backend.onrender.com';
   const targetUrl = `${BACKEND_BASE}${url.pathname}${url.search}`;
 
   const headers = new Headers(request.headers);
-  headers.set('Host', 'timelogic-api-fbd3128caa55.herokuapp.com');
+  headers.set('Host', 'timelogic-backend.onrender.com');
 
   const modifiedRequest = new Request(targetUrl, {
     method: request.method,

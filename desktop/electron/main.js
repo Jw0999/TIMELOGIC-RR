@@ -105,7 +105,7 @@ ipcMain.handle('open-external', async (_, url) => {
 const BACKEND_BASE = (
   isDev
     ? 'http://localhost:5000/api'
-    : (process.env.VITE_API_URL || 'https://timelogic-api-fbd3128caa55.herokuapp.com/api')
+    : (process.env.VITE_API_URL || 'https://timelogic-backend.onrender.com/api')
 ).replace(/\/$/, '');
 
 // IPC handler to securely proxy API calls in Node.js process so they never appear in Chromium DevTools Network tab
