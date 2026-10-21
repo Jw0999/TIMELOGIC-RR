@@ -15,7 +15,7 @@ YUNET_PATH = os.path.join(MODELS_DIR, 'face_detection_yunet.onnx')
 SFACE_PATH = os.path.join(MODELS_DIR, 'face_recognition_sface.onnx')
 
 # Initialize OpenCV DNN models
-detector = cv2.FaceDetectorYN.create(YUNET_PATH, '', (320, 320), score_threshold=0.6, nms_threshold=0.3)
+detector = cv2.FaceDetectorYN.create(YUNET_PATH, '', (320, 320), score_threshold=0.45, nms_threshold=0.3)
 recognizer = cv2.FaceRecognizerSF.create(SFACE_PATH, '')
 
 # Haar cascade backup
@@ -211,12 +211,12 @@ def liveness():
             float(np.mean(cv2.absdiff(face_crops[index], face_crops[index + 1]))) / 255.0
             for index in range(len(face_crops) - 1)
         )
-        verified = bool(stable_face and (horizontal_motion >= 0.012 or appearance_motion >= 0.015))
+        verified = bool(stable_face and (horizontal_motion >= 0.007 or appearance_motion >= 0.007))
         return jsonify({
             'verified': verified,
             'is_real': verified,
             'method': 'active-motion',
-            'confidence': round(min(1.0, max(horizontal_motion / 0.08, appearance_motion / 0.08)), 3),
+            'confidence': round(min(1.0, max(horizontal_motion / 0.05, appearance_motion / 0.05)), 3),
             'frame_count': len(frames),
             'error': None if verified else 'Move your head slightly left or right while the camera is active.',
         })

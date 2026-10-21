@@ -3,31 +3,43 @@ const logger = require('../config/logger');
 
 let _timer = null;
 
-async function ping() {
-  if (!env.DEEPFACE_URL || !env.DEEPFACE_URL.startsWith('http')) return;
+async function pingEndpoint(url, label) {
+  if (!url || !url.startsWith('http')) return;
   try {
-    const target = `${env.DEEPFACE_URL.replace(/\/+$/, '')}/health`;
+    const target = `${url.replace(/\/+$/, '')}/health`;
     const res = await fetch(target, {
       method: 'GET',
       headers: { 'User-Agent': 'TimeLogic-KeepAlive/1.0' },
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(25000),
     });
     if (res.ok) {
-      logger.info('DeepFace keep-alive: service is awake and healthy');
+      logger.info(`${label} keep-alive: service is awake and healthy`);
+    } else {
+      logger.warn(`${label} keep-alive returned status ${res.status}`);
     }
   } catch (err) {
-    logger.warn(`DeepFace keep-alive notice: ${err.message}`);
+    logger.warn(`${label} keep-alive notice: ${err.message}`);
   }
+}
+
+async function ping() {
+  const deepfaceTarget = env.DEEPFACE_URL;
+  const backendTarget = process.env.RENDER_EXTERNAL_URL || 'https://timelogic-backend.onrender.com';
+
+  await Promise.allSettled([
+    pingEndpoint(deepfaceTarget, 'DeepFace'),
+    pingEndpoint(backendTarget, 'Backend'),
+  ]);
 }
 
 function startDeepfaceKeepAlive() {
   if (_timer) return;
-  // If running against an external provider like Render, ping immediately on boot
-  if (env.DEEPFACE_URL && env.DEEPFACE_URL.includes('onrender.com')) {
+  // If running in production or against external providers, ping immediately on boot
+  if (process.env.NODE_ENV === 'production' || (env.DEEPFACE_URL && env.DEEPFACE_URL.includes('onrender.com'))) {
     ping().catch(() => {});
   }
-  // Ping every 10 minutes (Render sleeps after 15 minutes of inactivity)
-  _timer = setInterval(ping, 10 * 60 * 1000);
+  // Ping every 9 minutes (Render free tier sleeps after 15 minutes of inactivity)
+  _timer = setInterval(ping, 9 * 60 * 1000);
   if (_timer.unref) _timer.unref();
 }
 

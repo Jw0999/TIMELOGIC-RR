@@ -58,9 +58,9 @@ export default function FaceCapture({ onCapture, onError, disabled, activeLivene
   function captureFrame() {
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    if (!video || !canvas) return null;
+    if (!video || !canvas || !video.videoWidth || !video.videoHeight) return null;
 
-    const maxWidth = 480;
+    const maxWidth = 380;
     const scale = Math.min(1, maxWidth / video.videoWidth);
     canvas.width = Math.round(video.videoWidth * scale);
     canvas.height = Math.round(video.videoHeight * scale);
@@ -68,7 +68,7 @@ export default function FaceCapture({ onCapture, onError, disabled, activeLivene
     if (!ctx) return null;
 
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL('image/jpeg', 0.75);
+    return canvas.toDataURL('image/jpeg', 0.72);
   }
 
   async function capture() {
@@ -85,16 +85,16 @@ export default function FaceCapture({ onCapture, onError, disabled, activeLivene
       return;
     }
 
-    setInstruction('Turn your head slightly left');
-    await new Promise((resolve) => window.setTimeout(resolve, 1400));
+    setInstruction('Look straight at camera');
+    await new Promise((resolve) => window.setTimeout(resolve, 350));
     const first = captureFrame();
     if (!first) { setCapturing(false); return; }
-    setInstruction('Now turn your head slightly right');
-    await new Promise((resolve) => window.setTimeout(resolve, 1400));
+    setInstruction('Tilt or turn head slightly');
+    await new Promise((resolve) => window.setTimeout(resolve, 400));
     const second = captureFrame();
     if (!second) { setCapturing(false); return; }
-    setInstruction('Face the camera normally');
-    await new Promise((resolve) => window.setTimeout(resolve, 700));
+    setInstruction('Hold steady...');
+    await new Promise((resolve) => window.setTimeout(resolve, 350));
     const third = captureFrame();
     if (!third) { setCapturing(false); return; }
     setPreview(third);

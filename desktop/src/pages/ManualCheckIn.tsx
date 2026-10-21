@@ -61,27 +61,41 @@ function FaceCapture({
   const captureFrame = () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    if (!video || !canvas) return null;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d')?.drawImage(video, 0, 0);
-    return canvas.toDataURL('image/jpeg', 0.75);
+    if (!video || !canvas || !video.videoWidth || !video.videoHeight) return null;
+    const maxDim = 380;
+    let w = video.videoWidth;
+    let h = video.videoHeight;
+    if (w > maxDim || h > maxDim) {
+      if (w > h) {
+        h = Math.round((h * maxDim) / w);
+        w = maxDim;
+      } else {
+        w = Math.round((w * maxDim) / h);
+        h = maxDim;
+      }
+    }
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(video, 0, 0, w, h);
+    return canvas.toDataURL('image/jpeg', 0.72);
   };
 
   const capture = async () => {
     if (capturing || attempted) return;
     setAttempted(true);
     setCapturing(true);
-    setInstruction('Turn your head slightly left');
-    await new Promise((resolve) => window.setTimeout(resolve, 1400));
+    setInstruction('Look straight at camera');
+    await new Promise((resolve) => window.setTimeout(resolve, 350));
     const first = captureFrame();
     if (!first) { setCapturing(false); return; }
-    setInstruction('Now turn your head slightly right');
-    await new Promise((resolve) => window.setTimeout(resolve, 1400));
+    setInstruction('Tilt or turn head slightly');
+    await new Promise((resolve) => window.setTimeout(resolve, 400));
     const second = captureFrame();
     if (!second) { setCapturing(false); return; }
-    setInstruction('Face the camera normally');
-    await new Promise((resolve) => window.setTimeout(resolve, 700));
+    setInstruction('Hold steady...');
+    await new Promise((resolve) => window.setTimeout(resolve, 350));
     const third = captureFrame();
     if (third) {
       setInstruction('Live verification complete');
@@ -203,7 +217,7 @@ export default function ManualCheckIn() {
       return;
     }
     if (!quiet) setLoading(true);
-    setError('');
+    if (!quiet) setError('');
     try {
       const next = await fetchManualAttendance({
         sessionId: selectedSessionId || undefined,
@@ -211,10 +225,13 @@ export default function ManualCheckIn() {
       });
       setDashboard(next);
       if (!selectedSessionId && next.selectedSession?.id) setSelectedSessionId(next.selectedSession.id);
+      if (quiet) setError('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not load the manual attendance station.');
+      if (!quiet) {
+        setError(err instanceof Error ? err.message : 'Could not load the manual attendance station.');
+      }
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
   }, [organization?.allowManualCheckIn, selectedSessionId, debouncedSearch]);
 

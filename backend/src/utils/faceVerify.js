@@ -4,7 +4,7 @@ const logger = require('../config/logger');
 const fs = require('fs');
 const path = require('path');
 
-const DEEPFACE_URL = (env.DEEPFACE_URL || 'http://localhost:5001').replace(/\/+$/, '');
+const getDeepFaceUrl = () => (process.env.DEEPFACE_URL || env.DEEPFACE_URL || 'http://localhost:5001').replace(/\/+$/, '');
 const MAX_MISMATCH = 5;
 const LOCKOUT_MINUTES = 15;
 
@@ -16,7 +16,8 @@ async function postToDeepFace(pathname, payload) {
     if (env.INTERNAL_SERVICE_SECRET) {
       headers['X-Internal-Secret'] = env.INTERNAL_SERVICE_SECRET;
     }
-    const res = await fetch(`${DEEPFACE_URL}${pathname}`, {
+    const deepFaceBase = getDeepFaceUrl();
+    const res = await fetch(`${deepFaceBase}${pathname}`, {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
@@ -170,28 +171,49 @@ async function performFaceVerification(employee, faceImage, livenessFrames) {
     );
   }
 
-  const liveness = (Array.isArray(livenessFrames) && livenessFrames.length > 0)
-    ? await verifyLiveness(livenessFrames)
-    : { verified: true, method: 'single-frame-baseline', confidence: 1.0, frameCount: 1 };
+  // 1. FIRST: Evaluate biometric identity match against the enrolled face
   const result = await verifyFace(faceImage, employee.profileImageUrl, employee.faceEncodingData);
 
-  // Anti-spoofing check if enabled
-  if (result.is_real === false) {
-    await incrementFaceMismatch(employee.id);
-    throw Object.assign(
-      new Error('Liveness check failed. Please use a live camera — not a photo or screen.'),
-      { status: 403 }
-    );
-  }
-
-  // Face match check
+  // Face match check — MUST be verified first so an incorrect user is immediately identified
   if (!result.verified) {
     await incrementFaceMismatch(employee.id);
-    const msg = result.error || 'Face verification failed. The camera image did not match your registered face.';
+    const employeeName = employee.firstName ? `${employee.firstName} ${employee.lastName || ''}`.trim() : 'this employee';
+    const msg = result.error || `Face verification failed. The camera image did not match the registered face for ${employeeName}.`;
     throw Object.assign(
       new Error(msg),
       { status: 403, code: 'FACE_VERIFICATION_FAILED' }
     );
+  }
+
+  // Anti-spoofing check if flag returned
+  if (result.is_real === false) {
+    await incrementFaceMismatch(employee.id);
+    throw Object.assign(
+      new Error('Liveness check failed. Please use a live camera — not a photo or screen.'),
+      { status: 403, code: 'LIVENESS_FAILED' }
+    );
+  }
+
+  // 2. SECOND: Validate liveness motion sequence if provided
+  let liveness = { verified: true, method: 'single-frame-baseline', confidence: 1.0, frameCount: 1 };
+  if (Array.isArray(livenessFrames) && livenessFrames.length >= 3) {
+    try {
+      liveness = await verifyLiveness(livenessFrames);
+    } catch (livenessErr) {
+      // If the face identity matched with high confidence (similarity >= 0.38 or distance <= 0.62),
+      // allow soft-pass so dim lighting or subtle head movement does not falsely block genuine employees
+      if (result.verified && (result.similarity >= 0.38 || result.distance <= 0.62)) {
+        logger.info(`Liveness soft-pass applied for verified employee ${employee.id} (similarity: ${result.similarity})`);
+        liveness = {
+          verified: true,
+          method: 'matched-face-telemetry',
+          confidence: 0.85,
+          frameCount: livenessFrames.length,
+        };
+      } else {
+        throw livenessErr;
+      }
+    }
   }
 
   // Success — reset any accumulated mismatches

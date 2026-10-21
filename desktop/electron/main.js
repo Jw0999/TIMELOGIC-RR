@@ -143,7 +143,15 @@ ipcMain.handle('api-request', async (_, { path: reqPath, method = 'GET', headers
       }
     }
 
-    const res = await fetch(targetUrl, fetchOptions);
+    let res;
+    try {
+      res = await fetch(targetUrl, fetchOptions);
+    } catch (initialErr) {
+      // If Render free tier was cold or network dropped, wait 2s and retry once
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      res = await fetch(targetUrl, fetchOptions);
+    }
+
     const respHeaders = {};
     res.headers.forEach((val, key) => { respHeaders[key] = val; });
 
@@ -175,11 +183,19 @@ ipcMain.handle('api-request', async (_, { path: reqPath, method = 'GET', headers
       data: parsedData,
     };
   } catch (err) {
+    const isTimeout = err.name === 'AbortError' || err.code === 'UND_ERR_CONNECT_TIMEOUT' || err.message?.includes('timeout');
     return {
       ok: false,
-      status: 500,
-      statusText: 'Network Error',
+      status: 503,
+      statusText: isTimeout ? 'Service Warming Up' : 'Network Error',
       headers: {},
+      data: {
+        success: false,
+        message: isTimeout
+          ? 'TimeLogic backend is warming up. Please try again in a moment.'
+          : 'Unable to connect to TimeLogic backend. Please check your internet connection and try again.',
+        error: err.message,
+      },
       error: err.message,
     };
   }

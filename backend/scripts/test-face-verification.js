@@ -19,9 +19,9 @@ const DEEPFACE_URL = process.env.DEEPFACE_URL || 'http://127.0.0.1:5001';
 const INTERNAL_SECRET = env.INTERNAL_SERVICE_SECRET;
 
 // Test assets
-const FACE_1 = path.join(__dirname, '../uploads/faces/10759470-2606-4bf4-b805-dd597192b81f.jpeg');
-const FACE_2 = path.join(__dirname, '../uploads/faces/25dc7aed-2b00-4135-afc2-94d8b429baae.jpg');
-const FACE_3 = path.join(__dirname, '../uploads/faces/54f2440e-8d3c-47bd-b0d5-e72b69a529be.jpg');
+const FACE_1 = path.join(__dirname, '../../uploads/faces/667c5234-dbf3-421e-9b75-4c7a431d5171.jpg');
+const FACE_2 = path.join(__dirname, '../../Face.png');
+const FACE_3 = path.join(__dirname, '../../Face.png');
 const NON_FACE = path.join(__dirname, '../../IMAGE/logo.jpeg');
 
 const results = [];
