@@ -5,9 +5,9 @@ This document persists the architectural state, infrastructure endpoints, and cr
 ---
 
 ## 1. Core Repositories & Credentials Context
-- **GitHub Repository**: [Jw0999/TIMELOGIC-RR](https://github.com/Jw0999/TIMELOGIC-RR.git)
-- **Active Collaborator / Owner**: `Jw0999`
-- **Previous Repository (Access Lost)**: `arikytsya76-bit/TIMELOGIC`
+- **GitHub Repository**: [akenuw/TIMELOGICS](https://github.com/akenuw/TIMELOGICS.git)
+- **Active Collaborator / Owner**: `akenuw`
+- **Previous Repositories**: `Jw0999/TIMELOGIC-RR`, `arikytsya76-bit/TIMELOGIC`
 
 ---
 
