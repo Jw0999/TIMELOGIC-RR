@@ -83,6 +83,13 @@ function calculatePayroll({
   officeOpenTime = '08:00',
   officeCloseTime = '17:00',
   weeklySchedule = null,
+  hireDate = null,
+  isNewHire = false,
+  payoutEligible = true,
+  daysEmployed = null,
+  cycleNote = null,
+  carryoverEarnings = 0,
+  carryoverDetails = null,
 }) {
   const attendance = [...attendanceRecords].sort((left, right) => String(left.id).localeCompare(String(right.id)));
   const breaks = [...breakRecords].sort((left, right) => String(left.id).localeCompare(String(right.id)));
@@ -101,6 +108,23 @@ function calculatePayroll({
     sourceType: 'Employee',
     sourceId: employeeId,
   });
+
+  if (carryoverEarnings > 0) {
+    earnings.push({
+      id: `carryover:${employeeId}:${year}-${month}`,
+      type: 'PRIOR_MONTH_CARRYOVER',
+      category: 'EARNING',
+      categoryLabel: 'PRIOR CARRYOVER',
+      amount: money(carryoverEarnings),
+      currency,
+      description: carryoverDetails?.description || 'Prior month initial cycle carryover (accumulated days & records from last month)',
+      subDetail: carryoverDetails?.year && carryoverDetails?.month ? `Preserved from cycle ${carryoverDetails.month}/${carryoverDetails.year}` : 'Carried over from initial 31-day cycle',
+      sourceType: 'PayslipRecord',
+      sourceId: carryoverDetails?.sourceId || employeeId,
+      badgeBg: '#f0fdf4',
+      categoryColor: '#059669',
+    });
+  }
 
   const attendedRecords = attendance.filter((record) => Boolean(record.clockInTime)
     || ['PRESENT', 'LATE', 'COMPLETELY_LATE', 'HALF_DAY', 'REVIEW_REQUIRED'].includes(record.status));
@@ -269,22 +293,37 @@ function calculatePayroll({
   }
 
   const overtimeEarnings = money(earnings.reduce((total, item) => total + (item.type === 'OVERTIME' ? item.amount : 0), 0));
+  const carryoverTotal = money(earnings.reduce((total, item) => total + (item.type === 'PRIOR_MONTH_CARRYOVER' ? item.amount : 0), 0));
   const attendancePenalties = money(deductions.reduce((total, item) => total + (item.type === 'ATTENDANCE_PENALTY' ? item.amount : 0), 0));
   const breakPenalties = money(deductions.reduce((total, item) => total + (item.type === 'BREAK_PENALTY' ? item.amount : 0), 0));
   const manualPenaltiesTotal = money(deductions.reduce((total, item) => total + (item.type === 'MANUAL_PENALTY' ? item.amount : 0), 0));
-  const grossSalary = money(salary + overtimeEarnings);
+  const grossSalary = money(salary + overtimeEarnings + carryoverTotal);
   const totalDeductions = money(attendancePenalties + breakPenalties + manualPenaltiesTotal);
-  const netSalary = money(Math.max(0, grossSalary - totalDeductions));
+  const accumulatedNet = money(Math.max(0, grossSalary - totalDeductions));
+
+  // If this employee is in an initial 31-day cycle (< 31 days to cutoff):
+  // The 5th payout is held / deferred to the next month after 31 days.
+  // Records are still kept for last month and stored in snapshot and deferredAmount.
+  const netSalary = payoutEligible ? accumulatedNet : 0;
+  const deferredAmount = payoutEligible ? 0 : accumulatedNet;
+
   const lineItems = [...earnings, ...deductions];
   const summary = {
     baseSalary: salary,
     overtimeEarnings,
+    carryoverEarnings: carryoverTotal,
     grossSalary,
     attendancePenalties,
     breakPenalties,
     manualPenalties: manualPenaltiesTotal,
     totalDeductions,
     netSalary,
+    deferredAmount,
+    payoutEligible: Boolean(payoutEligible),
+    isNewHire: Boolean(isNewHire),
+    daysEmployed,
+    hireDate: hireDate ? (hireDate instanceof Date ? hireDate.toISOString() : String(hireDate)) : null,
+    cycleNote,
     totalWorkHours,
     totalPresentDays,
     totalLateDays,

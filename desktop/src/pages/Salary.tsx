@@ -99,6 +99,13 @@ interface EmployeePayroll {
   payslipStatus: string;
   whatsappStatus: string;
   whatsappSentAt?: string | null;
+  isNewHire?: boolean;
+  payoutEligible?: boolean;
+  daysEmployed?: number;
+  cycleNote?: string;
+  deferredAmount?: number;
+  hireDate?: string;
+  carryoverEarnings?: number;
 }
 
 interface PayrollSummary {
@@ -108,6 +115,8 @@ interface PayrollSummary {
   totalOvertimeEarnings?: number;
   totalDeductions: number;
   totalNetPayout: number;
+  totalDeferredPayroll?: number;
+  deferredEmployeesCount?: number;
   salaryPayoutDay: number;
   currency: string;
   periodStart?: string;
@@ -645,7 +654,14 @@ export default function Salary() {
             <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-2">
               {formatMoney(summary?.totalNetPayout || 0, currency)}
             </p>
-            <p className="text-[11px] text-[var(--text-muted)] mt-1">Calculated pay; no funds transferred</p>
+            {summary?.totalDeferredPayroll && summary.totalDeferredPayroll > 0 ? (
+              <p className="text-[11px] font-semibold text-purple-600 dark:text-purple-400 mt-1 flex items-center gap-1">
+                <Clock size={11} />
+                <span>{formatMoney(summary.totalDeferredPayroll, currency)} deferred ({summary.deferredEmployeesCount || 1} new hire · 31d cycle)</span>
+              </p>
+            ) : (
+              <p className="text-[11px] text-[var(--text-muted)] mt-1">Calculated pay; no funds transferred</p>
+            )}
           </div>
 
           <div className="bg-[var(--card-bg)] p-4 rounded-2xl border border-[var(--border)] shadow-sm">
@@ -659,6 +675,25 @@ export default function Salary() {
             <p className="text-[11px] text-[var(--text-muted)] mt-1">Salary addition for staying past closing</p>
           </div>
         </div>
+
+        {/* 31-Day Cycle New Hire Informational Banner */}
+        {Boolean(summary?.deferredEmployeesCount && summary.deferredEmployeesCount > 0) && (
+          <div className="rounded-2xl border border-purple-200 dark:border-purple-800/70 bg-purple-50/80 dark:bg-purple-950/30 p-4 text-xs text-purple-900 dark:text-purple-200 flex items-start justify-between gap-3 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-xl bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 mt-0.5">
+                <Clock size={16} />
+              </div>
+              <div className="space-y-0.5">
+                <p className="font-bold text-sm text-purple-800 dark:text-purple-300">
+                  Initial 31-Day Policy Active: {summary?.deferredEmployeesCount} New Employee(s) Deferred
+                </p>
+                <p className="text-purple-700/90 dark:text-purple-300/80 leading-relaxed">
+                  Employees onboarded mid-cycle complete 31 calendar days before entering the standard recurring {settingsData.salaryPayoutDay || 5}th payout cycle. All attendance hours, overstays, and deductions for this period ({formatMoney(summary?.totalDeferredPayroll || 0, currency)}) are safely kept and will automatically roll forward to next month&apos;s payout.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Main Employee Payroll Table Card */}
         <div className="bg-[var(--card-bg)] rounded-2xl border border-[var(--border)] shadow-sm overflow-hidden transition-colors">
@@ -757,6 +792,16 @@ export default function Salary() {
                                     </>
                                   )}
                                 </div>
+                                {Boolean(emp.isNewHire && !emp.payoutEligible) && (
+                                  <div className="mt-1">
+                                    <span
+                                      className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 px-2 py-0.5 rounded-full"
+                                      title={`Hired mid-cycle (${emp.daysEmployed ?? 1}d employed). Initial 31 days must be completed before joining regular ${settingsData.salaryPayoutDay || 5}th cycle.`}
+                                    >
+                                      🌱 31-Day Cycle ({emp.daysEmployed ?? 1}d / 31d)
+                                    </span>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </td>
@@ -783,6 +828,11 @@ export default function Salary() {
                                   {formatMoney(emp.baseSalary, emp.currency)}
                                 </span>
                                 <span className="block text-[10px] text-[var(--text-muted)]">Monthly rate</span>
+                                {emp.carryoverEarnings && emp.carryoverEarnings > 0 ? (
+                                  <span className="block text-[10px] font-bold text-purple-600 dark:text-purple-400 mt-0.5">
+                                    +{formatMoney(emp.carryoverEarnings || 0, emp.currency)} Rollover
+                                  </span>
+                                ) : null}
                                 {emp.overtimeEarnings > 0 && (
                                   <span className="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
                                     +{formatMoney(emp.overtimeEarnings, emp.currency)} Overstay
@@ -839,18 +889,43 @@ export default function Salary() {
                           {/* Net Payable */}
                           <td className="px-4 py-3">
                             <button onClick={() => setBreakdownModalEmployee(emp)} className="text-left group" title="View explainable pay calculation">
-                              <span className={`font-bold text-sm group-hover:underline ${emp.netSalary > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-[var(--text-muted)]'}`}>
-                                {formatMoney(emp.netSalary, emp.currency)}
-                              </span>
-                              <span className="block text-[10px] text-[var(--text-muted)]">
-                                {['GENERATED', 'SENT', 'PAID'].includes(emp.payslipStatus) ? 'Calculation snapshot' : 'View estimate'}
-                              </span>
+                              {emp.isNewHire && !emp.payoutEligible ? (
+                                <>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-bold text-xs text-[var(--text-muted)] line-through">
+                                      {formatMoney(emp.deferredAmount || emp.netSalary, emp.currency)}
+                                    </span>
+                                    <span className="font-bold text-sm text-purple-600 dark:text-purple-400 group-hover:underline">
+                                      ₦0.00
+                                    </span>
+                                  </div>
+                                  <span className="block text-[10px] font-semibold text-purple-600 dark:text-purple-400 mt-0.5">
+                                    +{formatMoney(emp.deferredAmount || emp.netSalary, emp.currency)} accumulated
+                                  </span>
+                                  <span className="block text-[9px] text-[var(--text-muted)]">
+                                    Deferred (31d cycle) · Rolls forward
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className={`font-bold text-sm group-hover:underline ${emp.netSalary > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-[var(--text-muted)]'}`}>
+                                    {formatMoney(emp.netSalary, emp.currency)}
+                                  </span>
+                                  <span className="block text-[10px] text-[var(--text-muted)]">
+                                    {['GENERATED', 'SENT', 'PAID'].includes(emp.payslipStatus) ? 'Calculation snapshot' : 'View estimate'}
+                                  </span>
+                                </>
+                              )}
                             </button>
                           </td>
 
                           {/* Email Delivery Status */}
                           <td className="px-4 py-3 text-center">
-                            {emp.whatsappStatus === 'SENT' ? (
+                            {emp.isNewHire && !emp.payoutEligible ? (
+                              <span className="inline-flex items-center gap-1 text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 px-2 py-0.5 rounded-full text-[10px] font-semibold" title="Deferred under 31-day new hire policy; rolls to next month">
+                                Held (31d Cycle)
+                              </span>
+                            ) : emp.whatsappStatus === 'SENT' ? (
                               <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded-full text-[10px] font-semibold">
                                 <CheckCircle2 size={11} /> Emailed
                               </span>
@@ -893,14 +968,23 @@ export default function Salary() {
                               </button>
 
                               {/* Email Dispatch */}
-                              <button
-                                onClick={() => handleSendEmail(emp)}
-                                disabled={sendingId === emp.id || ['SENT', 'PAID'].includes(emp.payslipStatus)}
-                                className="p-1.5 rounded-xl border border-blue-300 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition shadow-sm disabled:opacity-50"
-                                title={['SENT', 'PAID'].includes(emp.payslipStatus) ? 'Payslip already sent and locked' : 'Email official PDF payslip directly to employee'}
-                              >
-                                <Mail size={14} className={sendingId === emp.id ? 'animate-spin' : ''} />
-                              </button>
+                              {emp.isNewHire && !emp.payoutEligible ? (
+                                <span
+                                  className="px-2.5 py-1.5 rounded-xl border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 text-xs font-semibold cursor-help"
+                                  title={`New employee (${emp.daysEmployed ?? 1}d employed). Initial 31-day cycle active. Payout on the ${settingsData.salaryPayoutDay || 5}th is deferred and rolls forward to next month.`}
+                                >
+                                  31d Cycle
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() => handleSendEmail(emp)}
+                                  disabled={sendingId === emp.id || ['SENT', 'PAID'].includes(emp.payslipStatus)}
+                                  className="p-1.5 rounded-xl border border-blue-300 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition shadow-sm disabled:opacity-50"
+                                  title={['SENT', 'PAID'].includes(emp.payslipStatus) ? 'Payslip already sent and locked' : 'Email official PDF payslip directly to employee'}
+                                >
+                                  <Mail size={14} className={sendingId === emp.id ? 'animate-spin' : ''} />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1291,8 +1375,29 @@ export default function Salary() {
             </div>
 
             <div className="p-6 space-y-4">
+              {Boolean(breakdownModalEmployee.isNewHire && !breakdownModalEmployee.payoutEligible) && (
+                <div className="rounded-2xl border border-purple-200 dark:border-purple-800 bg-purple-50/80 dark:bg-purple-950/40 p-4 text-xs text-purple-900 dark:text-purple-200 space-y-1.5 shadow-sm">
+                  <div className="flex items-center gap-2 font-bold text-purple-800 dark:text-purple-300">
+                    <Clock size={15} />
+                    <span>Initial 31-Day Cycle Policy</span>
+                  </div>
+                  <p className="leading-relaxed">
+                    Employee was onboarded recently ({breakdownModalEmployee.daysEmployed ?? 1} day(s) employed). Under company policy, new hires must complete 31 days before entering the recurring {settingsData.salaryPayoutDay || 5}th payout cycle.
+                  </p>
+                  <p className="font-semibold text-purple-800 dark:text-purple-200">
+                    ✓ All attendance records and earnings for this period ({formatMoney(breakdownModalEmployee.deferredAmount || breakdownModalEmployee.netSalary, breakdownModalEmployee.currency)}) are preserved and will roll forward into next month&apos;s payroll.
+                  </p>
+                </div>
+              )}
+
               <div className="rounded-xl border border-[var(--border)] bg-[var(--hover-bg)] p-4 space-y-2 text-sm">
                 <div className="flex justify-between gap-3"><span>Base monthly salary</span><span>{formatMoney(breakdownModalEmployee.baseSalary, breakdownModalEmployee.currency)}</span></div>
+                {Boolean(breakdownModalEmployee.carryoverEarnings && breakdownModalEmployee.carryoverEarnings > 0) && (
+                  <div className="flex justify-between gap-3 text-purple-700 dark:text-purple-400 font-medium">
+                    <span>Prior month rollover (31-day cycle carryover)</span>
+                    <span className="font-bold">+{formatMoney(breakdownModalEmployee.carryoverEarnings || 0, breakdownModalEmployee.currency)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between gap-3 text-emerald-700 dark:text-emerald-400 font-medium">
                   <span>Overstay past closing (+ Added to salary)</span>
                   <span className="font-bold">+{formatMoney(breakdownModalEmployee.overtimeEarnings, breakdownModalEmployee.currency)}</span>
@@ -1317,7 +1422,22 @@ export default function Salary() {
                     <span>-{formatMoney(breakdownModalEmployee.manualPenalties, breakdownModalEmployee.currency)}</span>
                   </div>
                 )}
-                <div className="flex justify-between gap-3 border-t border-[var(--border)] pt-2 font-bold text-emerald-700 dark:text-emerald-400 text-base"><span>Net payable</span><span>{formatMoney(breakdownModalEmployee.netSalary, breakdownModalEmployee.currency)}</span></div>
+                {Boolean(breakdownModalEmployee.isNewHire && !breakdownModalEmployee.payoutEligible) ? (
+                  <div className="flex justify-between items-baseline gap-3 border-t border-[var(--border)] pt-2 font-bold text-purple-700 dark:text-purple-300 text-base">
+                    <div>
+                      <span>Net payable this cutoff</span>
+                      <span className="block text-[11px] font-normal text-[var(--text-muted)]">
+                        Deferred: {formatMoney(breakdownModalEmployee.deferredAmount || breakdownModalEmployee.netSalary, breakdownModalEmployee.currency)} rolls to next month
+                      </span>
+                    </div>
+                    <span>₦0.00 (Deferred)</span>
+                  </div>
+                ) : (
+                  <div className="flex justify-between gap-3 border-t border-[var(--border)] pt-2 font-bold text-emerald-700 dark:text-emerald-400 text-base">
+                    <span>Net payable</span>
+                    <span>{formatMoney(breakdownModalEmployee.netSalary, breakdownModalEmployee.currency)}</span>
+                  </div>
+                )}
               </div>
 
               <div>

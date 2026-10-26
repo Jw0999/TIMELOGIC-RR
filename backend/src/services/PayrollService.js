@@ -184,13 +184,17 @@ class PayrollService {
     }
 
     const { startDate, endDate } = this.getMonthDateRange(y, m, payoutDay);
+    const prevMonthDate = new Date(Date.UTC(y, m - 2, 1));
+    const prevY = prevMonthDate.getUTCFullYear();
+    const prevM = prevMonthDate.getUTCMonth() + 1;
 
-    const [employees, attendanceRecords, manualPenalties, breakRecords, existingPayslips] = await Promise.all([
+    const [employees, attendanceRecords, manualPenalties, breakRecords, existingPayslips, prevPayslips] = await Promise.all([
       prisma.user.findMany({
         where: {
           orgId,
           role: 'EMPLOYEE',
           status: { notIn: ['SUSPENDED', 'TERMINATED'] },
+          createdAt: { lte: endDate },
         },
         select: {
           id: true,
@@ -205,6 +209,7 @@ class PayrollService {
           bankName: true,
           accountNumber: true,
           accountName: true,
+          createdAt: true,
           department: { select: { id: true, name: true } },
           office: { select: { id: true, name: true, openTime: true, closeTime: true, weeklySchedule: true, timezone: true } },
         },
@@ -262,11 +267,19 @@ class PayrollService {
       prisma.payslipRecord.findMany({
         where: { orgId, year: y, month: m },
       }),
+      prisma.payslipRecord.findMany({
+        where: { orgId, year: prevY, month: prevM },
+      }),
     ]);
 
     const payslipMap = new Map();
     for (const p of existingPayslips) {
       payslipMap.set(p.employeeId, p);
+    }
+
+    const prevPayslipMap = new Map();
+    for (const p of prevPayslips) {
+      prevPayslipMap.set(p.employeeId, p);
     }
 
     const attendanceByEmployee = new Map();
@@ -293,6 +306,41 @@ class PayrollService {
       const userMp = manualPenaltiesByEmployee.get(emp.id) || [];
       const userBr = breakByEmployee.get(emp.id) || [];
       const currency = emp.salaryCurrency || org?.salaryCurrency || 'NGN';
+
+      const hireDate = new Date(emp.createdAt || Date.now());
+      const msInDay = 24 * 60 * 60 * 1000;
+      const daysSinceHire = Math.max(1, Math.floor((endDate.getTime() - hireDate.getTime()) / msInDay) + 1);
+
+      // A newly added employee whose hire date is less than 31 days before the cycle cutoff (e.g. 5th):
+      // The 5th payout does not apply. They follow an initial 31-day cycle before payout moves to the next month.
+      // However, all their records (attendance, penalties, hours) from last month are STILL KEPT!
+      const isNewHire = daysSinceHire < 31 && hireDate >= new Date(startDate.getTime() - 31 * msInDay);
+      const payoutEligible = !isNewHire;
+      const initialCycleEndDate = new Date(hireDate.getTime() + 31 * msInDay);
+
+      // Check for carryover from last month if the employee had deferred records in the previous cycle
+      const prevPayslip = prevPayslipMap.get(emp.id);
+      let carryoverEarnings = 0;
+      let carryoverDetails = null;
+
+      if (prevPayslip && (prevPayslip.status === 'DEFERRED_31_DAYS' || prevPayslip.calculationSnapshot?.summary?.isNewHire)) {
+        carryoverEarnings = prevPayslip.calculationSnapshot?.summary?.deferredAmount ?? prevPayslip.netSalary ?? 0;
+        carryoverDetails = {
+          description: `Prior month carryover (${prevPayslip.totalPresentDays}d worked, ${prevPayslip.totalWorkHours}h, overtime & penalties included from last month)`,
+          sourceId: prevPayslip.id,
+          year: prevY,
+          month: prevM,
+        };
+      }
+
+      const nextM = m === 12 ? 1 : m + 1;
+      const nextY = m === 12 ? y + 1 : y;
+      const nextMonthName = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][nextM - 1];
+
+      const cycleNote = isNewHire
+        ? `New Employee (Joined ${hireDate.toISOString().slice(0, 10)}) · Initial 31-day cycle completes ${initialCycleEndDate.toISOString().slice(0, 10)} · The ${payoutDay}th payout deferred to next month (${nextMonthName} ${payoutDay}th) · All records preserved for last month`
+        : null;
+
       const liveCalculation = calculatePayroll({
         employeeId: emp.id,
         year: y,
@@ -308,6 +356,13 @@ class PayrollService {
         officeOpenTime: emp.office?.openTime || '08:00',
         officeCloseTime: emp.office?.closeTime || '17:00',
         weeklySchedule: emp.office?.weeklySchedule || null,
+        hireDate,
+        isNewHire,
+        payoutEligible,
+        daysEmployed: daysSinceHire,
+        cycleNote,
+        carryoverEarnings,
+        carryoverDetails,
       });
       const isCurrentCycle = now >= startDate && now <= endDate;
       // Only lock calculation snapshot if payslip is for a closed past cycle AND has been finalized/paid
@@ -337,6 +392,7 @@ class PayrollService {
               calculationVersion: calculation.calculationVersion,
               calculationHash: calculation.calculationHash,
               calculationSnapshot: calculation.snapshot,
+              status: isNewHire ? 'DEFERRED_31_DAYS' : existing.status,
             },
           });
         } catch (err) {
@@ -375,12 +431,19 @@ class PayrollService {
         totalDeductions,
         grossSalary,
         netSalary,
+        deferredAmount: calculation.deferredAmount || 0,
+        carryoverEarnings: calculation.carryoverEarnings || 0,
+        isNewHire,
+        payoutEligible,
+        daysEmployed: daysSinceHire,
+        hireDate: hireDate.toISOString(),
+        cycleNote,
         calculationSnapshot: calculation.snapshot,
         calculationHash: calculation.calculationHash,
         calculationVersion: calculation.calculationVersion,
         lineItems: calculation.lineItems,
         payslipId: existing?.id || null,
-        payslipStatus: existing?.status || 'DRAFT',
+        payslipStatus: isNewHire ? 'DEFERRED_31_DAYS' : (existing?.status || 'DRAFT'),
         whatsappStatus: existing?.whatsappStatus || 'PENDING',
         whatsappSentAt: existing?.whatsappSentAt || null,
       };
@@ -391,6 +454,8 @@ class PayrollService {
     const totalOvertime = employeeRows.reduce((acc, r) => acc + r.overtimeEarnings, 0);
     const totalDeductions = employeeRows.reduce((acc, r) => acc + r.totalDeductions, 0);
     const totalNet = employeeRows.reduce((acc, r) => acc + r.netSalary, 0);
+    const totalDeferred = employeeRows.reduce((acc, r) => acc + (r.deferredAmount || 0), 0);
+    const deferredEmployeesCount = employeeRows.filter((r) => r.isNewHire && !r.payoutEligible).length;
 
     const isCurrentCycle = now >= startDate && now <= endDate;
     const isCompleted = now > endDate;
@@ -412,6 +477,8 @@ class PayrollService {
         totalOvertimeEarnings: totalOvertime,
         totalDeductions,
         totalNetPayout: totalNet,
+        totalDeferredPayroll: totalDeferred,
+        deferredEmployeesCount,
         salaryPayoutDay: payoutDay,
         currency: org?.salaryCurrency || 'NGN',
         periodStart: startDate.toISOString(),
@@ -561,13 +628,17 @@ class PayrollService {
     }
 
     const { startDate, endDate } = this.getMonthDateRange(y, m, payoutDay);
+    const prevMonthDate = new Date(Date.UTC(y, m - 2, 1));
+    const prevY = prevMonthDate.getUTCFullYear();
+    const prevM = prevMonthDate.getUTCMonth() + 1;
 
-    const [employees, attendanceRecords, manualPenalties, breakRecords, existingPayslips] = await Promise.all([
+    const [employees, attendanceRecords, manualPenalties, breakRecords, existingPayslips, prevPayslips] = await Promise.all([
       prisma.user.findMany({
         where: {
           orgId,
           role: 'EMPLOYEE',
           status: { notIn: ['SUSPENDED', 'TERMINATED'] },
+          createdAt: { lte: endDate },
         },
         select: {
           id: true,
@@ -578,6 +649,7 @@ class PayrollService {
           employeeCode: true,
           baseSalary: true,
           salaryCurrency: true,
+          createdAt: true,
           office: {
             select: {
               openTime: true,
@@ -610,6 +682,7 @@ class PayrollService {
         orderBy: { startTime: 'asc' },
       }),
       prisma.payslipRecord.findMany({ where: { orgId, year: y, month: m } }),
+      prisma.payslipRecord.findMany({ where: { orgId, year: prevY, month: prevM } }),
     ]);
 
     const currency = org?.salaryCurrency || 'NGN';
@@ -632,6 +705,7 @@ class PayrollService {
     }
 
     const payslipByEmployee = new Map(existingPayslips.map((payslip) => [payslip.employeeId, payslip]));
+    const prevPayslipMap = new Map(prevPayslips.map((payslip) => [payslip.employeeId, payslip]));
     const savedPayslips = [];
 
     const isCurrentCycle = now >= startDate && now <= endDate;
@@ -642,6 +716,40 @@ class PayrollService {
         savedPayslips.push(existingPayslip);
         continue;
       }
+
+      const hireDate = new Date(emp.createdAt || Date.now());
+      const msInDay = 24 * 60 * 60 * 1000;
+      const daysSinceHire = Math.max(1, Math.floor((endDate.getTime() - hireDate.getTime()) / msInDay) + 1);
+
+      // A newly added employee whose hire date is less than 31 days before the cycle cutoff (e.g. 5th):
+      // The 5th payout does not apply. They follow an initial 31-day cycle before payout moves to the next month.
+      // However, all their records (attendance, penalties, hours) from last month are STILL KEPT!
+      const isNewHire = daysSinceHire < 31 && hireDate >= new Date(startDate.getTime() - 31 * msInDay);
+      const payoutEligible = !isNewHire;
+      const initialCycleEndDate = new Date(hireDate.getTime() + 31 * msInDay);
+
+      // Check for carryover from last month if the employee had deferred records in the previous cycle
+      const prevPayslip = prevPayslipMap.get(emp.id);
+      let carryoverEarnings = 0;
+      let carryoverDetails = null;
+
+      if (prevPayslip && (prevPayslip.status === 'DEFERRED_31_DAYS' || prevPayslip.calculationSnapshot?.summary?.isNewHire)) {
+        carryoverEarnings = prevPayslip.calculationSnapshot?.summary?.deferredAmount ?? prevPayslip.netSalary ?? 0;
+        carryoverDetails = {
+          description: `Prior month carryover (${prevPayslip.totalPresentDays}d worked, ${prevPayslip.totalWorkHours}h, overtime & penalties included from last month)`,
+          sourceId: prevPayslip.id,
+          year: prevY,
+          month: prevM,
+        };
+      }
+
+      const nextM = m === 12 ? 1 : m + 1;
+      const nextY = m === 12 ? y + 1 : y;
+      const nextMonthName = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][nextM - 1];
+
+      const cycleNote = isNewHire
+        ? `New Employee (Joined ${hireDate.toISOString().slice(0, 10)}) · Initial 31-day cycle completes ${initialCycleEndDate.toISOString().slice(0, 10)} · The ${payoutDay}th payout deferred to next month (${nextMonthName} ${payoutDay}th) · All records preserved for last month`
+        : null;
 
       const userAtt = attendanceByEmployee.get(emp.id) || [];
       const userMp = manualByEmployee.get(emp.id) || [];
@@ -661,6 +769,13 @@ class PayrollService {
         officeOpenTime: emp.office?.openTime || '08:00',
         officeCloseTime: emp.office?.closeTime || '17:00',
         weeklySchedule: emp.office?.weeklySchedule || null,
+        hireDate,
+        isNewHire,
+        payoutEligible,
+        daysEmployed: daysSinceHire,
+        cycleNote,
+        carryoverEarnings,
+        carryoverDetails,
       });
 
       const payslip = await prisma.payslipRecord.upsert({
@@ -695,7 +810,7 @@ class PayrollService {
           calculationVersion: calculation.calculationVersion,
           calculationHash: calculation.calculationHash,
           calculationSnapshot: calculation.snapshot,
-          status: 'GENERATED',
+          status: isNewHire ? 'DEFERRED_31_DAYS' : 'GENERATED',
         },
         update: {
           periodStart: startDate,
@@ -717,7 +832,7 @@ class PayrollService {
           calculationVersion: calculation.calculationVersion,
           calculationHash: calculation.calculationHash,
           calculationSnapshot: calculation.snapshot,
-          status: existingPayslip?.status === 'SENT' ? 'SENT' : 'GENERATED',
+          status: isNewHire ? 'DEFERRED_31_DAYS' : (existingPayslip?.status === 'SENT' ? 'SENT' : 'GENERATED'),
         },
       });
 
@@ -1054,8 +1169,9 @@ class PayrollService {
     itemizedRecords.sort((a, b) => new Date(a.rawTimestamp).getTime() - new Date(b.rawTimestamp).getTime());
 
     const baseSalary = Number(payslip.baseSalary || payslip.employee?.baseSalary || 0);
+    const carryoverEarnings = Number(savedCalculation?.summary?.carryoverEarnings || 0);
     const overtimeEarnings = Number(savedCalculation?.summary?.overtimeEarnings ?? totalOvertimeEarnings);
-    const grossSalary = Number(savedCalculation?.summary?.grossSalary ?? (baseSalary + overtimeEarnings));
+    const grossSalary = Number(savedCalculation?.summary?.grossSalary ?? (baseSalary + overtimeEarnings + carryoverEarnings));
     const totalDeductions = Number(savedCalculation?.summary?.totalDeductions ?? (attendancePenalties + breakPenalties + manualPenalties));
     const netSalary = Number(savedCalculation?.summary?.netSalary ?? Math.max(0, grossSalary - totalDeductions));
     const roundedWorkHours = Math.round(displayWorkHours * 10) / 10;
@@ -1258,6 +1374,14 @@ class PayrollService {
           dedVal: attendancePenalties > 0 ? `-${this.formatMoneyPdf(attendancePenalties, currency)}` : '—',
           dedColor: attendancePenalties > 0 ? '#b91c1c' : '#94a3b8',
         },
+        ...(carryoverEarnings > 0 ? [{
+          earnLabel: 'Prior Month Rollover (31d Cycle)',
+          earnVal: `+${this.formatMoneyPdf(carryoverEarnings, currency)}`,
+          earnColor: '#6b21a8',
+          dedLabel: '—',
+          dedVal: '—',
+          dedColor: '#94a3b8',
+        }] : []),
         {
           earnLabel: 'Overtime Earnings',
           earnVal: overtimeEarnings > 0 ? `+${this.formatMoneyPdf(overtimeEarnings, currency)}` : '—',
@@ -1327,20 +1451,33 @@ class PayrollService {
       // ─────────────────────────────────────────────────────────────
       // 4. NET SALARY PAYABLE SUMMARY BOX (Classic Corporate Voucher)
       // ─────────────────────────────────────────────────────────────
+      const isNewHireDeferred = payslip.status === 'DEFERRED_31_DAYS' || savedCalculation?.summary?.payoutEligible === false;
+      const deferredAmount = Number(savedCalculation?.summary?.deferredAmount || netSalary);
       const netBoxH = 48;
       doc.rect(40, currentY, 515, netBoxH).fill('#f8fafc');
       doc.rect(40, currentY, 515, netBoxH).lineWidth(1).strokeColor('#cbd5e1').stroke();
-      // Solid navy accent bar
-      doc.rect(40, currentY, 4, netBoxH).fill('#0f172a');
+      // Accent bar: purple for deferred, solid navy for standard
+      doc.rect(40, currentY, 4, netBoxH).fill(isNewHireDeferred ? '#7c3aed' : '#0f172a');
 
-      doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold')
-        .text('NET PAY', 54, currentY + 10);
-      doc.fillColor('#0f172a').fontSize(16).font('Helvetica-Bold')
-        .text(this.formatMoneyPdf(netSalary, currency), 54, currentY + 22);
+      if (isNewHireDeferred) {
+        doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold')
+          .text('NET DISBURSED THIS CUTOFF (31-DAY CYCLE DEFERRED)', 54, currentY + 10);
+        doc.fillColor('#7c3aed').fontSize(15).font('Helvetica-Bold')
+          .text(`${this.formatMoneyPdf(0, currency)} (Deferred)`, 54, currentY + 22);
 
-      doc.fillColor('#475569').fontSize(8).font('Helvetica')
-        .text('Disbursement Method: Direct Deposit / Bank Transfer', 280, currentY + 12, { width: 265, align: 'right' })
-        .text('Prepared by TimeLogic Payroll', 280, currentY + 26, { width: 265, align: 'right' });
+        doc.fillColor('#475569').fontSize(8).font('Helvetica')
+          .text(`Preserved Balance: ${this.formatMoneyPdf(deferredAmount, currency)}`, 270, currentY + 12, { width: 275, align: 'right' })
+          .text(`Rolls forward to next month's ${payoutDay}th payout (31d Cycle)`, 270, currentY + 26, { width: 275, align: 'right' });
+      } else {
+        doc.fillColor('#64748b').fontSize(7.5).font('Helvetica-Bold')
+          .text('NET PAY', 54, currentY + 10);
+        doc.fillColor('#0f172a').fontSize(16).font('Helvetica-Bold')
+          .text(this.formatMoneyPdf(netSalary, currency), 54, currentY + 22);
+
+        doc.fillColor('#475569').fontSize(8).font('Helvetica')
+          .text('Disbursement Method: Direct Deposit / Bank Transfer', 280, currentY + 12, { width: 265, align: 'right' })
+          .text('Prepared by TimeLogic Payroll', 280, currentY + 26, { width: 265, align: 'right' });
+      }
 
       currentY += netBoxH + 12;
 
@@ -1516,6 +1653,14 @@ class PayrollService {
       : false;
     if (!options.force && (payslip.status === 'SENT' || (!isCurrentCycle && payslip.status === 'PAID'))) {
       return { success: true, status: 'SKIPPED', reason: 'This payslip has already been finalized and locked.' };
+    }
+
+    if (!options.force && (payslip.status === 'DEFERRED_31_DAYS' || payslip.calculationSnapshot?.summary?.payoutEligible === false)) {
+      return {
+        success: false,
+        status: 'SKIPPED',
+        reason: 'Employee is in their initial 31-day cycle; payout is deferred until next month.',
+      };
     }
 
     const email = payslip.employee.email;
@@ -1847,6 +1992,11 @@ class PayrollService {
     let skipped = 0;
 
     for (const p of payslips) {
+      if (p.status === 'DEFERRED_31_DAYS' || p.calculationSnapshot?.summary?.payoutEligible === false) {
+        logger.info(`Skipping payslip email for ${p.employeeId} (${p.employee?.firstName} ${p.employee?.lastName}) - initial 31-day cycle deferred to next month`);
+        skipped += 1;
+        continue;
+      }
       try {
         const res = await this.sendPayslipEmail(p.id);
         if (res.status === 'SKIPPED') skipped += 1;
