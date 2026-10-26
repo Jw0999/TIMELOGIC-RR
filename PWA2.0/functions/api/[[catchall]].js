@@ -11,26 +11,37 @@ export async function onRequest(context) {
   const headers = new Headers(request.headers);
   headers.set('Host', 'timelogic-backend.onrender.com');
 
-  const modifiedRequest = new Request(targetUrl, {
+  // Buffer body in memory so it can be re-sent safely if retry is needed
+  let bodyBuffer = undefined;
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    try {
+      bodyBuffer = await request.arrayBuffer();
+    } catch {
+      bodyBuffer = undefined;
+    }
+  }
+
+  const createReq = () => new Request(targetUrl, {
     method: request.method,
     headers,
-    body: request.method !== 'GET' && request.method !== 'HEAD' ? request.body : undefined,
+    body: bodyBuffer,
     redirect: 'follow',
   });
 
   try {
     let response;
     try {
-      response = await fetch(modifiedRequest);
+      response = await fetch(createReq());
     } catch (firstErr) {
       // If Render container was cold-starting or connection dropped, retry once
-      const retryReq = new Request(targetUrl, {
-        method: request.method,
-        headers,
-        body: request.method !== 'GET' && request.method !== 'HEAD' ? request.body : undefined,
-        redirect: 'follow',
-      });
-      response = await fetch(retryReq);
+      await new Promise((r) => setTimeout(r, 600));
+      response = await fetch(createReq());
+    }
+
+    if (response.status === 502 || response.status === 503) {
+      await new Promise((r) => setTimeout(r, 800));
+      const retry = await fetch(createReq()).catch(() => null);
+      if (retry && retry.ok) response = retry;
     }
 
     const responseHeaders = new Headers(response.headers);

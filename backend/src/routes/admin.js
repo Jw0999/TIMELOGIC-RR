@@ -11,6 +11,9 @@ const studentRoutes = require('./students');
 const { validateFaceEnrollment, hasValidEnrolledFace } = require('../utils/faceVerify');
 const { checkSubscription } = require('../middleware/subscriptionGuard');
 const fs = require('fs');
+const path = require('path');
+const { v4: uuidv4 } = require('uuid');
+const env = require('../config/env');
 
 // Enforce active subscription on admin operations (except redeem-code and subscription-status)
 router.use(checkSubscription);
@@ -22,19 +25,23 @@ router.get('/manual-attendance/employee', authenticate, isAdmin, [query('email')
 router.post('/manual-attendance/check-in', authenticate, isAdmin, stationLimiter, [
   body('employeeId').isUUID(),
   body('sessionId').isUUID(),
-  body('password').notEmpty(),
-  body('faceImage').optional({ nullable: true }).isString(),
-  body('livenessFrames').optional({ nullable: true }).isArray({ min: 3, max: 5 }),
-  body('timestamp').optional({ nullable: true }).isISO8601(),
-  body('idempotencyKey').optional().isString().isLength({ min: 8, max: 200 }),
+  body('password').notEmpty().withMessage('Password is required'),
+  body('faceImage').optional({ nullable: true, checkFalsy: true }).isString(),
+  body('livenessFrames').optional({ nullable: true, checkFalsy: true }).custom((val) => {
+    if (!val || (Array.isArray(val) && val.length === 0)) return true;
+    if (Array.isArray(val) && val.length >= 3 && val.length <= 10) return true;
+    throw new Error('Liveness verification requires at least 3 motion frames.');
+  }),
+  body('timestamp').optional({ nullable: true, checkFalsy: true }).isISO8601(),
+  body('idempotencyKey').optional({ checkFalsy: true }).isString().isLength({ min: 8, max: 200 }),
 ], validate, ctrl.manualCheckIn);
 router.post('/manual-attendance/check-out', authenticate, isAdmin, stationLimiter, [
   body('employeeId').isUUID(),
-  body('sessionId').optional({ nullable: true }).isUUID(),
-  body('password').notEmpty(),
-  body('faceImage').optional({ nullable: true }).isString(),
-  body('timestamp').optional({ nullable: true }).isISO8601(),
-  body('idempotencyKey').optional().isString().isLength({ min: 8, max: 200 }),
+  body('sessionId').optional({ nullable: true, checkFalsy: true }).isUUID(),
+  body('password').notEmpty().withMessage('Password is required'),
+  body('faceImage').optional({ nullable: true, checkFalsy: true }).isString(),
+  body('timestamp').optional({ nullable: true, checkFalsy: true }).isISO8601(),
+  body('idempotencyKey').optional({ checkFalsy: true }).isString().isLength({ min: 8, max: 200 }),
 ], validate, ctrl.manualCheckOut);
 router.post('/manual-attendance/batch-sync', authenticate, isAdmin, [
   body('records').isArray({ min: 1 }).withMessage('records must be an array with at least one record'),
@@ -147,13 +154,49 @@ router.post('/users/:userId/face',
   },
   upload.single('photo'),
   async (req, res, next) => {
+    let filePath = null;
+    let fileBuffer = null;
+    let filename = null;
+    let isTempFile = false;
+
     try {
-      if (!req.file) {
-        return res.status(400).json({ success: false, message: 'No photo received. Make sure the field name is "photo".' });
+      if (req.file) {
+        filePath = req.file.path;
+        fileBuffer = fs.readFileSync(filePath);
+        filename = req.file.filename;
+      } else if (req.body?.image || req.body?.photo) {
+        const raw = String(req.body.image || req.body.photo);
+        const matches = raw.match(/^data:image\/([a-zA-Z+]+);base64,(.+)$/);
+        let ext = '.jpg';
+        let base64Data = raw;
+        if (matches) {
+          const mimeSubtype = matches[1].toLowerCase();
+          if (mimeSubtype === 'png') ext = '.png';
+          else if (mimeSubtype === 'webp') ext = '.webp';
+          base64Data = matches[2];
+        } else {
+          base64Data = raw.replace(/^data:[^;]+;base64,/, '');
+        }
+        fileBuffer = Buffer.from(base64Data, 'base64');
+        filename = `${uuidv4()}${ext}`;
+        const UP = env.UPLOAD_DIR || 'uploads';
+        const baseDir = path.isAbsolute(UP) ? UP : path.join(process.cwd(), UP);
+        const facesDir = path.join(baseDir, 'faces');
+        if (!fs.existsSync(facesDir)) {
+          fs.mkdirSync(facesDir, { recursive: true });
+        }
+        filePath = path.join(facesDir, filename);
+        fs.writeFileSync(filePath, fileBuffer);
+        isTempFile = true;
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: 'No photo received. Send multipart file "photo" or JSON { image: "data:image/jpeg;base64,..." }.',
+        });
       }
-      const fileBuffer = fs.readFileSync(req.file.path);
-      await validateFaceEnrollment(req.file.path, fileBuffer);
-      const url = `/uploads/faces/${req.file.filename}`;
+
+      await validateFaceEnrollment(filePath, fileBuffer);
+      const url = `/uploads/faces/${filename}`;
 
       const user = await prisma.user.update({
         where: { id: req.params.userId },
@@ -163,9 +206,17 @@ router.post('/users/:userId/face',
         },
         select: { id: true, firstName: true, lastName: true, profileImageUrl: true },
       });
-      res.json({ success: true, data: user });
+      res.json({
+        success: true,
+        data: {
+          ...user,
+          hasFaceEnrolled: true,
+        },
+      });
     } catch (err) {
-      if (req.file?.path) fs.promises.unlink(req.file.path).catch(() => {});
+      if (filePath && fs.existsSync(filePath)) {
+        fs.promises.unlink(filePath).catch(() => {});
+      }
       next(err);
     }
   }

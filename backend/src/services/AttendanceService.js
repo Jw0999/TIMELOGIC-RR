@@ -1062,7 +1062,8 @@ class AttendanceService {
 
     const session = await this._loadManualSession(sessionId, employee.orgId, clockInTime);
     if (!officeHoursFor(clockInTime, session.office)) throw Object.assign(new Error('This office is closed today.'), { status: 400 });
-    if (employee.officeId && session.officeId && employee.officeId !== session.officeId) {
+    const sessionOfficeId = session.officeId || session.office?.id;
+    if (employee.officeId && sessionOfficeId && employee.officeId !== sessionOfficeId) {
       throw Object.assign(new Error(`This employee is assigned to ${employee.office?.name || 'another office'} and cannot check in at ${session.office?.name || 'this office'}.`), { status: 403, code: 'OFFICE_MISMATCH' });
     }
     await this._assertEmployeeMayCheckIn(employeeId, clockInTime, session.office.timezone);
@@ -1779,10 +1780,10 @@ class AttendanceService {
   }
 
   async _loadManualSession(sessionId, orgId, now) {
-    const session = await prisma.attendanceSession.findUnique({
+    let session = await prisma.attendanceSession.findUnique({
       where: { id: sessionId },
       select: {
-        id: true, status: true, startTime: true, endTime: true,
+        id: true, status: true, startTime: true, endTime: true, officeId: true,
         office: {
           select: {
             id: true, orgId: true, isActive: true, timezone: true, openTime: true, closeTime: true, weeklySchedule: true,
@@ -1804,7 +1805,7 @@ class AttendanceService {
         where: { id: session.id },
         data: { status: 'ACTIVE', endTime: extendedEndTime },
         select: {
-          id: true, status: true, startTime: true, endTime: true,
+          id: true, status: true, startTime: true, endTime: true, officeId: true,
           office: {
             select: {
               id: true, orgId: true, isActive: true, timezone: true, openTime: true, closeTime: true, weeklySchedule: true,

@@ -329,15 +329,22 @@ export async function manualCheckIn(
     throw new Error('Manual attendance requires a live connection so the server can verify identity and liveness.');
   }
 
+  const payload: any = {
+    employeeId,
+    sessionId,
+    password,
+    idempotencyKey: crypto.randomUUID(),
+  };
+
+  if (faceImage && typeof faceImage === 'string' && faceImage.trim()) {
+    payload.faceImage = faceImage;
+  }
+  if (Array.isArray(livenessFrames) && livenessFrames.length >= 3) {
+    payload.livenessFrames = livenessFrames;
+  }
+
   try {
-    return (await api.post<{ data: ActionResult }>('/admin/manual-attendance/check-in', {
-      employeeId,
-      sessionId,
-      password,
-      faceImage,
-      livenessFrames,
-      idempotencyKey: crypto.randomUUID(),
-    })).data;
+    return (await api.post<{ data: ActionResult }>('/admin/manual-attendance/check-in', payload)).data;
   } catch (error: any) {
     if (error.message?.includes('Unable to connect') || error.message?.includes('Failed to fetch') || !navigator.onLine) {
       throw new Error('Manual attendance requires a live connection so the server can verify identity and liveness.');
@@ -356,13 +363,17 @@ export async function manualCheckOut(
     throw new Error('Manual attendance requires a live connection so the server can verify the authenticated employee.');
   }
 
+  const payload: any = {
+    employeeId,
+    password,
+    idempotencyKey: crypto.randomUUID(),
+  };
+  if (sessionId) {
+    payload.sessionId = sessionId;
+  }
+
   try {
-    return (await api.post<{ data: ActionResult }>('/admin/manual-attendance/check-out', {
-      employeeId,
-      sessionId,
-      password,
-      idempotencyKey: crypto.randomUUID(),
-    })).data;
+    return (await api.post<{ data: ActionResult }>('/admin/manual-attendance/check-out', payload)).data;
   } catch (error: any) {
     if (error.message?.includes('Unable to connect') || error.message?.includes('Failed to fetch') || !navigator.onLine) {
       throw new Error('Manual attendance requires a live connection so the server can verify the authenticated employee.');
@@ -412,12 +423,24 @@ export async function checkOutStudent(studentId: string) {
     return (await api.post<{ data: Student }>(`/students/${studentId}/check-out`, {})).data;
   }
 }
-export async function enrollFace(employeeId: string, photoBlob: Blob): Promise<{ success: boolean; data: { id: string; firstName: string; lastName: string; profileImageUrl: string } }> {
+export async function enrollFace(
+  employeeId: string,
+  imageOrBlob: string | Blob
+): Promise<{ success: boolean; data: { id: string; firstName: string; lastName: string; profileImageUrl: string; hasFaceEnrolled?: boolean } }> {
+  if (typeof imageOrBlob === 'string') {
+    const res = await api.post<{ success: boolean; data: { id: string; firstName: string; lastName: string; profileImageUrl: string; hasFaceEnrolled?: boolean } }>(
+      `/admin/users/${employeeId}/face`,
+      { image: imageOrBlob }
+    );
+    return res;
+  }
+
   const formData = new FormData();
-  formData.append('photo', photoBlob, 'face.jpg');
+  formData.append('photo', imageOrBlob, 'face.jpg');
+  const token = getAccessToken();
   const response = await fetch(`${API_URL}/admin/users/${employeeId}/face`, {
     method: 'POST',
-    headers: { ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: formData,
   });
   if (!response.ok) {
@@ -425,4 +448,7 @@ export async function enrollFace(employeeId: string, photoBlob: Blob): Promise<{
     throw new Error(body?.message || 'Failed to enroll face.');
   }
   return response.json();
+}
+export async function releaseFace(employeeId: string): Promise<{ success: boolean; message: string }> {
+  return api.post<{ success: boolean; message: string }>(`/admin/users/${employeeId}/release-face`, {});
 }

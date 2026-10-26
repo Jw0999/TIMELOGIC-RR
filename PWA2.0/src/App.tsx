@@ -78,7 +78,7 @@ const formatDepartment = (employee: Employee) =>
 
 // Check if an employee has a face registered
 const hasEnrolledFace = (emp: Employee): boolean =>
-  Boolean(emp.hasFaceEnrolled || emp.profileImageUrl === 'enrolled');
+  Boolean(emp.hasFaceEnrolled || emp.profileImageUrl === 'enrolled' || (emp.profileImageUrl && emp.profileImageUrl.length > 5));
 
 // Check if an attendance timestamp belongs to today
 const isDateToday = (timeStr?: string | null, serverTime?: string | null): boolean => {
@@ -731,18 +731,16 @@ function App() {
     setActionBusy(true);
     setError('');
     try {
-      // Convert base64 data URI to Blob
-      const res = await fetch(faceImage);
-      const blob = await res.blob();
-
-      await enrollFace(emp.id, blob);
+      const res = await enrollFace(emp.id, faceImage);
 
       setNotice(`Biometric face template registered successfully for ${emp.firstName} ${emp.lastName}!`);
+
+      const newPhotoUrl = res?.data?.profileImageUrl || 'enrolled';
 
       // Update identifiedEmployee if matching
       setIdentifiedEmployee((prev) =>
         prev && prev.id === emp.id
-          ? { ...prev, profileImageUrl: 'enrolled', hasFaceEnrolled: true }
+          ? { ...prev, profileImageUrl: newPhotoUrl, hasFaceEnrolled: true }
           : prev
       );
 
@@ -753,7 +751,7 @@ function App() {
           ...prev,
           employees: prev.employees.map((e) =>
             e.id === emp.id
-              ? { ...e, profileImageUrl: 'enrolled', hasFaceEnrolled: true }
+              ? { ...e, profileImageUrl: newPhotoUrl, hasFaceEnrolled: true }
               : e
           ),
         };
