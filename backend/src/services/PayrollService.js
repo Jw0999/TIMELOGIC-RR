@@ -154,6 +154,7 @@ class PayrollService {
       select: {
         id: true,
         name: true,
+        createdAt: true,
         salaryPayoutDay: true,
         salaryAutomationEnabled: true,
         salaryCurrency: true,
@@ -164,6 +165,7 @@ class PayrollService {
     });
 
     const payoutDay = org?.salaryPayoutDay ?? 28;
+    const orgSetupCutoff = new Date(new Date(org?.createdAt || 0).getTime() + 7 * 24 * 60 * 60 * 1000);
     const now = new Date();
 
     let y = year ? parseInt(year, 10) : null;
@@ -188,7 +190,7 @@ class PayrollService {
     const prevY = prevMonthDate.getUTCFullYear();
     const prevM = prevMonthDate.getUTCMonth() + 1;
 
-    const [employees, attendanceRecords, manualPenalties, breakRecords, existingPayslips, prevPayslips] = await Promise.all([
+    const [employees, attendanceRecords, manualPenalties, breakRecords, existingPayslips, prevPayslips, priorAttendanceCounts, priorPayslips] = await Promise.all([
       prisma.user.findMany({
         where: {
           orgId,
@@ -270,6 +272,24 @@ class PayrollService {
       prisma.payslipRecord.findMany({
         where: { orgId, year: prevY, month: prevM },
       }),
+      prisma.attendanceRecord.groupBy({
+        by: ['employeeId'],
+        where: {
+          employee: { orgId },
+          date: { lt: startDate },
+        },
+        _count: { id: true },
+      }),
+      prisma.payslipRecord.findMany({
+        where: {
+          orgId,
+          OR: [
+            { year: { lt: y } },
+            { year: y, month: { lt: m } },
+          ],
+        },
+        select: { id: true, employeeId: true, year: true, month: true, status: true },
+      }),
     ]);
 
     const payslipMap = new Map();
@@ -280,6 +300,18 @@ class PayrollService {
     const prevPayslipMap = new Map();
     for (const p of prevPayslips) {
       prevPayslipMap.set(p.employeeId, p);
+    }
+
+    const priorAttendanceMap = new Map();
+    for (const pa of priorAttendanceCounts) {
+      priorAttendanceMap.set(pa.employeeId, pa._count.id);
+    }
+
+    const priorPayslipEmployees = new Set();
+    for (const pp of priorPayslips) {
+      if (pp.year < prevY || (pp.year === prevY && pp.month < prevM)) {
+        priorPayslipEmployees.add(pp.employeeId);
+      }
     }
 
     const attendanceByEmployee = new Map();
@@ -311,22 +343,31 @@ class PayrollService {
       const msInDay = 24 * 60 * 60 * 1000;
       const daysSinceHire = Math.max(1, Math.floor((endDate.getTime() - hireDate.getTime()) / msInDay) + 1);
 
-      // A newly added employee whose hire date is less than 31 days before the cycle cutoff (e.g. 5th):
-      // The 5th payout does not apply. They follow an initial 31-day cycle before payout moves to the next month.
-      // However, all their records (attendance, penalties, hours) from last month are STILL KEPT!
-      const isNewHire = daysSinceHire < 31 && hireDate >= new Date(startDate.getTime() - 31 * msInDay);
+      // Distinguish established staff from genuinely new mid-cycle hires:
+      const hasPriorAttendance = (priorAttendanceMap.get(emp.id) || 0) > 0;
+      const hasPriorPayslipHistory = priorPayslipEmployees.has(emp.id);
+      const isFoundingStaff = hireDate <= orgSetupCutoff;
+      const isEstablishedStaff = isFoundingStaff || hasPriorAttendance || hasPriorPayslipHistory || (hireDate < startDate);
+
+      // ONLY newly onboarded employees within THIS cycle with zero past history are deferred under the 31-day cycle rule
+      const isNewHire = !isEstablishedStaff && (hireDate >= startDate && hireDate <= endDate) && daysSinceHire < 31;
       const payoutEligible = !isNewHire;
       const initialCycleEndDate = new Date(hireDate.getTime() + 31 * msInDay);
 
-      // Check for carryover from last month if the employee had deferred records in the previous cycle
+      // Carryover ONLY applies to employees whose immediate prior payslip was explicitly deferred under the 31-day policy
       const prevPayslip = prevPayslipMap.get(emp.id);
       let carryoverEarnings = 0;
       let carryoverDetails = null;
 
-      if (prevPayslip && (prevPayslip.status === 'DEFERRED_31_DAYS' || prevPayslip.calculationSnapshot?.summary?.isNewHire)) {
-        carryoverEarnings = prevPayslip.calculationSnapshot?.summary?.deferredAmount ?? prevPayslip.netSalary ?? 0;
+      const isPrevDeferredNewHire = prevPayslip &&
+        prevPayslip.status === 'DEFERRED_31_DAYS' &&
+        prevPayslip.calculationSnapshot?.summary?.isNewHire === true &&
+        Number(prevPayslip.calculationSnapshot?.summary?.deferredAmount) > 0;
+
+      if (isPrevDeferredNewHire && daysSinceHire >= 31) {
+        carryoverEarnings = Number(prevPayslip.calculationSnapshot.summary.deferredAmount);
         carryoverDetails = {
-          description: `Prior month carryover (${prevPayslip.totalPresentDays}d worked, ${prevPayslip.totalWorkHours}h, overtime & penalties included from last month)`,
+          description: `Prior month initial 31-day cycle rollover (${prevPayslip.totalPresentDays || 0}d worked, ${prevPayslip.totalWorkHours || 0}h, overtime & deductions included from last month)`,
           sourceId: prevPayslip.id,
           year: prevY,
           month: prevM,
@@ -392,7 +433,7 @@ class PayrollService {
               calculationVersion: calculation.calculationVersion,
               calculationHash: calculation.calculationHash,
               calculationSnapshot: calculation.snapshot,
-              status: isNewHire ? 'DEFERRED_31_DAYS' : existing.status,
+              status: isNewHire ? 'DEFERRED_31_DAYS' : (existing.status === 'DEFERRED_31_DAYS' ? 'GENERATED' : existing.status),
             },
           });
         } catch (err) {
@@ -609,6 +650,7 @@ class PayrollService {
   async calculateMonthlyPayroll(orgId, year, month) {
     const org = await prisma.organization.findUnique({ where: { id: orgId } });
     const payoutDay = org?.salaryPayoutDay ?? 28;
+    const orgSetupCutoff = new Date(new Date(org?.createdAt || 0).getTime() + 7 * 24 * 60 * 60 * 1000);
     const now = new Date();
 
     let y = year ? parseInt(year, 10) : null;
@@ -683,6 +725,24 @@ class PayrollService {
       }),
       prisma.payslipRecord.findMany({ where: { orgId, year: y, month: m } }),
       prisma.payslipRecord.findMany({ where: { orgId, year: prevY, month: prevM } }),
+      prisma.attendanceRecord.groupBy({
+        by: ['employeeId'],
+        where: {
+          employee: { orgId },
+          date: { lt: startDate },
+        },
+        _count: { id: true },
+      }),
+      prisma.payslipRecord.findMany({
+        where: {
+          orgId,
+          OR: [
+            { year: { lt: y } },
+            { year: y, month: { lt: m } },
+          ],
+        },
+        select: { id: true, employeeId: true, year: true, month: true, status: true },
+      }),
     ]);
 
     const currency = org?.salaryCurrency || 'NGN';
@@ -706,6 +766,19 @@ class PayrollService {
 
     const payslipByEmployee = new Map(existingPayslips.map((payslip) => [payslip.employeeId, payslip]));
     const prevPayslipMap = new Map(prevPayslips.map((payslip) => [payslip.employeeId, payslip]));
+
+    const priorAttendanceMap = new Map();
+    for (const pa of priorAttendanceCounts) {
+      priorAttendanceMap.set(pa.employeeId, pa._count.id);
+    }
+
+    const priorPayslipEmployees = new Set();
+    for (const pp of priorPayslips) {
+      if (pp.year < prevY || (pp.year === prevY && pp.month < prevM)) {
+        priorPayslipEmployees.add(pp.employeeId);
+      }
+    }
+
     const savedPayslips = [];
 
     const isCurrentCycle = now >= startDate && now <= endDate;
@@ -721,22 +794,31 @@ class PayrollService {
       const msInDay = 24 * 60 * 60 * 1000;
       const daysSinceHire = Math.max(1, Math.floor((endDate.getTime() - hireDate.getTime()) / msInDay) + 1);
 
-      // A newly added employee whose hire date is less than 31 days before the cycle cutoff (e.g. 5th):
-      // The 5th payout does not apply. They follow an initial 31-day cycle before payout moves to the next month.
-      // However, all their records (attendance, penalties, hours) from last month are STILL KEPT!
-      const isNewHire = daysSinceHire < 31 && hireDate >= new Date(startDate.getTime() - 31 * msInDay);
+      // Distinguish established staff from genuinely new mid-cycle hires:
+      const hasPriorAttendance = (priorAttendanceMap.get(emp.id) || 0) > 0;
+      const hasPriorPayslipHistory = priorPayslipEmployees.has(emp.id);
+      const isFoundingStaff = hireDate <= orgSetupCutoff;
+      const isEstablishedStaff = isFoundingStaff || hasPriorAttendance || hasPriorPayslipHistory || (hireDate < startDate);
+
+      // ONLY newly onboarded employees within THIS cycle with zero past history are deferred under the 31-day cycle rule
+      const isNewHire = !isEstablishedStaff && (hireDate >= startDate && hireDate <= endDate) && daysSinceHire < 31;
       const payoutEligible = !isNewHire;
       const initialCycleEndDate = new Date(hireDate.getTime() + 31 * msInDay);
 
-      // Check for carryover from last month if the employee had deferred records in the previous cycle
+      // Carryover ONLY applies to employees whose immediate prior payslip was explicitly deferred under the 31-day policy
       const prevPayslip = prevPayslipMap.get(emp.id);
       let carryoverEarnings = 0;
       let carryoverDetails = null;
 
-      if (prevPayslip && (prevPayslip.status === 'DEFERRED_31_DAYS' || prevPayslip.calculationSnapshot?.summary?.isNewHire)) {
-        carryoverEarnings = prevPayslip.calculationSnapshot?.summary?.deferredAmount ?? prevPayslip.netSalary ?? 0;
+      const isPrevDeferredNewHire = prevPayslip &&
+        prevPayslip.status === 'DEFERRED_31_DAYS' &&
+        prevPayslip.calculationSnapshot?.summary?.isNewHire === true &&
+        Number(prevPayslip.calculationSnapshot?.summary?.deferredAmount) > 0;
+
+      if (isPrevDeferredNewHire && daysSinceHire >= 31) {
+        carryoverEarnings = Number(prevPayslip.calculationSnapshot.summary.deferredAmount);
         carryoverDetails = {
-          description: `Prior month carryover (${prevPayslip.totalPresentDays}d worked, ${prevPayslip.totalWorkHours}h, overtime & penalties included from last month)`,
+          description: `Prior month initial 31-day cycle rollover (${prevPayslip.totalPresentDays || 0}d worked, ${prevPayslip.totalWorkHours || 0}h, overtime & deductions included from last month)`,
           sourceId: prevPayslip.id,
           year: prevY,
           month: prevM,

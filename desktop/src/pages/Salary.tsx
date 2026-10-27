@@ -890,22 +890,22 @@ export default function Salary() {
                           <td className="px-4 py-3">
                             <button onClick={() => setBreakdownModalEmployee(emp)} className="text-left group" title="View explainable pay calculation">
                               {emp.isNewHire && !emp.payoutEligible ? (
-                                <>
+                                <div className="space-y-0.5">
                                   <div className="flex items-center gap-1.5">
-                                    <span className="font-bold text-xs text-[var(--text-muted)] line-through">
-                                      {formatMoney(emp.deferredAmount || emp.netSalary, emp.currency)}
-                                    </span>
-                                    <span className="font-bold text-sm text-purple-600 dark:text-purple-400 group-hover:underline">
+                                    <span className="font-bold text-sm text-purple-700 dark:text-purple-300 group-hover:underline">
                                       ₦0.00
                                     </span>
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300">
+                                      Deferred
+                                    </span>
                                   </div>
-                                  <span className="block text-[10px] font-semibold text-purple-600 dark:text-purple-400 mt-0.5">
-                                    +{formatMoney(emp.deferredAmount || emp.netSalary, emp.currency)} accumulated
+                                  <span className="block text-[11px] font-semibold text-purple-600 dark:text-purple-400">
+                                    +{formatMoney(emp.deferredAmount || emp.netSalary, emp.currency)} preserved
                                   </span>
-                                  <span className="block text-[9px] text-[var(--text-muted)]">
-                                    Deferred (31d cycle) · Rolls forward
+                                  <span className="block text-[10px] text-[var(--text-muted)]">
+                                    Initial 31d cycle · Rolls to next mo.
                                   </span>
-                                </>
+                                </div>
                               ) : (
                                 <>
                                   <span className={`font-bold text-sm group-hover:underline ${emp.netSalary > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-[var(--text-muted)]'}`}>
