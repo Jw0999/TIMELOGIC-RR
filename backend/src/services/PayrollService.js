@@ -5,6 +5,7 @@ const nodemailer = require('nodemailer');
 const { prisma } = require('../config/database');
 const logger = require('../config/logger');
 const WorkEventService = require('./WorkEventService');
+const AuditService = require('./AuditService');
 const { calculatePayroll } = require('./PayrollCalculationEngine');
 const { officeHoursFor } = require('../utils/attendanceClock');
 
@@ -229,7 +230,7 @@ class PayrollService {
     const prevY = prevMonthDate.getUTCFullYear();
     const prevM = prevMonthDate.getUTCMonth() + 1;
 
-    const [employees, attendanceRecords, manualPenalties, breakRecords, existingPayslips, prevPayslips, priorAttendanceCounts, priorPayslips] = await Promise.all([
+    const [employees, attendanceRecords, manualPenalties, salaryAdditions, breakRecords, existingPayslips, prevPayslips, priorAttendanceCounts, priorPayslips] = await Promise.all([
       prisma.user.findMany({
         where: {
           orgId,
@@ -286,6 +287,20 @@ class PayrollService {
           employeeId: true,
           amount: true,
           reason: true,
+          createdAt: true,
+        },
+      }),
+      prisma.salaryAddition.findMany({
+        where: {
+          orgId,
+          createdAt: { gte: startDate, lte: endDate },
+        },
+        select: {
+          id: true,
+          employeeId: true,
+          amount: true,
+          reason: true,
+          type: true,
           createdAt: true,
         },
       }),
@@ -371,11 +386,18 @@ class PayrollService {
       breakByEmployee.get(br.employeeId).push(br);
     }
 
+    const salaryAdditionsByEmployee = new Map();
+    for (const sa of salaryAdditions) {
+      if (!salaryAdditionsByEmployee.has(sa.employeeId)) salaryAdditionsByEmployee.set(sa.employeeId, []);
+      salaryAdditionsByEmployee.get(sa.employeeId).push(sa);
+    }
+
     const employeeRows = await Promise.all(employees.map(async (emp) => {
       const existing = payslipMap.get(emp.id);
       const userAtt = attendanceByEmployee.get(emp.id) || [];
       const userMp = manualPenaltiesByEmployee.get(emp.id) || [];
       const userBr = breakByEmployee.get(emp.id) || [];
+      const userAdditions = salaryAdditionsByEmployee.get(emp.id) || [];
       const currency = emp.salaryCurrency || org?.salaryCurrency || 'NGN';
 
       const hireDate = new Date(emp.createdAt || Date.now());
@@ -432,6 +454,7 @@ class PayrollService {
         attendanceRecords: userAtt,
         breakRecords: userBr,
         manualPenalties: userMp,
+        salaryAdditions: userAdditions,
         timezone: emp.office?.timezone || org?.timezone || 'Africa/Lagos',
         officeOpenTime: emp.office?.openTime || '08:00',
         officeCloseTime: emp.office?.closeTime || '17:00',
@@ -466,6 +489,7 @@ class PayrollService {
               attendancePenalties: calculation.attendancePenalties,
               breakPenalties: calculation.breakPenalties,
               manualPenalties: calculation.manualPenalties,
+              salaryAdditions: calculation.salaryAdditions || 0,
               totalDeductions: calculation.totalDeductions,
               netSalary: calculation.netSalary,
               breakdownJson: calculation.lineItems,
@@ -508,6 +532,8 @@ class PayrollService {
         attendancePenalties,
         breakPenalties,
         manualPenalties: manualPenaltiesTotal,
+        salaryAdditions: calculation.salaryAdditions || 0,
+        salaryAdditionsList: calculation.salaryAdditionsList || [],
         totalDeductions,
         grossSalary,
         netSalary,
@@ -532,6 +558,7 @@ class PayrollService {
     const totalBase = employeeRows.reduce((acc, r) => acc + r.baseSalary, 0);
     const totalGross = employeeRows.reduce((acc, r) => acc + r.grossSalary, 0);
     const totalOvertime = employeeRows.reduce((acc, r) => acc + r.overtimeEarnings, 0);
+    const totalAdditions = employeeRows.reduce((acc, r) => acc + (r.salaryAdditions || 0), 0);
     const totalDeductions = employeeRows.reduce((acc, r) => acc + r.totalDeductions, 0);
     const totalNet = employeeRows.reduce((acc, r) => acc + r.netSalary, 0);
     const totalDeferred = employeeRows.reduce((acc, r) => acc + (r.deferredAmount || 0), 0);
@@ -555,6 +582,7 @@ class PayrollService {
         totalBasePayroll: totalBase,
         totalGrossPayroll: totalGross,
         totalOvertimeEarnings: totalOvertime,
+        totalAdditions,
         totalDeductions,
         totalNetPayout: totalNet,
         totalDeferredPayroll: totalDeferred,
@@ -713,7 +741,7 @@ class PayrollService {
     const prevY = prevMonthDate.getUTCFullYear();
     const prevM = prevMonthDate.getUTCMonth() + 1;
 
-    const [employees, attendanceRecords, manualPenalties, breakRecords, existingPayslips, prevPayslips] = await Promise.all([
+    const [employees, attendanceRecords, manualPenalties, salaryAdditions, breakRecords, existingPayslips, prevPayslips, priorAttendanceCounts, priorPayslips] = await Promise.all([
       prisma.user.findMany({
         where: {
           orgId,
@@ -749,6 +777,13 @@ class PayrollService {
         orderBy: { date: 'asc' },
       }),
       prisma.manualPenalty.findMany({
+        where: {
+          orgId,
+          createdAt: { gte: startDate, lte: endDate },
+        },
+        orderBy: { createdAt: 'asc' },
+      }),
+      prisma.salaryAddition.findMany({
         where: {
           orgId,
           createdAt: { gte: startDate, lte: endDate },
@@ -801,6 +836,12 @@ class PayrollService {
     for (const br of breakRecords) {
       if (!breakByEmployee.has(br.employeeId)) breakByEmployee.set(br.employeeId, []);
       breakByEmployee.get(br.employeeId).push(br);
+    }
+
+    const salaryAdditionsByEmployee = new Map();
+    for (const sa of salaryAdditions) {
+      if (!salaryAdditionsByEmployee.has(sa.employeeId)) salaryAdditionsByEmployee.set(sa.employeeId, []);
+      salaryAdditionsByEmployee.get(sa.employeeId).push(sa);
     }
 
     const payslipByEmployee = new Map(existingPayslips.map((payslip) => [payslip.employeeId, payslip]));
@@ -875,6 +916,7 @@ class PayrollService {
       const userAtt = attendanceByEmployee.get(emp.id) || [];
       const userMp = manualByEmployee.get(emp.id) || [];
       const userBr = breakByEmployee.get(emp.id) || [];
+      const userAdditions = salaryAdditionsByEmployee.get(emp.id) || [];
       const calculation = calculatePayroll({
         employeeId: emp.id,
         year: y,
@@ -886,6 +928,7 @@ class PayrollService {
         attendanceRecords: userAtt,
         breakRecords: userBr,
         manualPenalties: userMp,
+        salaryAdditions: userAdditions,
         timezone: emp.office?.timezone || org?.timezone || 'Africa/Lagos',
         officeOpenTime: emp.office?.openTime || '08:00',
         officeCloseTime: emp.office?.closeTime || '17:00',
@@ -925,6 +968,7 @@ class PayrollService {
           attendancePenalties: calculation.attendancePenalties,
           breakPenalties: calculation.breakPenalties,
           manualPenalties: calculation.manualPenalties,
+          salaryAdditions: calculation.salaryAdditions || 0,
           totalDeductions: calculation.totalDeductions,
           netSalary: calculation.netSalary,
           breakdownJson: calculation.lineItems,
@@ -947,6 +991,7 @@ class PayrollService {
           attendancePenalties: calculation.attendancePenalties,
           breakPenalties: calculation.breakPenalties,
           manualPenalties: calculation.manualPenalties,
+          salaryAdditions: calculation.salaryAdditions || 0,
           totalDeductions: calculation.totalDeductions,
           netSalary: calculation.netSalary,
           breakdownJson: calculation.lineItems,
@@ -974,6 +1019,7 @@ class PayrollService {
           totalWorkHours: payslip.totalWorkHours,
           totalDeductions: payslip.totalDeductions,
           overtimeEarnings: payslip.overtimeEarnings,
+          salaryAdditions: payslip.salaryAdditions || 0,
           calculationVersion: payslip.calculationVersion,
           calculationHash: payslip.calculationHash,
           calculationSnapshot: payslip.calculationSnapshot,
@@ -1023,7 +1069,7 @@ class PayrollService {
     const periodLabel = this.formatPeriodLabel(periodStart, periodEnd);
 
     // Live query attendance, break records, and manual penalties for this employee within the active pay cycle
-    const [atts, breaks, manuals] = await Promise.all([
+    const [atts, breaks, manuals, additions] = await Promise.all([
       prisma.attendanceRecord.findMany({
         where: {
           employeeId: payslip.employeeId,
@@ -1084,6 +1130,20 @@ class PayrollService {
           id: true,
           amount: true,
           reason: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'asc' },
+      }),
+      prisma.salaryAddition.findMany({
+        where: {
+          employeeId: payslip.employeeId,
+          createdAt: { gte: periodStart, lte: periodEnd },
+        },
+        select: {
+          id: true,
+          amount: true,
+          reason: true,
+          type: true,
           createdAt: true,
         },
         orderBy: { createdAt: 'asc' },
@@ -1270,6 +1330,33 @@ class PayrollService {
       }
     }
 
+    let salaryAdditionsTotal = 0;
+    for (const add of additions) {
+      const amt = Number(add.amount || 0);
+      if (amt > 0) {
+        salaryAdditionsTotal += amt;
+        const timeStr = add.createdAt ? this.formatTime(add.createdAt, tz) : '';
+        const dateFormatted = this.formatDate(add.createdAt, tz);
+
+        itemizedRecords.push({
+          id: `addition-${add.id}`,
+          type: 'SALARY_ADDITION',
+          categoryType: 'EARNING',
+          category: add.type || 'SALARY ADDITION',
+          categoryColor: '#059669',
+          badgeBg: '#ecfdf5',
+          date: add.createdAt.toISOString().split('T')[0],
+          dateStr: dateFormatted,
+          time: timeStr,
+          timeStr: timeStr || '—',
+          amount: amt,
+          description: add.reason || 'Salary addition / bonus',
+          subDetail: `Compensation Addition (${add.type || 'Bonus'})`,
+          rawTimestamp: add.createdAt,
+        });
+      }
+    }
+
     const now = new Date();
     const isCurrentCycle = now >= periodStart && now <= periodEnd;
     const isHistoricalLocked = !isCurrentCycle && payslip.status === 'PAID';
@@ -1281,6 +1368,7 @@ class PayrollService {
       attendancePenalties = savedCalculation.summary.attendancePenalties ?? attendancePenalties;
       breakPenalties = savedCalculation.summary.breakPenalties ?? breakPenalties;
       manualPenalties = savedCalculation.summary.manualPenalties ?? manualPenalties;
+      salaryAdditionsTotal = savedCalculation.summary.salaryAdditions ?? salaryAdditionsTotal;
       if (savedCalculation.lineItems && savedCalculation.lineItems.length > 0) {
         itemizedRecords = savedCalculation.lineItems.filter((i) => i.type !== 'BASE_SALARY');
       }
@@ -1292,7 +1380,7 @@ class PayrollService {
     const baseSalary = Number(payslip.baseSalary || payslip.employee?.baseSalary || 0);
     const carryoverEarnings = Number(savedCalculation?.summary?.carryoverEarnings || 0);
     const overtimeEarnings = Number(savedCalculation?.summary?.overtimeEarnings ?? totalOvertimeEarnings);
-    const grossSalary = Number(savedCalculation?.summary?.grossSalary ?? (baseSalary + overtimeEarnings + carryoverEarnings));
+    const grossSalary = Number(savedCalculation?.summary?.grossSalary ?? (baseSalary + overtimeEarnings + carryoverEarnings + salaryAdditionsTotal));
     const totalDeductions = Number(savedCalculation?.summary?.totalDeductions ?? (attendancePenalties + breakPenalties + manualPenalties));
     const netSalary = Number(savedCalculation?.summary?.netSalary ?? Math.max(0, grossSalary - totalDeductions));
     const roundedWorkHours = Math.round(displayWorkHours * 10) / 10;
@@ -1308,6 +1396,7 @@ class PayrollService {
             baseSalary,
             grossSalary,
             overtimeEarnings,
+            salaryAdditions: salaryAdditionsTotal,
             totalWorkHours: roundedWorkHours,
             totalPresentDays: displayPresentDays,
             totalLateDays: displayLateDays,
@@ -1511,6 +1600,14 @@ class PayrollService {
           dedVal: '—',
           dedColor: '#94a3b8',
         },
+        ...(salaryAdditionsTotal > 0 ? [{
+          earnLabel: 'Salary Additions & Bonuses',
+          earnVal: `+${this.formatMoneyPdf(salaryAdditionsTotal, currency)}`,
+          earnColor: '#047857',
+          dedLabel: '—',
+          dedVal: '—',
+          dedColor: '#94a3b8',
+        }] : []),
         {
           earnLabel: '—',
           earnVal: '—',
@@ -2011,6 +2108,7 @@ class PayrollService {
         const catLabel = item.categoryLabel || item.category || (
           item.type === 'ATTENDANCE_PENALTY' || item.type === 'ATTENDANCE_LATE' ? 'LATE ARRIVAL'
           : item.type === 'BREAK_PENALTY' ? 'BREAK OVERSTAY'
+          : item.type === 'SALARY_ADDITION' ? (item.category || 'BONUS')
           : isEarning ? 'WORK OVERSTAY'
           : 'HR PENALTY'
         );
@@ -2100,6 +2198,12 @@ class PayrollService {
           <span class="row-label">Overstay / Overtime Addition:</span>
           <span class="row-val" style="color: #047857;">+${this.formatMoney(freshPayslip.overtimeEarnings || 0, currency)}</span>
         </div>
+        ${freshPayslip.salaryAdditions > 0 ? `
+        <div class="row">
+          <span class="row-label">Salary Additions & Bonuses:</span>
+          <span class="row-val" style="color: #047857;">+${this.formatMoney(freshPayslip.salaryAdditions, currency)}</span>
+        </div>
+        ` : ''}
         <div class="row">
           <span class="row-label">Gross pay:</span>
           <span class="row-val">${this.formatMoney(freshPayslip.grossSalary || (freshPayslip.baseSalary + (freshPayslip.overtimeEarnings || 0)), currency)}</span>
@@ -2303,6 +2407,241 @@ class PayrollService {
   async executeAutomatedPaydayCron() {
     logger.info('[Payroll] Automatic background email dispatch is disabled per organization policy. Payslip emails are dispatched exclusively on-demand by the admin via Complete Payout or the employee Mail icon.');
     return [];
+  }
+  /**
+   * List salary additions / bonuses with optional filtering
+   */
+  async listSalaryAdditions(orgId, query = {}) {
+    const { employeeId, month, type, search } = query;
+    const where = { orgId };
+
+    if (employeeId) {
+      where.employeeId = employeeId;
+    }
+
+    if (type && type !== 'ALL') {
+      where.type = type;
+    }
+
+    if (month) {
+      const monthMatch = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(String(month).trim());
+      if (monthMatch) {
+        const y = Number(monthMatch[1]);
+        const m = Number(monthMatch[2]);
+        const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { salaryPayoutDay: true } });
+        const payoutDay = org?.salaryPayoutDay ?? 28;
+        const { startDate, endDate } = this.getMonthDateRange(y, m, payoutDay);
+        where.createdAt = { gte: startDate, lte: endDate };
+      }
+    }
+
+    if (search && String(search).trim()) {
+      const s = String(search).trim();
+      where.OR = [
+        { reason: { contains: s, mode: 'insensitive' } },
+        { employee: { firstName: { contains: s, mode: 'insensitive' } } },
+        { employee: { lastName: { contains: s, mode: 'insensitive' } } },
+        { employee: { employeeCode: { contains: s, mode: 'insensitive' } } },
+      ];
+    }
+
+    const additions = await prisma.salaryAddition.findMany({
+      where,
+      include: {
+        employee: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            employeeCode: true,
+            baseSalary: true,
+            salaryCurrency: true,
+            email: true,
+            department: { select: { id: true, name: true } },
+          },
+        },
+        createdBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return additions;
+  }
+
+  /**
+   * Add money to an employee salary with mandatory reason and optional base salary bump
+   */
+  async createSalaryAddition(orgId, createdById, data) {
+    const { employeeId, amount, reason, type = 'BONUS', effectiveDate, updateBaseSalary = false } = data;
+    const numAmount = Number(amount);
+
+    if (!employeeId) throw new Error('Employee selection is required');
+    if (isNaN(numAmount) || numAmount <= 0) throw new Error('Amount must be a positive number');
+    if (!reason || !String(reason).trim()) throw new Error('Reason for adding salary is mandatory');
+
+    const employee = await prisma.user.findFirst({
+      where: { id: employeeId, orgId, role: 'EMPLOYEE', status: { notIn: ['SUSPENDED', 'TERMINATED'] } },
+      select: { id: true, firstName: true, lastName: true, employeeCode: true, baseSalary: true, salaryCurrency: true },
+    });
+    if (!employee) throw new Error('Employee not found or inactive');
+
+    const createdAt = effectiveDate ? new Date(effectiveDate) : new Date();
+
+    const addition = await prisma.salaryAddition.create({
+      data: {
+        orgId,
+        employeeId,
+        amount: numAmount,
+        reason: String(reason).trim(),
+        type: type || 'BONUS',
+        createdById,
+        createdAt,
+      },
+      include: {
+        employee: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            employeeCode: true,
+            baseSalary: true,
+            salaryCurrency: true,
+            department: { select: { id: true, name: true } },
+          },
+        },
+        createdBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
+
+    // If updateBaseSalary is toggled, also permanently increment the employee's base salary
+    let updatedEmployee = null;
+    if (updateBaseSalary) {
+      updatedEmployee = await prisma.user.update({
+        where: { id: employeeId },
+        data: {
+          baseSalary: {
+            increment: numAmount,
+          },
+        },
+        select: { id: true, baseSalary: true },
+      });
+      logger.info(`[PayrollService] Permanently increased base salary for employee ${employeeId} by +${numAmount} to ${updatedEmployee.baseSalary}`);
+    }
+
+    try {
+      await AuditService.log({
+        actorId: createdById,
+        actorEmail: 'admin@timelogic.app',
+        actorRole: 'ADMIN',
+        action: 'SALARY_ADDITION_CREATED',
+        targetId: addition.id,
+        targetType: 'SALARY_ADDITION',
+        details: {
+          employeeId,
+          amount: numAmount,
+          reason: String(reason).trim(),
+          type,
+          updateBaseSalary,
+          newBaseSalary: updatedEmployee?.baseSalary,
+        },
+      });
+    } catch (_) {}
+
+    try {
+      await WorkEventService.record({
+        orgId,
+        employeeId,
+        actorId: createdById,
+        type: 'SALARY_ADDITION_APPLIED',
+        occurredAt: addition.createdAt,
+        source: 'ADMIN',
+        sourceType: 'SalaryAddition',
+        sourceId: addition.id,
+        dedupeKey: `salary-addition:${addition.id}`,
+        metadata: {
+          amount: addition.amount,
+          reason: addition.reason,
+          type: addition.type,
+          updateBaseSalary,
+        },
+      });
+    } catch (_) {}
+
+    // Recalculate payroll for the month so the change updates everywhere immediately
+    const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { salaryPayoutDay: true } });
+    const payoutDay = org?.salaryPayoutDay ?? 28;
+    const addDate = new Date(addition.createdAt);
+    let y = addDate.getUTCFullYear();
+    let m = addDate.getUTCMonth() + 1;
+    if (addDate.getUTCDate() > payoutDay) {
+      if (m === 12) { y += 1; m = 1; } else { m += 1; }
+    }
+
+    try {
+      await this.calculateMonthlyPayroll(orgId, y, m);
+    } catch (calcErr) {
+      logger.warn('[PayrollService] Payroll recalculation after salary addition warning:', calcErr.message);
+    }
+
+    return addition;
+  }
+
+  /**
+   * Delete a salary addition record and recalculate payroll
+   */
+  async deleteSalaryAddition(orgId, additionId) {
+    const addition = await prisma.salaryAddition.findFirst({
+      where: { id: additionId, orgId },
+    });
+    if (!addition) throw new Error('Salary addition record not found');
+
+    await prisma.salaryAddition.delete({
+      where: { id: additionId },
+    });
+
+    try {
+      await AuditService.log({
+        action: 'SALARY_ADDITION_DELETED',
+        targetId: additionId,
+        targetType: 'SALARY_ADDITION',
+        details: {
+          employeeId: addition.employeeId,
+          amount: addition.amount,
+          reason: addition.reason,
+        },
+      });
+    } catch (_) {}
+
+    // Recalculate payroll for the month so the removal updates everywhere immediately
+    const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { salaryPayoutDay: true } });
+    const payoutDay = org?.salaryPayoutDay ?? 28;
+    const addDate = new Date(addition.createdAt);
+    let y = addDate.getUTCFullYear();
+    let m = addDate.getUTCMonth() + 1;
+    if (addDate.getUTCDate() > payoutDay) {
+      if (m === 12) { y += 1; m = 1; } else { m += 1; }
+    }
+
+    try {
+      await this.calculateMonthlyPayroll(orgId, y, m);
+    } catch (calcErr) {
+      logger.warn('[PayrollService] Payroll recalculation after salary addition deletion warning:', calcErr.message);
+    }
+
+    return { success: true, deletedId: additionId };
   }
 }
 

@@ -17,6 +17,7 @@ const logger = require('../config/logger');
 const { dateOnly } = require('../utils/attendanceClock');
 const { getCurrentServerTime } = require('../utils/networkTime');
 const { DEFAULT_SHIFT_SCHEDULES } = require('../utils/shiftHelper');
+const PayrollService = require('../services/PayrollService');
 
 // ── Organization / Office / Department ────────────────────────────────────────
 
@@ -953,6 +954,30 @@ const deletePenalty = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+const listSalaryAdditions = async (req, res, next) => {
+  try {
+    const targetOrgId = await resolveAdminOrgId(req);
+    const data = await PayrollService.listSalaryAdditions(targetOrgId, req.query);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
+const createSalaryAddition = async (req, res, next) => {
+  try {
+    const targetOrgId = await resolveAdminOrgId(req);
+    const data = await PayrollService.createSalaryAddition(targetOrgId, req.user.id, req.body);
+    res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
+const deleteSalaryAddition = async (req, res, next) => {
+  try {
+    const targetOrgId = await resolveAdminOrgId(req);
+    const data = await PayrollService.deleteSalaryAddition(targetOrgId, req.params.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
 const getEmployeeAutoPenalties = async (req, res, next) => {
   try {
     const targetOrgId = await resolveAdminOrgId(req);
@@ -1244,6 +1269,7 @@ module.exports = {
   getNotifications, createEmployee,
   getManualAttendance, findManualEmployee, manualCheckIn, manualCheckOut, batchSyncAttendance,
   listPenalties, createPenalty, deletePenalty, getEmployeeAutoPenalties, waiveEmployeeAutoPenalties,
+  listSalaryAdditions, createSalaryAddition, deleteSalaryAddition,
   setStationPassword, getStationPasswordStatus,
   getShiftConfiguration, updateShiftConfiguration,
   getKioskDevices, releaseKioskDevice,

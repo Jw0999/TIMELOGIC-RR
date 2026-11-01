@@ -121,6 +121,41 @@ class PayrollController {
   async batchSendWhatsApp(req, res) {
     return this.completePayout(req, res);
   }
+
+  async listAdditions(req, res) {
+    try {
+      const orgId = req.user.orgId;
+      const data = await PayrollService.listSalaryAdditions(orgId, req.query);
+      res.json({ status: 'success', data });
+    } catch (err) {
+      logger.error('Error fetching salary additions:', err);
+      res.status(500).json({ status: 'error', message: err.message });
+    }
+  }
+
+  async createAddition(req, res) {
+    try {
+      const orgId = req.user.orgId;
+      const createdById = req.user.id;
+      const data = await PayrollService.createSalaryAddition(orgId, createdById, req.body);
+      res.status(201).json({ status: 'success', data });
+    } catch (err) {
+      logger.error('Error creating salary addition:', err);
+      res.status(400).json({ status: 'error', message: err.message });
+    }
+  }
+
+  async deleteAddition(req, res) {
+    try {
+      const orgId = req.user.orgId;
+      const { id } = req.params;
+      const data = await PayrollService.deleteSalaryAddition(orgId, id);
+      res.json({ status: 'success', data });
+    } catch (err) {
+      logger.error('Error deleting salary addition:', err);
+      res.status(400).json({ status: 'error', message: err.message });
+    }
+  }
 }
 
 module.exports = new PayrollController();

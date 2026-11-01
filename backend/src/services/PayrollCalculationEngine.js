@@ -79,6 +79,7 @@ function calculatePayroll({
   attendanceRecords = [],
   breakRecords = [],
   manualPenalties = [],
+  salaryAdditions = [],
   timezone = 'Africa/Lagos',
   officeOpenTime = '08:00',
   officeCloseTime = '17:00',
@@ -94,6 +95,7 @@ function calculatePayroll({
   const attendance = [...attendanceRecords].sort((left, right) => String(left.id).localeCompare(String(right.id)));
   const breaks = [...breakRecords].sort((left, right) => String(left.id).localeCompare(String(right.id)));
   const penalties = [...manualPenalties].sort((left, right) => String(left.id).localeCompare(String(right.id)));
+  const additions = [...salaryAdditions].sort((left, right) => String(left.id).localeCompare(String(right.id)));
   const earnings = [];
   const deductions = [];
   const salary = money(baseSalary);
@@ -123,6 +125,33 @@ function calculatePayroll({
       sourceId: carryoverDetails?.sourceId || employeeId,
       badgeBg: '#f0fdf4',
       categoryColor: '#059669',
+    });
+  }
+
+  for (const record of additions) {
+    const addAmount = money(record.amount);
+    if (addAmount <= 0) continue;
+    const timeStr = record.createdAt ? formatTime(record.createdAt, timezone) : '';
+    const dateFormatted = formatDate(record.createdAt, timezone);
+    const dateKey = workDate(record.createdAt);
+
+    earnings.push({
+      id: `salary-addition:${record.id}`,
+      type: 'SALARY_ADDITION',
+      category: 'EARNING',
+      categoryLabel: record.type ? String(record.type).toUpperCase() : 'SALARY ADDITION',
+      categoryColor: '#059669',
+      badgeBg: '#ecfdf5',
+      amount: addAmount,
+      currency,
+      date: dateKey,
+      dateFormatted,
+      time: timeStr,
+      timeStr: timeStr || '—',
+      description: record.reason || 'Salary addition',
+      subDetail: 'Administrative bonus / allowance',
+      sourceType: 'SalaryAddition',
+      sourceId: record.id,
     });
   }
 
@@ -294,10 +323,11 @@ function calculatePayroll({
 
   const overtimeEarnings = money(earnings.reduce((total, item) => total + (item.type === 'OVERTIME' ? item.amount : 0), 0));
   const carryoverTotal = money(earnings.reduce((total, item) => total + (item.type === 'PRIOR_MONTH_CARRYOVER' ? item.amount : 0), 0));
+  const salaryAdditionsTotal = money(earnings.reduce((total, item) => total + (item.type === 'SALARY_ADDITION' ? item.amount : 0), 0));
   const attendancePenalties = money(deductions.reduce((total, item) => total + (item.type === 'ATTENDANCE_PENALTY' ? item.amount : 0), 0));
   const breakPenalties = money(deductions.reduce((total, item) => total + (item.type === 'BREAK_PENALTY' ? item.amount : 0), 0));
   const manualPenaltiesTotal = money(deductions.reduce((total, item) => total + (item.type === 'MANUAL_PENALTY' ? item.amount : 0), 0));
-  const grossSalary = money(salary + overtimeEarnings + carryoverTotal);
+  const grossSalary = money(salary + overtimeEarnings + carryoverTotal + salaryAdditionsTotal);
   const totalDeductions = money(attendancePenalties + breakPenalties + manualPenaltiesTotal);
   const accumulatedNet = money(Math.max(0, grossSalary - totalDeductions));
 
@@ -312,6 +342,7 @@ function calculatePayroll({
     baseSalary: salary,
     overtimeEarnings,
     carryoverEarnings: carryoverTotal,
+    salaryAdditions: salaryAdditionsTotal,
     grossSalary,
     attendancePenalties,
     breakPenalties,

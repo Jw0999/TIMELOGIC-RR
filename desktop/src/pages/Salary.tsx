@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Banknote,
   Calendar,
@@ -9,6 +10,7 @@ import {
   Download,
   FileText,
   Filter,
+  HandCoins,
   Info,
   Mail,
   Pencil,
@@ -80,6 +82,8 @@ interface EmployeePayroll {
   accountName?: string;
   totalWorkHours: number;
   overtimeEarnings: number;
+  salaryAdditions?: number;
+  salaryAdditionsList?: any[];
   grossSalary: number;
   totalPresentDays: number;
   totalLateDays: number;
@@ -113,6 +117,7 @@ interface PayrollSummary {
   totalBasePayroll: number;
   totalGrossPayroll?: number;
   totalOvertimeEarnings?: number;
+  totalAdditions?: number;
   totalDeductions: number;
   totalNetPayout: number;
   totalDeferredPayroll?: number;
@@ -139,6 +144,7 @@ interface PayrollSettingsData {
 }
 
 export default function Salary() {
+  const navigate = useNavigate();
   const currentDate = new Date();
   const [selectedYear, setSelectedYear] = useState<number>(currentDate.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number>(currentDate.getMonth() + 1);
@@ -838,6 +844,11 @@ export default function Salary() {
                                     +{formatMoney(emp.overtimeEarnings, emp.currency)} Overstay
                                   </span>
                                 )}
+                                {emp.salaryAdditions && emp.salaryAdditions > 0 ? (
+                                  <span className="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                                    +{formatMoney(emp.salaryAdditions, emp.currency)} Additions
+                                  </span>
+                                ) : null}
                               </div>
                             ) : (
                               <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded text-[11px] font-semibold border border-amber-200 dark:border-amber-800">
@@ -947,6 +958,16 @@ export default function Salary() {
                           {/* Sticky Actions Column */}
                           <td className="sticky right-0 bg-[var(--card-bg)] px-4 py-3 text-right shadow-[-4px_0_6px_rgba(0,0,0,0.06)] z-10">
                             <div className="flex items-center justify-end gap-1.5">
+                              {/* Quick Add Money to Salary */}
+                              <button
+                                onClick={() => navigate('/salary-additions')}
+                                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-xs font-semibold text-emerald-700 dark:text-emerald-300 transition shadow-sm"
+                                title="Add bonus, allowance or increment to salary"
+                              >
+                                <HandCoins size={12} className="text-emerald-600 dark:text-emerald-400" />
+                                <span>+ Add Money</span>
+                              </button>
+
                               {/* Employee Salary Button */}
                               <button
                                 onClick={() => openSalaryModal(emp)}
@@ -1402,6 +1423,12 @@ export default function Salary() {
                   <span>Overstay past closing (+ Added to salary)</span>
                   <span className="font-bold">+{formatMoney(breakdownModalEmployee.overtimeEarnings, breakdownModalEmployee.currency)}</span>
                 </div>
+                {Boolean(breakdownModalEmployee.salaryAdditions && breakdownModalEmployee.salaryAdditions > 0) && (
+                  <div className="flex justify-between gap-3 text-emerald-700 dark:text-emerald-400 font-medium">
+                    <span>Salary additions & bonuses (+ Added to salary)</span>
+                    <span className="font-bold">+{formatMoney(breakdownModalEmployee.salaryAdditions || 0, breakdownModalEmployee.currency)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between gap-3 border-t border-[var(--border)] pt-2 font-semibold"><span>Gross earnings</span><span>{formatMoney(breakdownModalEmployee.grossSalary, breakdownModalEmployee.currency)}</span></div>
                 <div className="flex justify-between gap-3 text-red-700 dark:text-red-400 border-t border-[var(--border)] pt-2 font-semibold"><span>Total deductions (-)</span><span>-{formatMoney(breakdownModalEmployee.totalDeductions, breakdownModalEmployee.currency)}</span></div>
                 {breakdownModalEmployee.breakPenalties > 0 && (

@@ -57,6 +57,18 @@ router.delete('/penalties/:id', authenticate, isAdmin, ctrl.deletePenalty);
 router.get('/penalties/auto/:employeeId', authenticate, isAdmin, ctrl.getEmployeeAutoPenalties);
 router.delete('/penalties/auto/:employeeId', authenticate, isAdmin, ctrl.waiveEmployeeAutoPenalties);
 
+// Salary Additions / Bonuses
+router.get('/salary-additions', authenticate, isAdmin, ctrl.listSalaryAdditions);
+router.post('/salary-additions', authenticate, isAdmin, [
+  body('employeeId').isUUID(),
+  body('amount').isFloat({ min: 1 }),
+  body('reason').trim().isLength({ min: 2, max: 500 }),
+  body('type').optional().isIn(['BONUS', 'ALLOWANCE', 'INCREMENT', 'COMMISSION', 'OTHER']),
+  body('effectiveDate').optional().isISO8601(),
+  body('updateBaseSalary').optional().isBoolean(),
+], validate, ctrl.createSalaryAddition);
+router.delete('/salary-additions/:id', authenticate, isAdmin, ctrl.deleteSalaryAddition);
+
 
 // Organisation
 router.get('/org', authenticate, isAdmin, ctrl.getOrg);

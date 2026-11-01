@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, CalendarClock, Users, ClipboardList,
   UmbrellaOff, Coffee, ShieldAlert, Zap, BarChart3, LogOut, Settings,
-  GraduationCap, UserCheck, ReceiptText, Banknote, TrendingUp, type LucideIcon,
+  GraduationCap, UserCheck, ReceiptText, Banknote, TrendingUp, HandCoins, type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { IS_LOCAL_PART } from '../config';
@@ -18,6 +18,7 @@ const NAV: { to: string; label: string; icon: LucideIcon; capability?: Capabilit
   { to: '/manual-attendance', label: 'Manual Check-In', icon: UserCheck },
   { to: '/employees',  label: 'Employees',      icon: Users },
   { to: '/salary',     label: 'Salary & Payroll', icon: Banknote },
+  { to: '/salary-additions', label: 'Salary Additions', icon: HandCoins },
   { to: '/sales-intelligence', label: 'Sales Intelligence', icon: TrendingUp },
   { to: '/penalties',  label: 'Penalties',      icon: ReceiptText },
   { to: '/students',   label: 'Students',       icon: GraduationCap, capability: 'hasStudents' },

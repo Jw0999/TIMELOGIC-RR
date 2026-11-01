@@ -18,6 +18,7 @@ import Settings from './pages/Settings';
 import Students from './pages/Students';
 import Penalties from './pages/Penalties';
 import Salary from './pages/Salary';
+import SalaryAdditions from './pages/SalaryAdditions';
 import SalesIntelligence from './pages/SalesIntelligence';
 import SubscriptionLockModal from './components/SubscriptionLockModal';
 import { IS_LOCAL_PART } from './config';
@@ -72,6 +73,7 @@ function AppRoutes() {
       <Route path="/manual-attendance" element={<Guard><Layout><ManualCheckIn /></Layout></Guard>} />
       <Route path="/employees"  element={<Guard><Layout><Employees /></Layout></Guard>} />
       <Route path="/salary"     element={<Guard><Layout><Salary /></Layout></Guard>} />
+      <Route path="/salary-additions" element={<Guard><Layout><SalaryAdditions /></Layout></Guard>} />
       <Route path="/sales-intelligence" element={
         IS_LOCAL_PART
           ? <Guard><Layout><SalesIntelligence /></Layout></Guard>

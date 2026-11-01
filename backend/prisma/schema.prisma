@@ -40,6 +40,7 @@ model Organization {
   students                Student[]
   users                   User[]
   manualPenalties         ManualPenalty[]
+  salaryAdditions         SalaryAddition[]
   activationCodes         ActivationCode[]
   kioskDevices            KioskDevice[]
   salaryPayoutDay         Int               @default(28)
@@ -168,6 +169,8 @@ model User {
   studentCheckOuts        StudentAttendance[]   @relation("StudentCheckOutRecorder")
   manualPenalties         ManualPenalty[]       @relation("EmployeeManualPenalties")
   createdPenalties        ManualPenalty[]       @relation("CreatedManualPenalties")
+  salaryAdditions         SalaryAddition[]      @relation("EmployeeSalaryAdditions")
+  createdSalaryAdditions  SalaryAddition[]      @relation("CreatedSalaryAdditions")
   baseSalary              Float?                @default(0)
   salaryCurrency          String                @default("NGN")
   bankName                String?
@@ -536,6 +539,23 @@ model ManualPenalty {
   @@map("manual_penalties")
 }
 
+model SalaryAddition {
+  id           String       @id @default(uuid())
+  orgId        String
+  employeeId   String
+  amount       Float
+  reason       String
+  type         String       @default("BONUS")
+  createdById  String
+  createdAt    DateTime     @default(now())
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  employee     User         @relation("EmployeeSalaryAdditions", fields: [employeeId], references: [id], onDelete: Cascade)
+  createdBy    User         @relation("CreatedSalaryAdditions", fields: [createdById], references: [id])
+
+  @@index([orgId, employeeId, createdAt])
+  @@map("salary_additions")
+}
+
 model LeaveRequest {
   id              String      @id @default(uuid())
   employeeId      String
@@ -865,6 +885,7 @@ model PayslipRecord {
   baseSalary          Float
   grossSalary         Float   @default(0)
   overtimeEarnings    Float   @default(0)
+  salaryAdditions     Float   @default(0)
   currency            String  @default("NGN")
   calculationVersion  String?
   calculationHash     String?

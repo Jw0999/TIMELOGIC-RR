@@ -146,4 +146,52 @@ router.post(
   ctrl.completePayout
 );
 
+/**
+ * GET /api/payroll/additions
+ * List all salary additions / bonuses with optional filtering
+ */
+router.get(
+  '/additions',
+  isAdmin,
+  [
+    query('employeeId').optional().isUUID(),
+    query('month').optional().matches(/^(\d{4})-(0[1-9]|1[0-2])$/),
+    query('type').optional().isString(),
+    query('search').optional().isString(),
+  ],
+  validate,
+  ctrl.listAdditions
+);
+
+/**
+ * POST /api/payroll/additions
+ * Add money to an employee salary with reason and optional permanent base salary update
+ */
+router.post(
+  '/additions',
+  isAdmin,
+  [
+    body('employeeId').isUUID().withMessage('Valid employee selection is required'),
+    body('amount').isFloat({ min: 1 }).withMessage('Amount must be at least 1'),
+    body('reason').trim().isLength({ min: 2, max: 500 }).withMessage('Reason must be between 2 and 500 characters'),
+    body('type').optional().isIn(['BONUS', 'ALLOWANCE', 'INCREMENT', 'COMMISSION', 'OTHER']),
+    body('effectiveDate').optional().isISO8601(),
+    body('updateBaseSalary').optional().isBoolean(),
+  ],
+  validate,
+  ctrl.createAddition
+);
+
+/**
+ * DELETE /api/payroll/additions/:id
+ * Remove a salary addition record and recalculate payroll
+ */
+router.delete(
+  '/additions/:id',
+  isAdmin,
+  [param('id').isUUID()],
+  validate,
+  ctrl.deleteAddition
+);
+
 module.exports = router;

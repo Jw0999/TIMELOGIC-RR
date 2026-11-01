@@ -219,6 +219,31 @@ export const sendPayslipWhatsApp = (payslipId: string) =>
 export const batchSendWhatsApp = (body: { year: number; month: number }) =>
   completePayout(body);
 
+export interface SalaryAdditionPayload {
+  employeeId: string;
+  amount: number;
+  reason: string;
+  type?: 'BONUS' | 'ALLOWANCE' | 'INCREMENT' | 'COMMISSION' | 'OTHER';
+  effectiveDate?: string;
+  updateBaseSalary?: boolean;
+}
+
+export const fetchSalaryAdditions = (params: { month?: string; employeeId?: string; type?: string; search?: string } = {}) => {
+  const q = new URLSearchParams();
+  if (params.month) q.set('month', params.month);
+  if (params.employeeId) q.set('employeeId', params.employeeId);
+  if (params.type && params.type !== 'ALL') q.set('type', params.type);
+  if (params.search) q.set('search', params.search);
+  const queryStr = q.toString() ? `?${q.toString()}` : '';
+  return api.get<any>(`/payroll/additions${queryStr}`).then((r) => r.data ?? r);
+};
+
+export const createSalaryAddition = (body: SalaryAdditionPayload) =>
+  api.post<any>('/payroll/additions', body).then((r) => r.data ?? r);
+
+export const deleteSalaryAddition = (id: string) =>
+  api.delete<any>(`/payroll/additions/${id}`).then((r) => r.data ?? r);
+
 export const downloadPayslipPdf = async (payslipId: string, fileName = 'payslip.pdf') => {
   const res = await authenticatedFetch(`${API_URL}/payroll/payslips/${payslipId}/pdf`);
   if (!res.ok) {

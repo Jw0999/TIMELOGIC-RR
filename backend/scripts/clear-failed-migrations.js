@@ -116,6 +116,31 @@ async function clearFailedMigrations() {
         // Ignore if table doesn't exist yet
       }
 
+      try {
+        await prisma.$executeRawUnsafe(`
+          CREATE TABLE IF NOT EXISTS "salary_additions" (
+            "id" TEXT NOT NULL,
+            "orgId" TEXT NOT NULL,
+            "employeeId" TEXT NOT NULL,
+            "amount" DOUBLE PRECISION NOT NULL,
+            "reason" TEXT NOT NULL,
+            "type" TEXT NOT NULL DEFAULT 'BONUS',
+            "createdById" TEXT NOT NULL,
+            "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT "salary_additions_pkey" PRIMARY KEY ("id")
+          );
+        `);
+        await prisma.$executeRawUnsafe(`
+          CREATE INDEX IF NOT EXISTS "salary_additions_orgId_employeeId_createdAt_idx" ON "salary_additions"("orgId", "employeeId", "createdAt");
+        `);
+        await prisma.$executeRawUnsafe(`
+          ALTER TABLE "payslip_records" ADD COLUMN IF NOT EXISTS "salaryAdditions" DOUBLE PRECISION NOT NULL DEFAULT 0;
+        `);
+        console.log('[Migration Cleanup] ✓ Ensured salary_additions table and payslip columns exist');
+      } catch (addErr) {
+        // Ignore if error
+      }
+
       console.log('[Migration Cleanup] ✓ Migration database is clean\n');
       return true;
 
