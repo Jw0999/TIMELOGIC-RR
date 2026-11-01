@@ -171,11 +171,11 @@ export default function Salary() {
     salaryAutomationEnabled: true,
     salaryCurrency: 'NGN',
     smtpHost: '',
-    smtpPort: 587,
+    smtpPort: 465,
     smtpUser: '',
     smtpPass: '',
     smtpFrom: '',
-    smtpSecure: false,
+    smtpSecure: true,
     hasSmtpCredentials: false,
   });
   const [savingSettings, setSavingSettings] = useState<boolean>(false);
@@ -1264,12 +1264,12 @@ export default function Salary() {
                     <label className={labelCls}>Port</label>
                     <input
                       type="number"
-                      placeholder="587"
-                      value={settingsData.smtpPort || 587}
+                      placeholder="465"
+                      value={settingsData.smtpPort || 465}
                       onChange={(e) =>
                         setSettingsData((prev) => ({
                           ...prev,
-                          smtpPort: parseInt(e.target.value, 10) || 587,
+                          smtpPort: parseInt(e.target.value, 10) || 465,
                         }))
                       }
                       className={inputCls}

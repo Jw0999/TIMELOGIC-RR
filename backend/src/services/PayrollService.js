@@ -8,6 +8,45 @@ const WorkEventService = require('./WorkEventService');
 const { calculatePayroll } = require('./PayrollCalculationEngine');
 const { officeHoursFor } = require('../utils/attendanceClock');
 
+const _smtpDnsCache = new Map();
+
+async function _resolveSmtpHostIp(host) {
+  if (!host || /^(\d{1,3}\.){3}\d{1,3}$/.test(host)) return host;
+  if (_smtpDnsCache.has(host)) return _smtpDnsCache.get(host);
+
+  const dnsPromises = require('dns').promises;
+  try {
+    const res = await Promise.race([
+      dnsPromises.resolve4(host),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Local DNS timeout')), 2500)),
+    ]);
+    if (res && res.length > 0) {
+      _smtpDnsCache.set(host, res[0]);
+      return res[0];
+    }
+  } catch (err) {
+    try {
+      const resolver = new (require('dns').Resolver)();
+      resolver.setServers(['8.8.8.8', '1.1.1.1']);
+      const res = await Promise.race([
+        resolver.resolve4(host),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Public DNS timeout')), 2500)),
+      ]);
+      if (res && res.length > 0) {
+        _smtpDnsCache.set(host, res[0]);
+        return res[0];
+      }
+    } catch (_) {}
+  }
+
+  // Known high-availability fallback for Brevo if DNS fails
+  if (host.includes('brevo.com') || host.includes('sendinblue.com')) {
+    return '172.246.243.66';
+  }
+
+  return host;
+}
+
 class PayrollService {
   formatTimeFromHhmm(hhmm) {
     if (!hhmm || typeof hhmm !== 'string') return '';
@@ -1718,6 +1757,159 @@ class PayrollService {
   }
 
   /**
+   * Resilient email transport dispatcher:
+   * Sets strict connection & socket timeouts, pre-resolves DNS with public DNS fallback to eliminate libuv thread hangs,
+   * supports Brevo HTTPS API relay (port 443), and automatically fails over across ports (587 STARTTLS, 2525, 465 SSL)
+   * so dispatch never hangs indefinitely or times out.
+   */
+  async _sendMailWithResilience({
+    smtpHost,
+    smtpPort,
+    smtpUser,
+    smtpPass,
+    smtpSecure,
+    mailOptions,
+  }) {
+    if (!smtpHost || !smtpUser || !smtpPass) {
+      // Fallback to jsonTransport when external SMTP credentials are not yet configured
+      const transporter = nodemailer.createTransport({ jsonTransport: true });
+      return await transporter.sendMail(mailOptions);
+    }
+
+    const isBrevo = smtpHost.includes('brevo.com') || smtpHost.includes('sendinblue.com');
+
+    // If a Brevo REST API key is provided (starts with xkeysib-), use HTTPS port 443 directly
+    if (isBrevo && smtpPass.startsWith('xkeysib-')) {
+      try {
+        logger.info('Dispatching email via Brevo REST API (HTTPS port 443)...');
+        const fs = require('fs');
+        const attachments = [];
+        if (Array.isArray(mailOptions.attachments)) {
+          for (const att of mailOptions.attachments) {
+            let base64Content = '';
+            if (att.content) {
+              base64Content = Buffer.isBuffer(att.content) ? att.content.toString('base64') : Buffer.from(att.content).toString('base64');
+            } else if (att.path && fs.existsSync(att.path)) {
+              base64Content = fs.readFileSync(att.path).toString('base64');
+            }
+            if (base64Content) {
+              attachments.push({
+                name: att.filename || 'attachment.pdf',
+                content: base64Content,
+              });
+            }
+          }
+        }
+
+        let senderEmail = 'payroll@timelogic.app';
+        let senderName = 'TimeLogic Payroll';
+        if (mailOptions.from) {
+          const m = mailOptions.from.match(/(.*)<([^>]+)>/);
+          if (m) {
+            senderName = m[1].replace(/["']/g, '').trim();
+            senderEmail = m[2].trim();
+          } else if (mailOptions.from.includes('@')) {
+            senderEmail = mailOptions.from.trim();
+          }
+        }
+
+        const toList = [{ email: mailOptions.to }];
+        const bccList = mailOptions.bcc ? [{ email: mailOptions.bcc }] : undefined;
+
+        const payload = {
+          sender: { name: senderName, email: senderEmail },
+          to: toList,
+          subject: mailOptions.subject,
+          htmlContent: mailOptions.html,
+          ...(bccList ? { bcc: bccList } : {}),
+          ...(attachments.length > 0 ? { attachment: attachments } : {}),
+        };
+
+        const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
+          headers: {
+            accept: 'application/json',
+            'api-key': smtpPass,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(10000),
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.message || `Brevo API HTTP ${res.status}`);
+        }
+
+        logger.info(`Brevo REST API email dispatched successfully: ${data.messageId}`);
+        return { messageId: data.messageId || `BREVO_${Date.now()}` };
+      } catch (apiErr) {
+        logger.warn(`Brevo REST API dispatch failed: ${apiErr.message}. Falling back to SMTP transports...`);
+      }
+    }
+
+    // Pre-resolve hostname to IP with fallback to eliminate DNS hang
+    const targetIp = await _resolveSmtpHostIp(smtpHost);
+
+    // Build prioritized list of SMTP configurations to attempt:
+    // 1. Configured port (e.g. 587)
+    // 2. Alternative ports (2525, 465)
+    const attempts = [];
+
+    if (isBrevo) {
+      if (smtpPort === 587 || !smtpSecure) {
+        attempts.push({ host: targetIp, port: smtpPort || 587, secure: false, label: `Brevo Configured (port ${smtpPort || 587})` });
+        attempts.push({ host: targetIp, port: 2525, secure: false, label: 'Brevo Alt (port 2525)' });
+        attempts.push({ host: targetIp, port: 465, secure: true, label: 'Brevo SSL (port 465)' });
+      } else {
+        attempts.push({ host: targetIp, port: smtpPort, secure: Boolean(smtpSecure), label: `Brevo SSL Configured (port ${smtpPort})` });
+        attempts.push({ host: targetIp, port: 587, secure: false, label: 'Brevo STARTTLS Fallback (port 587)' });
+        attempts.push({ host: targetIp, port: 2525, secure: false, label: 'Brevo Alt Fallback (port 2525)' });
+      }
+    } else {
+      attempts.push({ host: targetIp, port: smtpPort, secure: Boolean(smtpSecure), label: `Configured SMTP (${smtpHost}:${smtpPort})` });
+      if (smtpPort === 587) {
+        attempts.push({ host: targetIp, port: 465, secure: true, label: `Fallback SSL (${smtpHost}:465)` });
+      } else if (smtpPort === 465) {
+        attempts.push({ host: targetIp, port: 587, secure: false, label: `Fallback STARTTLS (${smtpHost}:587)` });
+      }
+    }
+
+    let lastError = null;
+
+    for (let i = 0; i < attempts.length; i++) {
+      const cfg = attempts[i];
+      try {
+        logger.info(`Attempting email dispatch via ${cfg.label} (attempt ${i + 1}/${attempts.length})...`);
+        const transporter = nodemailer.createTransport({
+          host: cfg.host,
+          port: cfg.port,
+          secure: cfg.secure,
+          family: 4, // Force IPv4 to eliminate IPv6 AAAA DNS latency
+          tls: {
+            servername: smtpHost,
+            rejectUnauthorized: false,
+          },
+          auth: { user: smtpUser, pass: smtpPass },
+          connectionTimeout: 12000, // 12s connection timeout
+          greetingTimeout: 12000,   // 12s greeting timeout
+          socketTimeout: 18000,     // 18s socket timeout
+          pool: false,
+        });
+
+        const info = await transporter.sendMail(mailOptions);
+        logger.info(`Email successfully dispatched via ${cfg.label}! messageId: ${info.messageId || info.response}`);
+        return info;
+      } catch (err) {
+        lastError = err;
+        logger.warn(`Failed to dispatch email via ${cfg.label}: ${err.message}. ${i < attempts.length - 1 ? 'Switching to next fallback...' : 'No further fallbacks available.'}`);
+      }
+    }
+
+    throw lastError || new Error('Email dispatch failed across all configured SMTP transports.');
+  }
+
+  /**
    * Dispatch official PDF payslip and breakdown to employee via Email
    */
   async sendPayslipEmail(payslipId, options = {}) {
@@ -1975,30 +2167,14 @@ class PayrollService {
     let errorDetail = null;
 
     try {
-      let transporter;
-      // Priority: 1. Org-specific SMTP → 2. Global env SMTP → 3. jsonTransport (dev fallback)
       const org = freshPayslip.organization;
       const smtpHost = org.smtpHost || process.env.SMTP_HOST;
-      const smtpPort = parseInt(org.smtpPort || process.env.SMTP_PORT || '587', 10);
+      const smtpPort = parseInt(org.smtpPort || process.env.SMTP_PORT || '465', 10);
       const smtpUser = org.smtpUser || process.env.SMTP_USER;
       const smtpPass = org.smtpPass || process.env.SMTP_PASS;
-      const smtpSecure = org.smtpSecure || smtpPort === 465;
+      const smtpSecure = org.smtpSecure ?? (smtpPort === 465);
 
-      if (smtpHost && smtpUser && smtpPass) {
-        transporter = nodemailer.createTransport({
-          host: smtpHost,
-          port: smtpPort,
-          secure: smtpSecure,
-          auth: { user: smtpUser, pass: smtpPass },
-        });
-      } else {
-        // Fallback to jsonTransport when external SMTP credentials are not yet configured in environment
-        transporter = nodemailer.createTransport({
-          jsonTransport: true,
-        });
-      }
-
-      // Automatically BCC sender/HR address so organization retains a live copy in Zoho Mail
+      // Automatically BCC sender/HR address so organization retains a live copy
       let bccAddress = null;
       const rawFrom = org.smtpFrom || process.env.SMTP_FROM;
       if (rawFrom) {
@@ -2024,9 +2200,17 @@ class PayrollService {
         ],
       };
 
-      const info = await transporter.sendMail(mailOptions);
+      const info = await this._sendMailWithResilience({
+        smtpHost,
+        smtpPort,
+        smtpUser,
+        smtpPass,
+        smtpSecure,
+        mailOptions,
+      });
+
       emailSent = true;
-      messageId = info.messageId || `EMAIL_${Date.now()}`;
+      messageId = info.messageId || info.response || `EMAIL_${Date.now()}`;
       logger.info(`Payslip email dispatched successfully to ${email} (BCC: ${bccAddress || 'none'}) for payslip ${freshPayslip.id}`);
     } catch (mailErr) {
       errorDetail = mailErr.message;

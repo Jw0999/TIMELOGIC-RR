@@ -91,7 +91,10 @@ class PayrollController {
         return res.status(404).json({ status: 'error', message: 'Payslip record not found or belongs to another organization.' });
       }
 
-      const data = await PayrollService.sendPayslipEmail(payslipId);
+      const data = await PayrollService.sendPayslipEmail(payslipId, { force: true });
+      if (!data.success && data.status !== 'SKIPPED') {
+        return res.status(400).json({ status: 'error', message: data.error || 'Failed to dispatch email.', data });
+      }
       res.json({ status: 'success', data });
     } catch (err) {
       logger.error('Error sending payslip email:', err);
