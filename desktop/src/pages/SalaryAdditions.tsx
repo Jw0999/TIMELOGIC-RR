@@ -95,7 +95,6 @@ export default function SalaryAdditions() {
   const [reason, setReason] = useState('');
   const [additionType, setAdditionType] = useState<'BONUS' | 'ALLOWANCE' | 'INCREMENT' | 'COMMISSION' | 'OTHER'>('BONUS');
   const [effectiveDate, setEffectiveDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [updateBaseSalary, setUpdateBaseSalary] = useState(false);
 
   // Delete State
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -212,7 +211,6 @@ export default function SalaryAdditions() {
     setReason('');
     setAdditionType('BONUS');
     setEffectiveDate(new Date().toISOString().slice(0, 10));
-    setUpdateBaseSalary(false);
     setModalEmployeeSearch('');
     setError('');
     setShowAddModal(true);
@@ -243,7 +241,6 @@ export default function SalaryAdditions() {
         reason: reason.trim(),
         type: additionType,
         effectiveDate,
-        updateBaseSalary,
       };
 
       await createSalaryAddition(payload);
@@ -311,13 +308,14 @@ export default function SalaryAdditions() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--page-bg)]">
+    <div className="flex flex-col h-full overflow-hidden bg-[var(--page-bg)]">
       <Header
         title="Salary Additions & Bonuses"
         subtitle="Award bonuses, allowances, and salary increments with automatic payroll synchronization"
       />
 
-      <main className="p-6 max-w-7xl mx-auto space-y-6">
+      <div className="flex-1 overflow-y-auto">
+        <main className="p-6 max-w-7xl mx-auto space-y-6">
         {/* Top Control & Month Picker */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -624,6 +622,7 @@ export default function SalaryAdditions() {
           )}
         </div>
       </main>
+      </div>
 
       {/* ─────────────────────────────────────────────────────────────
           "+ Add to Salary" Modal Dialog
@@ -778,24 +777,15 @@ export default function SalaryAdditions() {
                 />
               </div>
 
-              {/* Permanent Base Salary Increment Checkbox */}
-              <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--page-bg)] space-y-2">
-                <label className="flex items-start gap-2.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={updateBaseSalary}
-                    onChange={(e) => setUpdateBaseSalary(e.target.checked)}
-                    className="mt-0.5 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-gray-300"
-                  />
-                  <div>
-                    <span className="font-bold text-xs text-[var(--text-main)] block">
-                      Also permanently increase ongoing monthly Base Salary
-                    </span>
-                    <span className="text-[11px] text-[var(--text-muted)] leading-relaxed block mt-0.5">
-                      Check this box if this addition represents a permanent promotion or pay raise. Leave unchecked if this is a one-time addition or bonus for this month&apos;s payroll only.
-                    </span>
-                  </div>
-                </label>
+              {/* Payroll Calculation Note */}
+              <div className="p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/70 dark:bg-emerald-950/30 text-xs text-emerald-800 dark:text-emerald-300 space-y-1">
+                <span className="font-bold flex items-center gap-1.5">
+                  <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-400" />
+                  Automatic Payroll & Payslip Integration
+                </span>
+                <p className="text-[11px] leading-relaxed text-emerald-700 dark:text-emerald-300/90">
+                  This addition will be added to the employee&apos;s gross earnings for this payroll cycle. All penalties (lateness, break overstays, and disciplinary deductions) will be accurately subtracted from total earnings, and this reason will be officially itemized on their payslip.
+                </p>
               </div>
 
               {/* Modal Actions */}

@@ -1377,7 +1377,7 @@ class PayrollService {
     // Sort all itemized audit records chronologically
     itemizedRecords.sort((a, b) => new Date(a.rawTimestamp).getTime() - new Date(b.rawTimestamp).getTime());
 
-    const baseSalary = Number(payslip.baseSalary || payslip.employee?.baseSalary || 0);
+    const baseSalary = isHistoricalLocked ? Number(payslip.baseSalary || payslip.employee?.baseSalary || 0) : Number(payslip.employee?.baseSalary || payslip.baseSalary || 0);
     const carryoverEarnings = Number(savedCalculation?.summary?.carryoverEarnings || 0);
     const overtimeEarnings = Number(savedCalculation?.summary?.overtimeEarnings ?? totalOvertimeEarnings);
     const grossSalary = Number(savedCalculation?.summary?.grossSalary ?? (baseSalary + overtimeEarnings + carryoverEarnings + salaryAdditionsTotal));
@@ -2476,10 +2476,10 @@ class PayrollService {
   }
 
   /**
-   * Add money to an employee salary with mandatory reason and optional base salary bump
+   * Add money to an employee salary with mandatory reason and payroll synchronization
    */
   async createSalaryAddition(orgId, createdById, data) {
-    const { employeeId, amount, reason, type = 'BONUS', effectiveDate, updateBaseSalary = false } = data;
+    const { employeeId, amount, reason, type = 'BONUS', effectiveDate } = data;
     const numAmount = Number(amount);
 
     if (!employeeId) throw new Error('Employee selection is required');
@@ -2526,21 +2526,6 @@ class PayrollService {
       },
     });
 
-    // If updateBaseSalary is toggled, also permanently increment the employee's base salary
-    let updatedEmployee = null;
-    if (updateBaseSalary) {
-      updatedEmployee = await prisma.user.update({
-        where: { id: employeeId },
-        data: {
-          baseSalary: {
-            increment: numAmount,
-          },
-        },
-        select: { id: true, baseSalary: true },
-      });
-      logger.info(`[PayrollService] Permanently increased base salary for employee ${employeeId} by +${numAmount} to ${updatedEmployee.baseSalary}`);
-    }
-
     try {
       await AuditService.log({
         actorId: createdById,
@@ -2554,8 +2539,7 @@ class PayrollService {
           amount: numAmount,
           reason: String(reason).trim(),
           type,
-          updateBaseSalary,
-          newBaseSalary: updatedEmployee?.baseSalary,
+          effectiveDate: createdAt.toISOString(),
         },
       });
     } catch (_) {}
@@ -2575,7 +2559,6 @@ class PayrollService {
           amount: addition.amount,
           reason: addition.reason,
           type: addition.type,
-          updateBaseSalary,
         },
       });
     } catch (_) {}

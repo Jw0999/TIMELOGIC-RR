@@ -672,13 +672,15 @@ export default function Salary() {
 
           <div className="bg-[var(--card-bg)] p-4 rounded-2xl border border-[var(--border)] shadow-sm">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-[var(--text-muted)]">Overstay / Overtime</span>
-              <Clock size={16} className="text-emerald-500" />
+              <span className="text-xs font-semibold text-[var(--text-muted)]">Extra Earnings & Bonuses</span>
+              <HandCoins size={16} className="text-emerald-500" />
             </div>
             <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-2">
-              +{formatMoney(summary?.totalOvertimeEarnings || 0, currency)}
+              +{formatMoney((summary?.totalOvertimeEarnings || 0) + (summary?.totalAdditions || 0), currency)}
             </p>
-            <p className="text-[11px] text-[var(--text-muted)] mt-1">Salary addition for staying past closing</p>
+            <p className="text-[11px] text-[var(--text-muted)] mt-1">
+              Additions: +{formatMoney(summary?.totalAdditions || 0, currency)} · Overstay: +{formatMoney(summary?.totalOvertimeEarnings || 0, currency)}
+            </p>
           </div>
         </div>
 
@@ -757,7 +759,7 @@ export default function Salary() {
                   <tr className="bg-[var(--hover-bg)] border-b border-[var(--border)]">
                     <th className="text-left text-xs font-semibold text-[var(--text-muted)] px-4 py-3">Employee</th>
                     <th className="text-left text-xs font-semibold text-[var(--text-muted)] px-4 py-3">Dept / Bank</th>
-                    <th className="text-left text-xs font-semibold text-[var(--text-muted)] px-4 py-3">Base Salary</th>
+                    <th className="text-left text-xs font-semibold text-[var(--text-muted)] px-4 py-3">Base / Gross Salary</th>
                     <th className="text-center text-xs font-semibold text-[var(--text-muted)] px-4 py-3">Attendance</th>
                     <th className="text-left text-xs font-semibold text-[var(--text-muted)] px-4 py-3">Deductions</th>
                     <th className="text-left text-xs font-semibold text-[var(--text-muted)] px-4 py-3">Net Payable</th>
@@ -826,17 +828,17 @@ export default function Salary() {
                             )}
                           </td>
 
-                          {/* Base Salary */}
+                          {/* Base / Gross Salary */}
                           <td className="px-4 py-3">
                             {hasSalary ? (
                               <div>
                                 <span className="font-bold text-[var(--text-main)]">
                                   {formatMoney(emp.baseSalary, emp.currency)}
                                 </span>
-                                <span className="block text-[10px] text-[var(--text-muted)]">Monthly rate</span>
-                                {emp.carryoverEarnings && emp.carryoverEarnings > 0 ? (
-                                  <span className="block text-[10px] font-bold text-purple-600 dark:text-purple-400 mt-0.5">
-                                    +{formatMoney(emp.carryoverEarnings || 0, emp.currency)} Rollover
+                                <span className="block text-[10px] text-[var(--text-muted)]">Base rate</span>
+                                {emp.salaryAdditions && emp.salaryAdditions > 0 ? (
+                                  <span className="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                                    +{formatMoney(emp.salaryAdditions, emp.currency)} Additions
                                   </span>
                                 ) : null}
                                 {emp.overtimeEarnings > 0 && (
@@ -844,11 +846,18 @@ export default function Salary() {
                                     +{formatMoney(emp.overtimeEarnings, emp.currency)} Overstay
                                   </span>
                                 )}
-                                {emp.salaryAdditions && emp.salaryAdditions > 0 ? (
-                                  <span className="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
-                                    +{formatMoney(emp.salaryAdditions, emp.currency)} Additions
+                                {emp.carryoverEarnings && emp.carryoverEarnings > 0 ? (
+                                  <span className="block text-[10px] font-bold text-purple-600 dark:text-purple-400 mt-0.5">
+                                    +{formatMoney(emp.carryoverEarnings || 0, emp.currency)} Rollover
                                   </span>
                                 ) : null}
+                                {Boolean((emp.salaryAdditions && emp.salaryAdditions > 0) || emp.overtimeEarnings > 0 || (emp.carryoverEarnings && emp.carryoverEarnings > 0)) && (
+                                  <div className="mt-1 pt-1 border-t border-[var(--border)]">
+                                    <span className="text-[11px] font-extrabold text-primary-700 dark:text-primary-300">
+                                      Gross: {formatMoney(emp.grossSalary, emp.currency)}
+                                    </span>
+                                  </div>
+                                )}
                               </div>
                             ) : (
                               <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded text-[11px] font-semibold border border-amber-200 dark:border-amber-800">
