@@ -32,7 +32,7 @@ flowchart LR
    - **Branch**: `main`
    - **Root Directory**: `backend`
    - **Runtime**: `Node`
-   - **Build Command**: `npm run build`
+   - **Build Command**: `npm install && npm run build` (or `npm install`)
    - **Start Command**: `npm run start`
    - **Instance Type**: `Free` or `Starter`
 

@@ -13,8 +13,12 @@
 const fs = require('fs');
 const path = require('path');
 
-// Load environment variables early
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+// Load environment variables early if dotenv is available
+try {
+  require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+} catch (e) {
+  // Dotenv is optional in production environments where process.env is injected by the host (e.g. Render)
+}
 
 async function clearFailedMigrations() {
   try {

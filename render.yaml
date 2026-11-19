@@ -3,7 +3,7 @@ services:
     name: timelogic-backend
     runtime: node
     rootDir: backend
-    buildCommand: npm run build
+    buildCommand: npm install && npm run build
     startCommand: npm run start
     envVars:
       - key: NODE_ENV
