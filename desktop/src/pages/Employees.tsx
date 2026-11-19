@@ -662,7 +662,21 @@ export default function Employees() {
       .catch((err: any) => setLoadError(err?.message ?? 'Could not load employees.'))
       .finally(() => setLoading(false));
   };
-  useEffect(() => { load(); const timer = setInterval(load, 10000); return () => clearInterval(timer); }, []);
+  useEffect(() => {
+    load();
+    const timer = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      load();
+    }, 20000);
+    const onVisible = () => {
+      if (typeof document !== 'undefined' && !document.hidden) load();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
 
   const filtered = employees.filter((e) => {
     const name = `${e.firstName} ${e.lastName} ${e.email} ${e.employeeCode ?? ''}`.toLowerCase();

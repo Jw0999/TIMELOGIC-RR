@@ -682,12 +682,22 @@ function App() {
     }
   }
 
-  // Poll dashboard every 20s
+  // Poll dashboard every 20s when visible
   useEffect(() => {
     if (!user) return;
     void load();
-    const interval = setInterval(() => void load(true), 20000);
-    return () => clearInterval(interval);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      void load(true);
+    }, 20000);
+    const onVisible = () => {
+      if (typeof document !== 'undefined' && !document.hidden) void load(true);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [user, sessionId, search]);
 
   // Students loader

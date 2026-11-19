@@ -237,8 +237,18 @@ export default function ManualCheckIn() {
 
   useEffect(() => {
     void load();
-    const timer = window.setInterval(() => void load(true), 5000);
-    return () => window.clearInterval(timer);
+    const timer = window.setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      void load(true);
+    }, 5000);
+    const onVisible = () => {
+      if (typeof document !== 'undefined' && !document.hidden) void load(true);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [load]);
 
   const activeSessionId = selectedSessionId || dashboard?.selectedSession?.id || '';

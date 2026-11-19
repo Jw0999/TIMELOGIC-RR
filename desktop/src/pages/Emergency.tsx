@@ -59,12 +59,24 @@ export default function Emergency() {
   const [revertBusy, setRevertBusy] = useState<string | null>(null);
   const visibleActions = ACTIONS.filter((action) => action.key !== 'lock' || user?.role === 'SUPER_ADMIN');
 
-  // Refresh live stats every 5 seconds
+  // Refresh live stats every 5 seconds when visible
   useEffect(() => {
-    const load = () => fetchLiveStats().then(setLiveStats).catch(() => {});
+    const load = () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchLiveStats().then(setLiveStats).catch(() => {});
+    };
     load();
     const t = setInterval(load, 5000);
-    return () => clearInterval(t);
+    const onVisible = () => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        fetchLiveStats().then(setLiveStats).catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, []);
 
   const trigger = async () => {

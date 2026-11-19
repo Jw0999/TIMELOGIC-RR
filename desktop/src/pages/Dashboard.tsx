@@ -35,9 +35,19 @@ export default function Dashboard() {
 
   useEffect(() => {
     load();
-    // Auto-refresh dashboard every 15 seconds
-    const t = setInterval(load, 15_000);
-    return () => clearInterval(t);
+    // Auto-refresh dashboard every 15 seconds when active/visible
+    const t = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      load();
+    }, 15_000);
+    const onVisible = () => {
+      if (typeof document !== 'undefined' && !document.hidden) load();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, []);
 
   return (

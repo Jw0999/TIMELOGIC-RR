@@ -64,7 +64,21 @@ export default function Sessions() {
     fetchSessions().then(setSessions).finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => { load(); const t = setInterval(load, 5000); return () => clearInterval(t); }, [load]);
+  useEffect(() => {
+    load();
+    const t = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      load();
+    }, 10000);
+    const onVisible = () => {
+      if (typeof document !== 'undefined' && !document.hidden) load();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [load]);
 
   const act = async (fn: () => Promise<any>) => { await fn(); load(); };
 

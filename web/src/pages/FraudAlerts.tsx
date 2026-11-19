@@ -105,7 +105,21 @@ export default function FraudAlerts() {
     setLoading(true);
     api.get<any>('/fraud?limit=100').then((r) => setAlerts(r.data ?? [])).catch(() => setAlerts([])).finally(() => setLoading(false));
   };
-  useEffect(() => { load(); const t = setInterval(load, 15_000); return () => clearInterval(t); }, []);
+  useEffect(() => {
+    load();
+    const t = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      load();
+    }, 15_000);
+    const onVisible = () => {
+      if (typeof document !== 'undefined' && !document.hidden) load();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
 
   const allA     = alerts;
   const newA     = alerts.filter((a) => a.status === 'NEW');

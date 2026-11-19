@@ -26,8 +26,18 @@ export default function Dashboard() {
       setLoadError(error instanceof Error ? error.message : 'Could not load live Super Admin data.');
     }).finally(() => setLoading(false));
     load();
-    const t = setInterval(load, 20_000);
-    return () => clearInterval(t);
+    const t = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      load();
+    }, 20_000);
+    const onVisible = () => {
+      if (typeof document !== 'undefined' && !document.hidden) load();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, []);
 
   const present = stats?.presentToday ?? 0;

@@ -52,11 +52,21 @@ export default function Reports() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Auto-refresh every 15 seconds
+  // Auto-refresh every 15 seconds when active and visible
   useEffect(() => {
     if (!autoRefresh) return;
-    const t = setInterval(load, 15_000);
-    return () => clearInterval(t);
+    const t = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      load();
+    }, 15_000);
+    const onVisible = () => {
+      if (typeof document !== 'undefined' && !document.hidden && autoRefresh) load();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [autoRefresh, load]);
 
   const download = async (type: 'excel' | 'csv') => {

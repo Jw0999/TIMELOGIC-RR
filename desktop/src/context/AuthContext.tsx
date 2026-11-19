@@ -190,9 +190,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } catch { /* the shared API client handles expired sessions */ }
     };
-    const timer = window.setInterval(() => void refreshUser(), 30_000);
-    const onFocus = () => void refreshUser();
-    const clockTimer = window.setInterval(() => void syncServerTime().catch(() => {}), 30_000);
+    const timer = window.setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      void refreshUser();
+    }, 30_000);
+    const onFocus = () => {
+      void refreshUser();
+      void syncServerTime().catch(() => {});
+    };
+    const clockTimer = window.setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      void syncServerTime().catch(() => {});
+    }, 30_000);
     void syncServerTime().catch(() => {});
     window.addEventListener('focus', onFocus);
     return () => {

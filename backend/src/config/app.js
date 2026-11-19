@@ -38,9 +38,8 @@ function createApp() {
 
   // Don't advertise the framework, and trust the proxy (correct client IPs for rate limiting)
   app.disable('x-powered-by');
-  // Local-first mode connects directly to Express. Do not trust spoofable
-  // X-Forwarded-* headers until a known hosting proxy is configured later.
-  app.set('trust proxy', false);
+  // Trust upstream reverse proxy in production (Render ingress) for accurate client IPs and rate limiting
+  app.set('trust proxy', env.NODE_ENV === 'production' ? 1 : false);
 
   // Security headers
   app.use(helmet({

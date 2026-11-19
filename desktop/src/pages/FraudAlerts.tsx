@@ -32,7 +32,21 @@ export default function FraudAlerts() {
   const [filter, setFilter] = useState('All');
 
   const load = () => fetchAlerts().then((data) => setAlerts(Array.isArray(data) ? data : data?.data || [])).finally(() => setLoading(false));
-  useEffect(() => { load(); const t = setInterval(load, 15000); return () => clearInterval(t); }, []);
+  useEffect(() => {
+    load();
+    const t = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      load();
+    }, 15000);
+    const onVisible = () => {
+      if (typeof document !== 'undefined' && !document.hidden) load();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
 
   const filtered = alerts.filter((a) => filter === 'All' || a.status === filter);
 

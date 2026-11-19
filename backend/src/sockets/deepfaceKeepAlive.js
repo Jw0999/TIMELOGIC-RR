@@ -24,12 +24,13 @@ async function pingEndpoint(url, label) {
 
 async function ping() {
   const deepfaceTarget = env.DEEPFACE_URL;
-  const backendTarget = process.env.RENDER_EXTERNAL_URL || 'https://timelogic-backend.onrender.com';
+  const backendTarget = process.env.RENDER_EXTERNAL_URL || process.env.BACKEND_URL;
 
-  await Promise.allSettled([
-    pingEndpoint(deepfaceTarget, 'DeepFace'),
-    pingEndpoint(backendTarget, 'Backend'),
-  ]);
+  const pings = [];
+  if (deepfaceTarget) pings.push(pingEndpoint(deepfaceTarget, 'DeepFace'));
+  if (backendTarget) pings.push(pingEndpoint(backendTarget, 'Backend'));
+
+  await Promise.allSettled(pings);
 }
 
 function startDeepfaceKeepAlive() {
