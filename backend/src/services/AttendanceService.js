@@ -2170,8 +2170,10 @@ class AttendanceService {
         attendanceRecordId: record.id,
         eventType: 'CHECK_OUT',
         source: 'SYSTEM',
+        result: 'AUTO_CHECKED_OUT',
+        idempotencyKey: uuidv4(),
         ruleVersion: 'AUTO_CHECKOUT_SWEEP',
-        metadata: { reason, shiftType, isAutoCheckedOut: true },
+        outcome: { reason, shiftType, isAutoCheckedOut: true },
       },
     }).catch((e) => logger.warn(`Failed to log auto-checkout event for ${record.id}:`, e.message));
 

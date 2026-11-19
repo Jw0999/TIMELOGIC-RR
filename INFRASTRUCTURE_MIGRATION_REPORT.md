@@ -35,7 +35,7 @@ The TimeLogic infrastructure has been successfully migrated and hardened for hig
 | :--- | :--- | :--- | :--- |
 | **PostgreSQL Database** | Render | `timelogic-db` (`timelogic_s7qa`) | `dpg-dbvlpql9fdbs73bl726g-a:5432` *(internal)* <br/> `dpg-dbvlpql9fdbs73bl726g-a.oregon-postgres.render.com:5432` *(external)* |
 | **DeepFace Service** | Heroku | `timelogic-deepface` (Docker Container) | `https://timelogic-deepface-74b4f1a80a95.herokuapp.com` |
-| **Express Backend** | Render | `timelogic-backend` (Web Service) | `https://timelogic-backend.onrender.com` *(or user-selected subdomain)* |
+| **Express Backend** | Render | `timelogic-backend` (Web Service) | `https://timelogic-backend-n41k.onrender.com` |
 | **Super Admin Portal** | Cloudflare Pages | `timelogic-superadmin` | `https://timelogic-superadmin.pages.dev` |
 | **PWA Web Client** | Cloudflare Pages | `timelogic` | `https://timelogic.pages.dev` |
 
@@ -71,12 +71,12 @@ flowchart TD
 
 ## 4. Client Reconnection Guide
 
-When the Render Web Service URL is assigned (e.g. `https://timelogic-backend.onrender.com`):
+When connecting clients to the live backend (`https://timelogic-backend-n41k.onrender.com`):
 
 1. **Desktop App (`desktop/.env.production`)**:
    ```env
-   VITE_API_URL=https://<RENDER-SERVICE-NAME>.onrender.com/api/v1
-   VITE_SOCKET_URL=https://<RENDER-SERVICE-NAME>.onrender.com
+   VITE_API_URL=https://timelogic-backend-n41k.onrender.com/api/v1
+   VITE_SOCKET_URL=https://timelogic-backend-n41k.onrender.com
    ```
    Rebuild binaries:
    ```bash
