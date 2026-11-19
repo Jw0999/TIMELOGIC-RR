@@ -5,11 +5,12 @@ export async function onRequest(context) {
   const { request } = context;
   const url = new URL(request.url);
 
-  const BACKEND_BASE = 'https://timelogic-backend.onrender.com';
+  const BACKEND_BASE = (context.env && context.env.BACKEND_BASE) || 'https://timelogic-backend-n41k.onrender.com';
   const targetUrl = `${BACKEND_BASE}${url.pathname}${url.search}`;
 
+  const targetHost = new URL(BACKEND_BASE).host;
   const headers = new Headers(request.headers);
-  headers.set('Host', 'timelogic-backend.onrender.com');
+  headers.set('Host', targetHost);
 
   // Buffer body in memory so it can be re-sent safely if retry is needed
   let bodyBuffer = undefined;
