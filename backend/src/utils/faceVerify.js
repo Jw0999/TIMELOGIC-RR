@@ -200,9 +200,9 @@ async function performFaceVerification(employee, faceImage, livenessFrames) {
     try {
       liveness = await verifyLiveness(livenessFrames);
     } catch (livenessErr) {
-      // If the face identity matched with high confidence (similarity >= 0.38 or distance <= 0.62),
+      // If the face identity matched with high confidence (similarity >= 0.42 or distance <= 0.58),
       // allow soft-pass so dim lighting or subtle head movement does not falsely block genuine employees
-      if (result.verified && (result.similarity >= 0.38 || result.distance <= 0.62)) {
+      if (result.verified && (result.similarity >= 0.42 || result.distance <= 0.58)) {
         logger.info(`Liveness soft-pass applied for verified employee ${employee.id} (similarity: ${result.similarity})`);
         liveness = {
           verified: true,

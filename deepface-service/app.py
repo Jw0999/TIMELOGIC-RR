@@ -22,8 +22,11 @@ recognizer = cv2.FaceRecognizerSF.create(SFACE_PATH, '')
 HAAR_PATH = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
 haar_cascade = cv2.CascadeClassifier(HAAR_PATH) if os.path.exists(HAAR_PATH) else None
 
-# SFace cosine similarity threshold: >= 0.363 is considered the same person
-COSINE_THRESHOLD = 0.363
+# SFace dual-metric verification thresholds:
+# 1. Cosine similarity must be >= 0.42 (calibrated for low FAR in real-world camera streams)
+# 2. L2 norm distance must be <= 1.08 (dual-check to prevent cross-identity false acceptances)
+COSINE_THRESHOLD = 0.42
+L2_THRESHOLD = 1.08
 
 INTERNAL_SERVICE_SECRET = os.environ.get('INTERNAL_SERVICE_SECRET', '')
 
@@ -130,15 +133,21 @@ def verify():
                 'is_real': True
             }), 200
 
-        # If stored photo has no face detected, crop center
+        # If stored photo has no face detected, return explicit error
         if faces2 is None or len(faces2) == 0:
-            h, w, _ = img2.shape
-            synthetic = np.array([[
-                w * 0.1, h * 0.1, w * 0.8, h * 0.8,
-                w * 0.35, h * 0.35, w * 0.65, h * 0.35,
-                w * 0.5, h * 0.55, w * 0.35, h * 0.75, w * 0.65, h * 0.75, 0.9
-            ]], dtype=np.float32)
-            faces2 = synthetic
+            return jsonify({
+                'verified': False,
+                'distance': 1.0,
+                'threshold': round(1.0 - COSINE_THRESHOLD, 3),
+                'error': 'No face detected in registered employee photo. Please update enrollment photo.',
+                'is_real': True
+            }), 200
+
+        # Sort faces by area descending to ensure primary foreground face is selected
+        if len(faces1) > 1:
+            faces1 = sorted(faces1, key=lambda f: float(f[2] * f[3]), reverse=True)
+        if len(faces2) > 1:
+            faces2 = sorted(faces2, key=lambda f: float(f[2] * f[3]), reverse=True)
 
         crop1 = recognizer.alignCrop(img1, faces1[0])
         crop2 = recognizer.alignCrop(img2, faces2[0])
@@ -147,14 +156,20 @@ def verify():
         feat2 = recognizer.feature(crop2)
 
         cosine_score = float(recognizer.match(feat1, feat2, cv2.FaceRecognizerSF_FR_COSINE))
-        verified = bool(cosine_score >= COSINE_THRESHOLD)
+        l2_score = float(recognizer.match(feat1, feat2, cv2.FaceRecognizerSF_FR_NORM_L2))
+
+        # Dual-metric gating: must pass BOTH cosine similarity AND L2 distance
+        verified = bool(cosine_score >= COSINE_THRESHOLD and l2_score <= L2_THRESHOLD)
         distance = round(max(0.0, 1.0 - cosine_score), 4)
+
+        print(f"[VERIFY] Cosine: {cosine_score:.4f} (thresh >= {COSINE_THRESHOLD}), L2: {l2_score:.4f} (thresh <= {L2_THRESHOLD}) -> verified={verified}", flush=True)
 
         return jsonify({
             'verified': verified,
             'distance': distance,
             'threshold': round(1.0 - COSINE_THRESHOLD, 3),
             'similarity': round(cosine_score, 4),
+            'l2_distance': round(l2_score, 4),
             'is_real': True
         })
 
