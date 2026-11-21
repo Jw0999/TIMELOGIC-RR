@@ -91,6 +91,8 @@ function calculatePayroll({
   cycleNote = null,
   carryoverEarnings = 0,
   carryoverDetails = null,
+  priorDeductions = [],
+  priorOvertimeEarnings = 0,
 }) {
   const attendance = [...attendanceRecords].sort((left, right) => String(left.id).localeCompare(String(right.id)));
   const breaks = [...breakRecords].sort((left, right) => String(left.id).localeCompare(String(right.id)));
@@ -126,6 +128,35 @@ function calculatePayroll({
       badgeBg: '#f0fdf4',
       categoryColor: '#059669',
     });
+  }
+
+  if (priorOvertimeEarnings > 0) {
+    earnings.push({
+      id: `prior-overtime:${employeeId}:${year}-${month}`,
+      type: 'OVERTIME',
+      category: 'EARNING',
+      categoryLabel: 'WORK OVERSTAY',
+      amount: money(priorOvertimeEarnings),
+      currency,
+      description: 'Prior month initial cycle work overstay (carried over from deferred cycle)',
+      subDetail: 'Rolled over from prior month',
+      badgeBg: '#f0fdf4',
+      categoryColor: '#059669',
+      sourceType: 'PayslipRecord',
+      sourceId: employeeId,
+    });
+  }
+
+  if (Array.isArray(priorDeductions) && priorDeductions.length > 0) {
+    for (const item of priorDeductions) {
+      if (item && Number(item.amount) > 0) {
+        deductions.push({
+          ...item,
+          id: String(item.id).startsWith('prior-') ? item.id : `prior-${item.id}`,
+          subDetail: item.subDetail ? `${item.subDetail} · Rolled over from prior month` : 'Rolled over from prior month',
+        });
+      }
+    }
   }
 
   for (const record of additions) {

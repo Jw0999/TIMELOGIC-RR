@@ -24,9 +24,123 @@ async function main() {
     let repairedCount = 0;
 
     for (const p of payslips) {
-      const isNewHireEmmanuel = p.employee?.employeeCode === 'EMP014';
-      if (isNewHireEmmanuel) {
-        // Emmanuel is the actual new hire, keep his initial 31-day cycle preservation intact
+      const isEmmanuel = p.employee?.employeeCode === 'EMP014';
+
+      // Fix Emmanuel's December payslip specifically
+      if (isEmmanuel && p.year === 2026 && p.month === 12) {
+        const summary = p.calculationSnapshot?.summary || {};
+        const hasBogusCarryover = Number(summary.carryoverEarnings || 0) > 0 || Number(p.grossSalary || 0) > 60000;
+
+        if (hasBogusCarryover) {
+          // Fetch November payslip to get prior month penalties & overtime
+          const novPayslip = await prisma.payslipRecord.findFirst({
+            where: {
+              employeeId: p.employeeId,
+              year: 2026,
+              month: 11,
+            },
+          });
+
+          const novLineItems = Array.isArray(novPayslip?.breakdownJson) ? novPayslip.breakdownJson : [];
+          const priorPenalties = novLineItems.filter((i) => i.category === 'DEDUCTION' || (i.type && i.type.includes('PENALTY')));
+          const priorOvertime = novLineItems.filter((i) => i.type === 'OVERTIME');
+
+          const baseSalary = 50000;
+          const overtimeEarnings = priorOvertime.reduce((sum, item) => sum + Number(item.amount || 0), 0); // 85
+
+          const decLines = Array.isArray(p.breakdownJson)
+            ? p.breakdownJson.filter((i) => i.type !== 'PRIOR_MONTH_CARRYOVER' && i.type !== 'BASE_SALARY' && !String(i.id).startsWith('prior-'))
+            : [];
+
+          const formattedPriorPenalties = priorPenalties.map((item) => ({
+            ...item,
+            id: String(item.id).startsWith('prior-') ? item.id : `prior-${item.id}`,
+            subDetail: item.subDetail ? `${item.subDetail} · Rolled over from prior month` : 'Rolled over from prior month',
+          }));
+
+          const allDeductions = [...decLines.filter((i) => i.category === 'DEDUCTION'), ...formattedPriorPenalties];
+          const attendancePenalties = allDeductions.filter((i) => i.type === 'ATTENDANCE_PENALTY').reduce((sum, item) => sum + Number(item.amount || 0), 0); // 1500 + 1000 = 2500
+          const breakPenalties = allDeductions.filter((i) => i.type === 'BREAK_PENALTY').reduce((sum, item) => sum + Number(item.amount || 0), 0); // 300
+          const manualPenalties = allDeductions.filter((i) => i.type === 'MANUAL_PENALTY').reduce((sum, item) => sum + Number(item.amount || 0), 0); // 0
+          const totalDeductions = attendancePenalties + breakPenalties + manualPenalties; // 2800
+
+          const grossSalary = baseSalary + overtimeEarnings; // 50085
+          const netSalary = Math.max(0, grossSalary - totalDeductions); // 47285
+
+          const cleanLineItems = [
+            {
+              id: `base-salary:${p.employeeId}`,
+              type: 'BASE_SALARY',
+              category: 'EARNING',
+              amount: baseSalary,
+              currency: p.currency || 'NGN',
+              description: 'Monthly base salary',
+              sourceType: 'Employee',
+              sourceId: p.employeeId,
+            },
+            ...priorOvertime.map((item) => ({
+              ...item,
+              id: String(item.id).startsWith('prior-') ? item.id : `prior-${item.id}`,
+              subDetail: item.subDetail ? `${item.subDetail} · Rolled over from prior month` : 'Rolled over from prior month',
+            })),
+            ...allDeductions,
+          ];
+
+          const cleanSnapshot = {
+            ...(p.calculationSnapshot || {}),
+            summary: {
+              ...(p.calculationSnapshot?.summary || {}),
+              baseSalary,
+              grossSalary,
+              overtimeEarnings,
+              carryoverEarnings: 0,
+              attendancePenalties,
+              breakPenalties,
+              manualPenalties,
+              totalDeductions,
+              netSalary,
+              deferredAmount: 0,
+              isNewHire: false,
+              payoutEligible: true,
+              cycleNote: null,
+            },
+            lineItems: cleanLineItems,
+          };
+
+          await prisma.payslipRecord.update({
+            where: { id: p.id },
+            data: {
+              baseSalary,
+              grossSalary,
+              overtimeEarnings,
+              attendancePenalties,
+              breakPenalties,
+              manualPenalties,
+              totalDeductions,
+              netSalary,
+              breakdownJson: cleanLineItems,
+              calculationSnapshot: cleanSnapshot,
+              status: 'GENERATED',
+            },
+          });
+
+          if (novPayslip && novPayslip.status === 'DEFERRED_31_DAYS') {
+            await prisma.payslipRecord.update({
+              where: { id: novPayslip.id },
+              data: {
+                status: 'RESOLVED_ROLLED_OVER',
+              },
+            });
+            console.log(`[repair-corrupted-payslips] Succeeded marking November payslip ${novPayslip.id} as RESOLVED_ROLLED_OVER`);
+          }
+
+          console.log(`[repair-corrupted-payslips] Repaired Emmanuel Adewoye (EMP014) December payslip: base=${baseSalary}, gross=${grossSalary}, deductions=${totalDeductions}, net=${netSalary}, status=GENERATED`);
+          repairedCount += 1;
+        }
+        continue;
+      }
+
+      if (isEmmanuel) {
         continue;
       }
 

@@ -419,6 +419,8 @@ class PayrollService {
       const prevPayslip = prevPayslipMap.get(emp.id);
       let carryoverEarnings = 0;
       let carryoverDetails = null;
+      let priorDeductions = [];
+      let priorOvertimeEarnings = 0;
 
       const isPrevDeferredNewHire = prevPayslip &&
         prevPayslip.status === 'DEFERRED_31_DAYS' &&
@@ -426,13 +428,13 @@ class PayrollService {
         Number(prevPayslip.calculationSnapshot?.summary?.deferredAmount) > 0;
 
       if (isPrevDeferredNewHire && daysSinceHire >= 31) {
-        carryoverEarnings = Number(prevPayslip.calculationSnapshot.summary.deferredAmount);
-        carryoverDetails = {
-          description: `Prior month initial 31-day cycle rollover (${prevPayslip.totalPresentDays || 0}d worked, ${prevPayslip.totalWorkHours || 0}h, overtime & deductions included from last month)`,
-          sourceId: prevPayslip.id,
-          year: prevY,
-          month: prevM,
-        };
+        // DO NOT add deferred base salary to carryover earnings (which doubles the monthly wage).
+        // The active cycle already provides the standard monthly base salary.
+        // Instead, carry over the prior month's unsettled penalties into this cycle's deductions.
+        const prevSnapshot = prevPayslip.calculationSnapshot || {};
+        const prevLines = prevSnapshot.lineItems || prevPayslip.breakdownJson || [];
+        priorDeductions = prevLines.filter((i) => i.category === 'DEDUCTION' || (i.type && i.type.includes('PENALTY')));
+        priorOvertimeEarnings = Number(prevSnapshot.summary?.overtimeEarnings || prevPayslip.overtimeEarnings || 0);
       }
 
       const nextM = m === 12 ? 1 : m + 1;
@@ -464,8 +466,10 @@ class PayrollService {
         payoutEligible,
         daysEmployed: daysSinceHire,
         cycleNote,
-        carryoverEarnings,
-        carryoverDetails,
+        carryoverEarnings: 0,
+        carryoverDetails: null,
+        priorDeductions,
+        priorOvertimeEarnings,
       });
       const isCurrentCycle = now >= startDate && now <= endDate;
       // Only lock calculation snapshot if payslip is for a closed past cycle AND has been finalized/paid
@@ -889,6 +893,8 @@ class PayrollService {
       const prevPayslip = prevPayslipMap.get(emp.id);
       let carryoverEarnings = 0;
       let carryoverDetails = null;
+      let priorDeductions = [];
+      let priorOvertimeEarnings = 0;
 
       const isPrevDeferredNewHire = prevPayslip &&
         prevPayslip.status === 'DEFERRED_31_DAYS' &&
@@ -896,13 +902,13 @@ class PayrollService {
         Number(prevPayslip.calculationSnapshot?.summary?.deferredAmount) > 0;
 
       if (isPrevDeferredNewHire && daysSinceHire >= 31) {
-        carryoverEarnings = Number(prevPayslip.calculationSnapshot.summary.deferredAmount);
-        carryoverDetails = {
-          description: `Prior month initial 31-day cycle rollover (${prevPayslip.totalPresentDays || 0}d worked, ${prevPayslip.totalWorkHours || 0}h, overtime & deductions included from last month)`,
-          sourceId: prevPayslip.id,
-          year: prevY,
-          month: prevM,
-        };
+        // DO NOT add deferred base salary to carryover earnings (which doubles the monthly wage).
+        // The active cycle already provides the standard monthly base salary.
+        // Instead, carry over the prior month's unsettled penalties into this cycle's deductions.
+        const prevSnapshot = prevPayslip.calculationSnapshot || {};
+        const prevLines = prevSnapshot.lineItems || prevPayslip.breakdownJson || [];
+        priorDeductions = prevLines.filter((i) => i.category === 'DEDUCTION' || (i.type && i.type.includes('PENALTY')));
+        priorOvertimeEarnings = Number(prevSnapshot.summary?.overtimeEarnings || prevPayslip.overtimeEarnings || 0);
       }
 
       const nextM = m === 12 ? 1 : m + 1;
@@ -938,8 +944,10 @@ class PayrollService {
         payoutEligible,
         daysEmployed: daysSinceHire,
         cycleNote,
-        carryoverEarnings,
-        carryoverDetails,
+        carryoverEarnings: 0,
+        carryoverDetails: null,
+        priorDeductions,
+        priorOvertimeEarnings,
       });
 
       const payslip = await prisma.payslipRecord.upsert({
@@ -1029,6 +1037,27 @@ class PayrollService {
       });
 
       savedPayslips.push(payslip);
+
+      if (isPrevDeferredNewHire && daysSinceHire >= 31) {
+        try {
+          await prisma.payslipRecord.update({
+            where: { id: prevPayslip.id },
+            data: {
+              status: 'RESOLVED_ROLLED_OVER',
+              calculationSnapshot: {
+                ...prevPayslip.calculationSnapshot,
+                summary: {
+                  ...prevPayslip.calculationSnapshot?.summary,
+                  resolvedInCycle: `${y}-${m}`,
+                  deferredAmount: 0,
+                },
+              },
+            },
+          });
+        } catch (e) {
+          logger.warn(`Failed to mark prior payslip ${prevPayslip.id} as resolved: ${e.message}`);
+        }
+      }
     }
 
     return {
