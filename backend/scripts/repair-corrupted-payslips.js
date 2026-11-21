@@ -29,9 +29,9 @@ async function main() {
       // Fix Emmanuel's December payslip specifically
       if (isEmmanuel && p.year === 2026 && p.month === 12) {
         const summary = p.calculationSnapshot?.summary || {};
-        const hasBogusCarryover = Number(summary.carryoverEarnings || 0) > 0 || Number(p.grossSalary || 0) > 60000;
+        const needsRepair = Number(summary.carryoverEarnings || 0) > 0 || Number(p.grossSalary || 0) > 60000 || Number(p.totalDeductions || 0) < 2000;
 
-        if (hasBogusCarryover) {
+        if (needsRepair) {
           // Fetch November payslip to get prior month penalties & overtime
           const novPayslip = await prisma.payslipRecord.findFirst({
             where: {
@@ -124,14 +124,22 @@ async function main() {
             },
           });
 
-          if (novPayslip && novPayslip.status === 'DEFERRED_31_DAYS') {
+          if (novPayslip) {
             await prisma.payslipRecord.update({
               where: { id: novPayslip.id },
               data: {
                 status: 'RESOLVED_ROLLED_OVER',
+                calculationSnapshot: {
+                  ...(novPayslip.calculationSnapshot || {}),
+                  summary: {
+                    ...(novPayslip.calculationSnapshot?.summary || {}),
+                    resolvedInCycle: '2026-12',
+                    deferredAmount: 0,
+                  },
+                },
               },
             });
-            console.log(`[repair-corrupted-payslips] Succeeded marking November payslip ${novPayslip.id} as RESOLVED_ROLLED_OVER`);
+            console.log(`[repair-corrupted-payslips] Succeeded marking November payslip ${novPayslip.id} as RESOLVED_ROLLED_OVER with resolvedInCycle=2026-12`);
           }
 
           console.log(`[repair-corrupted-payslips] Repaired Emmanuel Adewoye (EMP014) December payslip: base=${baseSalary}, gross=${grossSalary}, deductions=${totalDeductions}, net=${netSalary}, status=GENERATED`);

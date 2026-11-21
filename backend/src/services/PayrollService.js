@@ -423,9 +423,9 @@ class PayrollService {
       let priorOvertimeEarnings = 0;
 
       const isPrevDeferredNewHire = prevPayslip &&
-        prevPayslip.status === 'DEFERRED_31_DAYS' &&
-        prevPayslip.calculationSnapshot?.summary?.isNewHire === true &&
-        Number(prevPayslip.calculationSnapshot?.summary?.deferredAmount) > 0;
+        (prevPayslip.status === 'DEFERRED_31_DAYS' ||
+         (prevPayslip.status === 'RESOLVED_ROLLED_OVER' && prevPayslip.calculationSnapshot?.summary?.resolvedInCycle === `${y}-${m}`)) &&
+        prevPayslip.calculationSnapshot?.summary?.isNewHire === true;
 
       if (isPrevDeferredNewHire && daysSinceHire >= 31) {
         // DO NOT add deferred base salary to carryover earnings (which doubles the monthly wage).
@@ -897,9 +897,9 @@ class PayrollService {
       let priorOvertimeEarnings = 0;
 
       const isPrevDeferredNewHire = prevPayslip &&
-        prevPayslip.status === 'DEFERRED_31_DAYS' &&
-        prevPayslip.calculationSnapshot?.summary?.isNewHire === true &&
-        Number(prevPayslip.calculationSnapshot?.summary?.deferredAmount) > 0;
+        (prevPayslip.status === 'DEFERRED_31_DAYS' ||
+         (prevPayslip.status === 'RESOLVED_ROLLED_OVER' && prevPayslip.calculationSnapshot?.summary?.resolvedInCycle === `${y}-${m}`)) &&
+        prevPayslip.calculationSnapshot?.summary?.isNewHire === true;
 
       if (isPrevDeferredNewHire && daysSinceHire >= 31) {
         // DO NOT add deferred base salary to carryover earnings (which doubles the monthly wage).
